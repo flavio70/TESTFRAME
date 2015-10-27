@@ -26,18 +26,30 @@ class Kunit:
         self.__clnm = None  # basic name of test, i.e. without path and suffix
         self.__st   = None  # test execution starting time
         self.__f    = None  # file descriptor
+        self.children = None # object's children list
+        self.frameStatus = None # object's frameStatus
+        self.name = None # object name
         self.__fn   = '{:s}.XML'.format(os.path.splitext(fileName)[0])
         self.__clnm = os.path.splitext(os.path.basename(self.__fn))[0]
         self.__cnt  = 0
+        self.children = []
+        self.frameStatus = False
+        self.name = fileName
 
+    def __str__(self):
+        return self.__fn
 
     def frame_open(self):
         """ Start xml composition
         """
         self.__f = open(self.__fn, "w")
-        os.chmod(self.__fn, 0o644)
+        try:
+            os.chmod(self.__fn, 0o666)
+        except:
+            pass      
         self.__f.writelines('<?xml version="1.0" encoding="UTF-8"?>\n')
         self.__f.writelines('<testsuite>\n')
+        self.frameStatus = True
 
 
     def frame_close(self):
@@ -45,6 +57,7 @@ class Kunit:
         """
         self.__f.writelines('</testsuite>\n')
         self.__f.close()
+        self.frameStatus = False
 
 
     def add_success(self, ref_obj, title, elapsed_time, out_text):
@@ -62,6 +75,16 @@ class Kunit:
         self.__f.writelines(self.__make_test_case(ref_obj, title, delta_t))
         self.__make_system_out(out_text)
         self.__f.writelines('\t</testcase>\n')
+        '''
+        The following code is used in case we have to fill up also the xml part related to any open kunit child
+        For example for any TPSBlock opened inside testcase istance
+        '''
+        for child in self.children:
+          if child.frameStatus:
+            child.__st = None
+            child.__f.writelines(child.__make_test_case(ref_obj, title, delta_t))
+            child.__make_system_out(out_text)
+            child.__f.writelines('\t</testcase>\n')
 
 
     def add_failure(self, ref_obj, title, elapsed_time, out_text, err_text, log_text=None):
@@ -84,6 +107,19 @@ class Kunit:
         self.__make_system_out(out_text)
         self.__make_system_err(err_text)
         self.__f.writelines('\t</testcase>\n')
+        '''
+        The following code is used in case we have to fill up also the xml part related to any open kunit child
+        For example for any TPSBlock opened inside testcase istance
+        '''
+        for child in self.children:
+          if child.frameStatus:
+            child.__st = None
+            row1 = child.__make_test_case(ref_obj, title, delta_t)
+            child.__f.writelines(row1)
+            child.__make_log_error(log_text)
+            child.__make_system_out(out_text)
+            child.__make_system_err(err_text)
+            child.__f.writelines('\t</testcase>\n')
 
 
     def add_skipped(self, ref_obj, title, elapsed_time, out_text, err_text, skip_text=None):
@@ -106,6 +142,20 @@ class Kunit:
         self.__make_system_out(out_text)
         self.__make_system_err(err_text)
         self.__f.writelines('\t</testcase>\n')
+        '''
+        The following code is used in case we have to fill up also the xml part related to any open kunit child
+        For example for any TPSBlock opened inside testcase istance
+        '''
+        for child in self.children:
+          if child.frameStatus:
+            child.__st = None
+            row1 = child.__make_test_case(ref_obj, title, delta_t)
+            child.__f.writelines(row1)
+            child.__make_skipped(skip_text)
+            child.__make_system_out(out_text)
+            child.__make_system_err(err_text)
+            child.__f.writelines('\t</testcase>\n')
+
 
 
     def start_time(self):
@@ -116,6 +166,32 @@ class Kunit:
             on above add_success(),... methods
         """
         self.__st = datetime.datetime.now()
+
+      
+    def start_tps_Block(self, tps_area, tps_name):
+        '''
+        Start an official block containg all code related to aspecific TPS (Test Procedure)
+        calling this function into testcase object will generate a specific XML report file for each TPSName provided
+        '''
+        tpsreport = None     
+        for mychild in self.children:
+            if mychild.name == self.__dir + '/' + os.path.splitext(os.path.splitext(self.__clnm)[0])[0] + '.' + tps_area +'_'+ tps_name + '.XML':
+                tpsreport = mychild 
+                break
+        else:
+            tpsreport=Kunit(self.__dir + '/' + os.path.splitext(os.path.splitext(self.__clnm)[0])[0] + '.' + tps_area +'_'+ tps_name + '.XML')
+            self.children.append(tpsreport)
+        if not tpsreport.frameStatus: tpsreport.frameOpen()
+        print(tpsreport.__fn)
+
+
+    def stop_tps_block(self, tps_area, tps_name):
+        '''
+        Stop the block containing the code related to the specific TPS (test Procedure)
+        This function will terminate the specific XML report file related to TPSName test id
+        '''
+        for c in self.children:
+            if c.__fn == self.__dir + '/' + os.path.splitext(os.path.splitext(self.__clnm)[0])[0] + '.' + tps_area +'_'+ tps_name + '.XML': c.frameClose()
 
 
     def __make_test_case(self, ref_obj, title, elapsed_time):
