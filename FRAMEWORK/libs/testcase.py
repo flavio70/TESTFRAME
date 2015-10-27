@@ -16,43 +16,43 @@ class TestCase(object):
     '''
     TestCase General class definition
     '''
-    __TestDir = None  # py file Directory
+    __testdir = None  # py file Directory
     fn = None # py file name
-    __xmlReport = None # Py file XML Report File
-    __prsFile = None # file containing the json preset for Test
-    prsValues = None # Structure containing the parsed json Test parameters
+    __xml_report = None # Py file XML Report File
+    __prs_file = None # file containing the json preset for Test
+    prs_values = None # Structure containing the parsed json Test parameters
     report = None # contains reference to the current kunit file report object
 
     def __init__(self, filename):
-        self.__TestDir, self.fn = os.path.split(os.path.abspath(filename))
-        self.__xmlReport = self.__TestDir + '/../test-reports/'+ os.path.splitext(self.fn)[0] + '._Main.py'
-        self.__prsFile = open(os.path.abspath(filename)+ '.prs')
-        self.prsValues = json.load(self.__prsFile)
-        self.report = Kunit(self.__xmlReport)
+        self.__testdir, self.fn = os.path.split(os.path.abspath(filename))
+        self.__xml_report = self.__testdir + '/../test-reports/'+ os.path.splitext(self.fn)[0] + '._Main.py'
+        self.__prs_file = open(os.path.abspath(filename)+ '.prs')
+        self.prs_values = json.load(self.__prs_file)
+        self.report = Kunit(self.__xml_report)
 
-    def printPrs(self):
+    def print_prs(self):
         '''
         Print out the json parameters
         '''
         print('\ninput values for ', self.fn, ' : \n')
-        for key, values in self.prsValues.items():
+        for key, values in self.prs_values.items():
             print(key + '=' + values)
         print('\n-- End of values -- \n')
 
-    def skipSection(self, runSection):
+    def skip_section(self, run_section):
         '''
         function used t skip test section
         '''
-        print(runSection + ' Skipped\n')
-        self.report.addSkipped(None, runSection, '0', runSection + " Skipped by User", runSection + " Skipped by User")
+        print(run_section + ' Skipped\n')
+        self.report.add_skipped(None, run_section, '0', run_section + " Skipped by User", run_section + " Skipped by User")
 
     def init(self):
         '''
         Main class constructor
         '''
         print('\nInitializing ', self.fn, ' environment ...')
-        self.printPrs()
-        self.report.frameOpen()
+        self.print_prs()
+        self.report.frame_open()
         print('DONE \n')
 
     def close(self):
@@ -60,38 +60,38 @@ class TestCase(object):
         function used to finalize test execution
         '''
         print('\nFinalizing ', self.fn, ' ...')
-        self.report.frameClose()
+        self.report.frame_close()
         print('DONE \n')
 
-    def DUTSetUp(self):
+    def dut_setup(self):
         '''
         Empty dut setup common function
         should be overwritten by user implementation
         '''
         print('Running empty DUT SetUp...')
 
-    def testSetUp(self):
+    def test_setup(self):
         '''
         Empty test setup common function
         should be overwritten by user implementation
         '''
         print('Running empty test Setup...')
 
-    def testBody(self):
+    def test_body(self):
         '''
         Empty test body common function
         should be overwritten by user implementation
         '''
         print('Running empty Main Test...')
 
-    def testCleanUp(self):
+    def test_cleanup(self):
         '''
         Empty test cleanup common function
         should be overwritten by user implementation
         '''
         print('Running empty Test cleanUp...')
 
-    def DUTCleanUp(self):
+    def dut_cleanup(self):
         '''
         Empty dut cleanup common function
         should be overwritten by user implementation
@@ -111,10 +111,10 @@ class TestCase(object):
         parser.add_argument("--DUTClean", help="Run the DUTs Clean Up", action="store_true")
         args = parser.parse_args()
         self.init()
-        self.runTest(args)
+        self.run_test(args)
         self.close()
 
-    def runTest(self, args):
+    def run_test(self, args):
         '''
         test sections run
         '''
@@ -126,8 +126,8 @@ class TestCase(object):
             args.testClean = True
             args.DUTClean = True
         print(args)
-        self.DUTSetUp() if args.DUTSet else self.skipSection('DUT Setup')
-        self.testSetUp() if args.testSet else self.skipSection('test Setup')
-        self.testBody() if args.testBody else self.skipSection('test Body')
-        self.testCleanUp() if args.testClean else self.skipSection('test Clean Up')
-        self.DUTCleanUp() if args.DUTClean else self.skipSection('DUT Cleanup')
+        self.dut_setup() if args.DUTSet else self.skip_section('DUT Setup')
+        self.test_setup() if args.testSet else self.skip_section('test Setup')
+        self.test_body() if args.testBody else self.skip_section('test Body')
+        self.test_cleanup() if args.testClean else self.skip_section('test Clean Up')
+        self.dut_cleanup() if args.DUTClean else self.skip_section('DUT Cleanup')
