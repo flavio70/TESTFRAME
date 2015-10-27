@@ -44,7 +44,7 @@ class TestCase(object):
         function used t skip test section
         '''
         print(run_section + ' Skipped\n')
-        self.report.addSkipped(None, run_section, '0', run_section + " Skipped by User", run_section + " Skipped by User")
+        self.report.add_skipped(None, run_section, '0', run_section + " Skipped by User", run_section + " Skipped by User")
 
     def init(self):
         '''
@@ -52,7 +52,7 @@ class TestCase(object):
         '''
         print('\nInitializing ', self.fn, ' environment ...')
         self.print_prs()
-        self.report.frameOpen()
+        self.report.frame_open()
         print('DONE \n')
 
     def close(self):
@@ -60,7 +60,7 @@ class TestCase(object):
         function used to finalize test execution
         '''
         print('\nFinalizing ', self.fn, ' ...')
-        self.report.frameClose()
+        self.report.frame_close()
         print('DONE \n')
 
     def dut_setup(self):

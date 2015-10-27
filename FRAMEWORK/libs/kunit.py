@@ -29,9 +29,11 @@ class Kunit:
         self.children = None # object's children list
         self.frameStatus = None # object's frameStatus
         self.name = None # object name
+        self.__dir = None # test dir
         self.__fn   = '{:s}.XML'.format(os.path.splitext(fileName)[0])
         self.__clnm = os.path.splitext(os.path.basename(self.__fn))[0]
         self.__cnt  = 0
+        self.__dir = os.path.split(os.path.abspath(fileName))[0]
         self.children = []
         self.frameStatus = False
         self.name = fileName
@@ -168,7 +170,7 @@ class Kunit:
         self.__st = datetime.datetime.now()
 
       
-    def start_tps_Block(self, tps_area, tps_name):
+    def start_tps_block(self, tps_area, tps_name):
         '''
         Start an official block containg all code related to aspecific TPS (Test Procedure)
         calling this function into testcase object will generate a specific XML report file for each TPSName provided
@@ -181,7 +183,7 @@ class Kunit:
         else:
             tpsreport=Kunit(self.__dir + '/' + os.path.splitext(os.path.splitext(self.__clnm)[0])[0] + '.' + tps_area +'_'+ tps_name + '.XML')
             self.children.append(tpsreport)
-        if not tpsreport.frameStatus: tpsreport.frameOpen()
+        if not tpsreport.frameStatus: tpsreport.frame_open()
         print(tpsreport.__fn)
 
 
@@ -191,7 +193,7 @@ class Kunit:
         This function will terminate the specific XML report file related to TPSName test id
         '''
         for c in self.children:
-            if c.__fn == self.__dir + '/' + os.path.splitext(os.path.splitext(self.__clnm)[0])[0] + '.' + tps_area +'_'+ tps_name + '.XML': c.frameClose()
+            if c.__fn == self.__dir + '/' + os.path.splitext(os.path.splitext(self.__clnm)[0])[0] + '.' + tps_area +'_'+ tps_name + '.XML': c.frame_close()
 
 
     def __make_test_case(self, ref_obj, title, elapsed_time):
