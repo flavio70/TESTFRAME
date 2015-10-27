@@ -54,7 +54,7 @@ class IP:
         else:
             return str(None)
 
-    def debug(self):
+    def __debug(self):
         print("DEBUG IP:")
         print(self.__ip)
         print("END IP:")
@@ -100,7 +100,7 @@ class NetIF:
         """ Set Netmask value (IP class type)"""
         self.__net_info['NM']  = nm
 
-    def set_ge(self, gw):
+    def set_gw(self, gw):
         """ Set Gateway value (IP class type)"""
         self.__net_info['GW']  = gw
 
@@ -116,7 +116,7 @@ class NetIF:
         """ Get IP (IP class type)"""
         return self.__net_info['IP']
 
-    def get_ip(self):
+    def get_ip_str(self):
         """ Get IP (string)"""
         return self.__net_info['IP'].get_val()
 
@@ -124,7 +124,7 @@ class NetIF:
         """ Get Netmask (IP class type)"""
         return self.__net_info['NM']
 
-    def get_nm(self):
+    def get_nm_str(self):
         """ Get Netmask (sring)"""
         return self.__net_info['NM'].get_val()
 
@@ -132,7 +132,7 @@ class NetIF:
         """ Get Gateway (IP class type)"""
         return self.__net_info['GW']
 
-    def get_gw(self):
+    def get_gw_str(self):
         """ Get Gateway (string)"""
         return self.__net_info['GW'].get_val()
 
@@ -144,7 +144,7 @@ class NetIF:
         """ Get ethernet device adapter"""
         return self.__net_info['DEV']
 
-    def debug(self):
+    def __debug(self):
         print("IP : " + self.get_ip())
         print("NM : " + self.get_nm())
         print("GW : " + self.get_gw())
@@ -171,9 +171,11 @@ class SerIF:
         self.__ser_info[slot] = { 'IP' : ip, 'port' : port }
 
     def get_val(self, slot):
+        """ Return the couple (IP, PORT) for specified slot number
+        """
         return ( (self.__ser_info[slot]['IP']).get_val(), self.__ser_info[slot]['port'] )
 
-    def debug(self):
+    def __debug(self):
         print(self.__ser_info)
 
 
@@ -190,7 +192,7 @@ if __name__ == "__main__":
     #gw = IP("10.10.10.1")
 
     #elem = NetIF(ip, nm, gw, "00:aa:bb:cc:11:22")
-    #print(elem.debug())
+    #print(elem.__debug())
 
     serIP = IP("192.168.1.25")
     mySer = SerIF()
@@ -202,4 +204,4 @@ if __name__ == "__main__":
     print("---")
     print("seriale 10: " + str(mySer.get_val(10)))
     print("---")
-    #print(mySer.debug())
+    #print(mySer.__debug())
