@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 ###############################################################################
-# MODULE: eqpt1850TSS320.py
+# MODULE: eqpt1850tss320.py
 #
 # AUTHOR: C.Ghelfi
 # DATE  : 29/07/2015
@@ -38,12 +38,12 @@ class Eqpt1850TSS320(equipment.Equipment):
 
         self.__get_eqpt_info_from_db(ID)
 
-        flc1ser = self.__ser.getVal(1)
-        self.__ser_con = access1850.SER_1850( (flc1ser[0], flc1ser[1]) )
+        flc1ser = self.__ser.get_val(1)
+        self.__ser_con = access1850.SER1850( (flc1ser[0], flc1ser[1]) )
 
         self.__open_main_ssh_connection()
 
-        self.tl1 = plugin_tl1.Plugin1850TL1(self.__net.getIP(), krepo=self.__krepo, eRef=self)
+        self.tl1 = plugin_tl1.Plugin1850TL1(self.__net.get_ip_str(), krepo=self.__krepo, eRef=self)
 
 
     def clean_up(self):
@@ -57,35 +57,34 @@ class Eqpt1850TSS320(equipment.Equipment):
             self.__krepo.startTime()
 
         if self.__is_reachable_by_ip():
-            print("Equipment '" + self.getLabel() + "' reachable by IP " + self.__net.getIP())
+            print("Equipment '" + self.get_label() + "' reachable by IP " + self.__net.get_ip_str())
             print("nothing to do.")
-            if self.__krepo:
-                self.__krepo.addSkipped(self, "CONFIGURE IP", None, "equipment already reachable", "")
+            self.__t_skipped("CONFIGURE IP", None, "equipment already reachable", "")
             return True
         else:
-            print("Configuring IP address for equipment '" + self.getLabel() + "'")
-            dev     = self.__net.getDEV()
+            print("Configuring IP address for equipment '" + self.get_label() + "'")
+            dev     = self.__net.get_dev()
             cmd_ifdn = "ifconfig {:s} down".format(dev)
-            cmd_hwet = "ifconfig {:s} hw ether {:s}".format(dev, self.__net.getMAC())
-            cmd_ipad = "ifconfig {:s} {:s} netmask {:s}".format(dev, self.__net.getIP(), self.__net.getNM())
+            cmd_hwet = "ifconfig {:s} hw ether {:s}".format(dev, self.__net.get_mac())
+            cmd_ipad = "ifconfig {:s} {:s} netmask {:s}".format(dev, self.__net.get_ip_str(), self.__net.get_nm_str())
             cmd_ifup = "ifconfig {:s} up".format(dev)
-            cmd_rout = "route add default gw {:s}".format(self.__net.getGW())
+            cmd_rout = "route add default gw {:s}".format(self.__net.get_gw_str())
 
             max_iterations = 50
 
             for i in range(1, max_iterations+1):
-                self.__ser_con.sendCmdSimple(cmd_ifdn)
+                self.__ser_con.send_cmd_simple(cmd_ifdn)
                 time.sleep(3)
-                self.__ser_con.sendCmdSimple(cmd_hwet)
+                self.__ser_con.send_cmd_simple(cmd_hwet)
                 time.sleep(3)
-                self.__ser_con.sendCmdSimple(cmd_ipad)
+                self.__ser_con.send_cmd_simple(cmd_ipad)
                 time.sleep(5)
-                self.__ser_con.sendCmdSimple(cmd_ifup)
+                self.__ser_con.send_cmd_simple(cmd_ifup)
                 time.sleep(5)
-                self.__ser_con.sendCmdSimple(cmd_rout)
+                self.__ser_con.send_cmd_simple(cmd_rout)
                 time.sleep(5)
 
-                if not self.__is_ongoing_to_address(self.__net.getGW()):
+                if not self.__is_ongoing_to_address(self.__net.get_gw_str()):
                     msg = "Error in IP Configuration. Retrying... [{:d}/{:d}]".format(i, max_iterations)
                     print(msg)
                 else:
@@ -98,14 +97,12 @@ class Eqpt1850TSS320(equipment.Equipment):
                     print(msg)
                     time.sleep(10)
                 else:
-                    if self.__krepo:
-                        self.__krepo.addSuccess(self, "CONFIGURE IP", None, "Equipment reachable")
+                    self.__t_success("CONFIGURE IP", None, "Equipment reachable")
                     return True
 
 
             print("Error in IP CONFIG")
-            if self.__krepo:
-                self.__krepo.addFailure(self, "CONFIGURE IP", None, "error in configuring IP", "")
+            self.__t_failure("CONFIGURE IP", None, "error in configuring IP", "")
             return False
 
 
@@ -117,15 +114,13 @@ class Eqpt1850TSS320(equipment.Equipment):
         if self.__krepo:
             self.__krepo.startTime()
 
-        res = self.__net_con.sendCmdAndCheck("/etc/rc.d/init.d/dhcp stop", "Stopping DHCP server: dhcpd")
+        res = self.__net_con.send_cmd_and_check("/etc/rc.d/init.d/dhcp stop", "Stopping DHCP server: dhcpd")
         if res == False:
             print("DHCP not stopped")
-            if self.__krepo:
-                self.__krepo.addFailure(self, "DHCP SHUTDOWN", None, "error in DHCP shutdown", "")
+            self.__t_failure("DHCP SHUTDOWN", None, "error in DHCP shutdown", "")
         else:
             print("DHCP stopped")
-            if self.__krepo:
-                self.__krepo.addSuccess(self, "DHCP SHUTDOWN", None, "DHCP shutted down")
+            self.__t_success("DHCP SHUTDOWN", None, "DHCP shutted down")
         return res
 
 
@@ -137,19 +132,17 @@ class Eqpt1850TSS320(equipment.Equipment):
         if self.__krepo:
             self.__krepo.startTime()
 
-        self.__net_con.sendCmdSimple("flc_reboot")
+        self.__net_con.send_cmd_simple("flc_reboot")
 
         klist = [b'Start BOOT image V', b'Restarting system']
         res = self.__ser_con.EXPECT(klist)
         if res[0] == 0  or  res[0] == 1:
             print("FLC RESTARTED")
-            if self.__krepo:
-                self.__krepo.addSuccess(self, "FLC REBOOT", None, "FLC restarted")
+            self.__t_success("FLC REBOOT", None, "FLC restarted")
             return True
         else:
             print("ERROR IN FLC REBOOT")
-            if self.__krepo:
-                self.__krepo.addFailure(self, "FLC REBOOT", None, "error in FLC rebooting", "")
+            self.__t_failure("FLC REBOOT", None, "error in FLC rebooting", "")
             return False
 
 
@@ -158,27 +151,24 @@ class Eqpt1850TSS320(equipment.Equipment):
             slot : slc slot number
         """
         print("REBOOT SLC " + str(slot))
-        flc_ip = self.__net.getIP()
+        flc_ip = self.__net.get_ip_str()
         slc_ip = "100.0.1.{:s}".format(slot)
 
         if not self.__is_reachable_by_ip(slc_ip):
-            if self.__krepo:
-                self.__krepo.addSkipped(self, "SLC "+ str(slot) + " REBOOT", None, "SLC not present", "")
-            return True
+            self.__t_skipped("SLC "+ str(slot) + " REBOOT", None, "SLC not present", "")
+        return True
 
         try:
-            tmpsh = access1850.SSH_1850(flc_ip)
-            tmpsh.telnetTunnel(slc_ip)
-            tmpsh.sendBMcmd(slc_ip, "reboot")
-            tmpsh.close()
+            tmpsh = access1850.SSH1850(flc_ip)
+            tmpsh.telnet_tunnel(slc_ip)
+            tmpsh.send_bm_command(slc_ip, "reboot")
+            tmpsh.close_ssh()
         except Exception as eee:
             print(str(eee))
-            if self.__krepo:
-                self.__krepo.addFailure(self, "SLC "+ str(slot) + " REBOOT", None, "error in SLC rebooting", "")
+            self.__t_failure("SLC "+ str(slot) + " REBOOT", None, "error in SLC rebooting", "")
             return False
 
-        if self.__krepo:
-            self.__krepo.addSuccess(self, "SLC "+ str(slot) + " REBOOT", None, "SLC restarted")
+        self.__t_success("SLC "+ str(slot) + " REBOOT", None, "SLC restarted")
 
         return True
 
@@ -191,17 +181,15 @@ class Eqpt1850TSS320(equipment.Equipment):
         if self.__krepo:
             self.__krepo.startTime()
 
-        self.__net_con.sendCmdSimple("/bin/rm -fr /pureNeApp/FLC/DB/*")
+        self.__net_con.send_cmd_simple("/bin/rm -fr /pureNeApp/FLC/DB/*")
 
-        res = self.__net_con.sendCmdAndCheck("/bin/ls -l /pureNeApp/FLC/DB", "total 0")
+        res = self.__net_con.send_cmd_and_check("/bin/ls -l /pureNeApp/FLC/DB", "total 0")
         if res == False:
             print("DB not scrtatched")
-            if self.__krepo:
-                self.__krepo.addFailure(self, "SCRATCH DB", None, "error in scratching DB", "")
+            self.__t_failure("SCRATCH DB", None, "error in scratching DB", "")
         else:
             print("DB scratched")
-            if self.__krepo:
-                self.__krepo.addSuccess(self, "SCRATCH DB", None, "DB correctly scratched")
+            self.__t_success("SCRATCH DB", None, "DB correctly scratched")
         return res
 
 
@@ -223,7 +211,7 @@ class Eqpt1850TSS320(equipment.Equipment):
         # Check for running application processes
         res = False
         for i in range(1, max_iterations+1):
-            out = self.__net_con.sendCmdAndCapture("pidof bin_1850TSS_TDM320_FLC.bin")
+            out = self.__net_con.send_cmd_and_capture("pidof bin_1850TSS_TDM320_FLC.bin")
             if out[:-1] == "":
                 print("No running SWP yet. Retrying in 15s [{:d}/{:d}]".format(i, max_iterations))
                 time.sleep(15)
@@ -233,13 +221,12 @@ class Eqpt1850TSS320(equipment.Equipment):
         if not res:
             msg = "Not able to find a running SWP after {:d}s".format(15*max_iterations)
             print(msg)
-            if self.__krepo:
-                self.__krepo.addFailure(self, "FLC IN SERVICE", None, "timeout", msg)
+            self.__t_failure("FLC IN SERVICE", None, "timeout", msg)
 
         # Check for TL1 agent
         res = False
         for i in range(1, max_iterations+1):
-            if not self.__net_con.sendCmdAndCheck("netstat -anp | grep ':3083'", "0.0.0.0:3083"):
+            if not self.__net_con.send_cmd_and_check("netstat -anp | grep ':3083'", "0.0.0.0:3083"):
                 print("TL1 agent not ready. Retrying in 15s [{:d}/{:d}]".format(i, max_iterations))
                 time.sleep(15)
             else:
@@ -249,15 +236,14 @@ class Eqpt1850TSS320(equipment.Equipment):
         if not res:
             msg = "Not able to find TL1 Agent after {:d}s".format(15*max_iterations)
             print(msg)
-            if self.__krepo:
-                self.__krepo.addFailure(self, "FLC IN SERVICE", None, "timeout", msg)
+            self.__t_failure("FLC IN SERVICE", None, "timeout", msg)
 
         # Check for SNMP agent
         for sub_agent in 161,171:
             res = False
             for i in range(1, max_iterations+1):
                 cmd = "netstat -anp | grep '{:d}'".format(sub_agent)
-                if not self.__net_con.sendCmdAndCheck(cmd, "bin_1850TSS_"):
+                if not self.__net_con.send_cmd_and_check(cmd, "bin_1850TSS_"):
                     print("SNMP:{:s} sub-agent not ready. Retrying in 15s [{:d}/{:d}]".format(sub_agent, i, max_iterations))
                     time.sleep(15)
                 else:
@@ -267,13 +253,11 @@ class Eqpt1850TSS320(equipment.Equipment):
             if not res:
                 msg = "Not able to find SNMP:{:d} sub-agent after {:d}s".format(sub_agent, 15*max_iterations)
                 print(msg)
-                if self.__krepo:
-                    self.__krepo.addFailure(self, "FLC IN SERVICE", None, "timeout", msg)
+                self.__t_failure("FLC IN SERVICE", None, "timeout", msg)
 
         print("FLC IN SERVICE")
 
-        if self.__krepo:
-            self.__krepo.addSuccess(self, "FLC IN SERVICE", None, "FLC correctly in service")
+        self.__t_success("FLC IN SERVICE", None, "FLC correctly in service")
 
         return True
 
@@ -282,7 +266,7 @@ class Eqpt1850TSS320(equipment.Equipment):
         """ Load the specified SWP
             swp_string : the StartApp string
         """
-        print("LOADING SWP ON '" + self.getLabel() + "'")
+        print("LOADING SWP ON '" + self.get_label() + "'")
         print("SWP STRING: '" + swp_string + "'")
 
         if self.__krepo:
@@ -290,19 +274,17 @@ class Eqpt1850TSS320(equipment.Equipment):
 
         if self.__is_reachable_by_ip():
             print("SSH ACCESS")
-            res = self.__net_con.sendCmdAndCheck(swp_string, "EC_SetSwVersionActive status SUCCESS")
+            res = self.__net_con.send_cmd_and_check(swp_string, "EC_SetSwVersionActive status SUCCESS")
         else:
             print("SERIAL ACCESS")
-            res = self.__ser_con.sendCmdAndCheck(swp_string, "EC_SetSwVersionActive status SUCCESS")
+            res = self.__ser_con.send_cmd_and_check(swp_string, "EC_SetSwVersionActive status SUCCESS")
 
         if res == False:
             print("SWP LOAD ERROR")
-            if self.__krepo:
-                self.__krepo.addFailure(self, "SWP LOAD", None, "error in loading SWP", "")
+            self.__t_failure("SWP LOAD", None, "error in loading SWP", "")
         else:
             print("SWP LOADING TERMINATE")
-            if self.__krepo:
-                self.__krepo.addSuccess(self, "SWP LOAD", None, "SWP correctly load")
+            self.__t_success("SWP LOAD", None, "SWP correctly load")
 
         return res
 
@@ -367,7 +349,9 @@ class Eqpt1850TSS320(equipment.Equipment):
             print("INSTALL ABORTED")
             return False
 
-        if not self.checkRunningSWP():
+        swp_id = ""     # sistemare
+
+        if not self.flc_check_running_swp(""):
             print("INSTALL ABORTED")
             return False
 
@@ -377,14 +361,14 @@ class Eqpt1850TSS320(equipment.Equipment):
     def __is_ongoing_to_address(self, dest_ip):
         cmd = "ping -c 4 {:s}".format(dest_ip)
         exp = "4 packets transmitted, 4 received, 0% packet loss,"
-        res = self.__ser_con.sendCmdAndCheck(cmd, exp)
+        res = self.__ser_con.send_cmd_and_check(cmd, exp)
         print(res)
         return res
 
 
     def __is_reachable_by_ip(self, eqpt_ip=None):
         if not eqpt_ip:
-            eqpt_ip = self.__net.getIP()
+            eqpt_ip = self.__net.get_ip_str()
         cmd = "ping -c 4 {:s}".format(eqpt_ip)
         if os.system(cmd) == 0:
             return True
@@ -428,12 +412,12 @@ class Eqpt1850TSS320(equipment.Equipment):
         print("  Name   : " + e_name)
         print("  Type   : " + e_type)
         print("  Net    : {:s} {:s} {:s} {:s} {:s}".format( eth_adapter,
-                                                            ip.getVal(),
-                                                            nm.getVal(),
-                                                            gw.getVal(),
-                                                            ip.evaluateMAC()))
+                                                            ip.get_val(),
+                                                            nm.get_val(),
+                                                            gw.get_val(),
+                                                            ip.evaluate_mac()))
 
-        self.__net = facility1850.NetIF(ip, nm, gw, ip.evaluateMAC(), eth_adapter)
+        self.__net = facility1850.NetIF(ip, nm, gw, ip.evaluate_mac(), eth_adapter)
         self.__ser = facility1850.SerIF()
 
         tabSer = TSerial
@@ -441,17 +425,32 @@ class Eqpt1850TSS320(equipment.Equipment):
         for r in tabSer.objects.all():
             if r.t_equipment_id_equipment.id_equipment == ID:
                 sIP = tabNet.objects.get(id_ip=r.t_net_id_ip.id_ip)
-                self.__ser.setSerToSlot(r.slot, facility1850.IP(sIP.ip), r.port)
+                self.__ser.set_serial_to_slot(r.slot, facility1850.IP(sIP.ip), r.port)
                 print("  Serial : {:2d} <--> {:s}:{:d}".format(r.slot, sIP.ip, r.port))
 
 
     def __open_main_ssh_connection(self):
-        self.__net_con = access1850.SSH_1850(self.__net.getIP())
+        self.__net_con = access1850.SSH1850(self.__net.get_ip_str())
 
 
     def __close_main_ssh_connection(self):
-        self.__net_con.close()
+        self.__net_con.close_ssh()
         self.__net_con = None
+
+
+    def __t_success(self, title, elapsed_time, out_text):
+        if self.__krepo:
+            self.__krepo.add_success(self, title, elapsed_time, out_text)
+
+
+    def __t_failure(self, title, e_time, outText, err_text, log_text=None):
+        if self.__krepo:
+            self.__krepo.add_failure(self, title, e_time, outText, err_text, log_text)
+
+
+    def __t_skipped(self, title, e_time, outText, err_text, skip_text=None):
+        if self.__krepo:
+            self.__krepo.add_skipped(self, title, e_time, outText, err_text, skip_text)
 
 
 
