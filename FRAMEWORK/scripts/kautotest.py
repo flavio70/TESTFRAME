@@ -18,18 +18,24 @@ def printFRMWRKdata():
     """
     print Framework environemnt data into Kunit format
     """
-    myRepo = Repo(JenkinsHome + '/KateRepo')
-    git = myRepo.git
-    frmwrkVersionLong = git.log('--decorate', '-1')
-    frmwrkVersionShort = git.describe('--tags')
+    try:
+        myRepo = Repo(JenkinsHome + '/KateRepo')
+        git = myRepo.git
+        frmwrkVersionLong = git.log('--decorate', '-1') 
+    except:
+        frmwrkVersionLong = 'Git infos not available' 
+    try:
+        frmwrkVersionShort = git.describe('--tags')
+    except:
+        frmwrkVersionShort = 'tags Not Available'
     print('K@TE Framework Commit used for test: ' + frmwrkVersionLong + '/n')
     print('API version: ' + frmwrkVersionShort)
     xmlReport = JobWorkspace + '/test-reports/EnvSettings.FrameworkAPI.XML'
     r = Kunit(xmlReport)
-    r.frameOpen()
-    r.startTime()
-    r.addSuccess(None, "KATE API: " + frmwrkVersionShort, None, frmwrkVersionLong)
-    r.frameClose()
+    r.frame_open()
+    r.start_time()
+    r.add_success(None, "KATE API: " + frmwrkVersionShort, None, frmwrkVersionLong)
+    r.frame_close()
 
 
 def main():
