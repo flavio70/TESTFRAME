@@ -178,11 +178,8 @@ class SSH1850():
     def close_ssh(self):
         """ TODO
         """
-        try:
-            self.__sh.close()
-            self.__sh = None
-        except Exception as eee:
-            print("SSH1850: error in close_ssh() (" + str(eee) + ")")
+        self.__sh.close()
+        self.__sh = None
 
 
     def send_cmd_simple(self, cmd):
@@ -194,7 +191,7 @@ class SSH1850():
             try:
                 self.__sh.exec_command(cmd)
                 done = True
-            except Exception as eee:
+            except paramiko.SSHException as eee:
                 msg = "SSH1850: error connectind '{:s}' ({:s}). Retrying...".format(self.__ip, str(eee))
                 print(msg)
                 self.__setup_ssh()
@@ -211,7 +208,7 @@ class SSH1850():
             try:
                 stdin,stdout,stderr = self.__sh.exec_command(cmd)
                 done = True
-            except Exception as eee:
+            except paramiko.SSHException as eee:
                 msg = "SSH1850: error connectind '{:s}' ({:s}). Retrying...".format(self.__ip, str(eee))
                 print(msg)
                 self.__setup_ssh()
@@ -242,7 +239,7 @@ class SSH1850():
                 stdin,stdout,stderr = self.__sh.exec_command(cmd)
                 print("eseguito [" + cmd + "]")
                 done = True
-            except Exception as eee:
+            except paramiko.SSHException as eee:
                 msg = "SSH1850: error connectind '{:s}' ({:s}). Retrying...".format(self.__ip, str(eee))
                 print(msg)
                 self.__setup_ssh()
@@ -261,7 +258,9 @@ class SSH1850():
         if not self.__sh.get_transport():
             try:
                 self.__sh.connect(self.__ip, username='root', password='alcatel', timeout=10)
-            except Exception as eee:
+            except (paramiko.BadHostKeyException,
+                    paramiko.AuthenticationException,
+                    paramiko.SSHException) as eee:
                 print("SSH1850: error connecting '" + self.__ip + "' (" + str(eee) +")")
                 self.__sh.close()
                 self.__sh = None
@@ -281,7 +280,9 @@ class SSH1850():
         if not self.__sh.get_transport():
             try:
                 self.__sh.connect(self.__ip, username='root', password='alcatel', timeout=10)
-            except Exception as eee:
+            except (paramiko.BadHostKeyException,
+                    paramiko.AuthenticationException,
+                    paramiko.SSHException) as eee:
                 print("SSH1850: error connectind '" + self.__ip + "' (" + str(eee) +")")
                 self.__sh.close()
                 self.__sh = None
@@ -318,22 +319,16 @@ class SSH1850():
         """ INTERNAL USAGE
         """
         print("calling __setup_ssh")
-        try:
-            self.__sh = paramiko.SSHClient()
-        except Exception as eee:
-            print("SSH1850: init error for '" + self.__ip + "' - setup -(" + str(eee) +")")
-            self.__sh = None
 
-        try:
-            self.__sh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-        except Exception as eee:
-            print("SSH1850: init error for '" + self.__ip + "' - key - (" + str(eee) +")")
-            self.__sh.close()
-            self.__sh = None
+        self.__sh = paramiko.SSHClient()
+
+        self.__sh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
 
         try:
             self.__sh.connect(self.__ip, username='root', password='alcatel', timeout=10)
-        except Exception as eee:
+        except (paramiko.BadHostKeyException,
+                paramiko.AuthenticationException,
+                paramiko.SSHException) as eee:
             print("SSH1850: init error for '" + self.__ip + "' - connect - (" + str(eee) +")")
             self.__sh.close()
             self.__sh = None

@@ -439,18 +439,24 @@ class Eqpt1850TSS320(equipment.Equipment):
 
 
     def __t_success(self, title, elapsed_time, out_text):
+        """ INTERNAL USAGE
+        """
         if self.__krepo:
-            self.__krepo.add_success(self, title, elapsed_time, out_text)
+            self.__krepo.add_success(self.__eqpt_ref, title, elapsed_time, out_text)
 
 
-    def __t_failure(self, title, e_time, outText, err_text, log_text=None):
+    def __t_failure(self, title, e_time, out_text, err_text, log_text=None):
+        """ INTERNAL USAGE
+        """
         if self.__krepo:
-            self.__krepo.add_failure(self, title, e_time, outText, err_text, log_text)
+            self.__krepo.add_failure(self.__eqpt_ref, title, e_time, out_text, err_text, log_text)
 
 
-    def __t_skipped(self, title, e_time, outText, err_text, skip_text=None):
+    def __t_skipped(self, title, e_time, out_text, err_text, skip_text=None):
+        """ INTERNAL USAGE
+        """
         if self.__krepo:
-            self.__krepo.add_skipped(self, title, e_time, outText, err_text, skip_text)
+            self.__krepo.add_skipped(self.__eqpt_ref, title, e_time, out_text, err_text, skip_text)
 
 
 

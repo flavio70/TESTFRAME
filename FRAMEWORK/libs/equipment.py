@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+"""
 ###############################################################################
 # MODULE: equipment.py
 #
@@ -6,10 +7,7 @@
 # DATE  : 29/07/2015
 #
 ###############################################################################
-
-
-import os
-import string
+"""
 
 class Equipment:
     """
@@ -24,22 +22,22 @@ class Equipment:
         self.__id     = ID
         self.__type   = "unknown"
 
-    def set_label(self, v):
-        """ Initialize equipment type
-            v : equipment name
+    def set_label(self, the_label):
+        """ Initialize equipment name
+            the_label : equipment name
         """
-        self.__label = v
+        self.__label = the_label
 
     def get_label(self):
         """ Get Equipment Name
         """
         return self.__label
 
-    def set_type(self, v):
+    def set_type(self, the_type):
         """ Initialize equipment type
-            v = equipment type
+            the_type = equipment type
         """
-        self.__type = v
+        self.__type = the_type
 
     def get_type(self):
         """ Get Equipment type

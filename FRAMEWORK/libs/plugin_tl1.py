@@ -1,4 +1,13 @@
 #!/usr/bin/env python
+"""
+###############################################################################
+# MODULE: kunit.py
+#
+# AUTHOR: C.Ghelfi
+# DATE  : 29/07/2015
+#
+###############################################################################
+"""
 
 import telnetlib
 import re
@@ -262,6 +271,8 @@ class TL1Facility():
 
     @staticmethod
     def __is_event(msg_code):
+        """ INTERNAL USAGE
+        """
         return ( msg_code == '*C' or
                  msg_code == '**' or
                  msg_code == '*'  or
@@ -313,6 +324,8 @@ class Plugin1850TL1():
 
 
     def __del__(self):
+        """ INTERNAL USAGE
+        """
         self.__disconnect()
 
 
@@ -342,6 +355,8 @@ class Plugin1850TL1():
 
 
     def __do(self, channel, cmd, policy, match):
+        """ INTERNAL USAGE
+        """
         if self.__krepo:
             self.__krepo.startTime()
 
@@ -349,7 +364,6 @@ class Plugin1850TL1():
         while str(channel.read_very_eager().strip(), 'utf-8') != "":
             pass
 
-        cmd_lower  = cmd.lower()
         verb_lower = cmd.replace(";", "").split(":")[0].lower().replace("\r", "").replace("\n", "")
 
         try:
@@ -368,7 +382,6 @@ class Plugin1850TL1():
         keepalive_count_max = 100
         keepalive_count    = 0
         msg_str  = ""
-        echo    = ""
 
         while True:
             res_list  = channel.expect([b"\n\>", b"\n\;"])
@@ -376,11 +389,9 @@ class Plugin1850TL1():
             msg_tmp   = str(res_list[2], 'utf-8')
 
             if msg_tmp.find("\r\n\n") == -1:
-                echo = echo + msg_tmp
                 continue
 
             resp_part_list = msg_tmp.split("\r\n\n")
-            echo           = echo + resp_part_list[0]
             msg_tmp        = "\r\n\n".join(resp_part_list[1:])
 
             if match_idx ==  1:
@@ -417,7 +428,7 @@ class Plugin1850TL1():
             else:
                 result = False
 
-        elif    cmd_lower == "canc-user;":
+        elif   cmd.lower() == "canc-user;":
             self.__last_status = "CMPLD"
             result = (policy == "CMPLD")
         elif    msg_str.find(" COMPLD") != -1:
@@ -430,17 +441,18 @@ class Plugin1850TL1():
         # valutare l'espressione regolare prima di restituire result
         # ###
 
-        if self.__krepo:
-            title = cmd
-            if result:
-                self.__krepo.addSuccess(self.__eqpt_ref, title, None, self.get_last_outcome())
-            else:
-                self.__krepo.addFailure(self.__eqpt_ref, title, None, self.get_last_outcome(), "")
+        if result:
+            self.__t_success(cmd, None, self.get_last_outcome())
+        else:
+            self.__t_failure(cmd, None, self.get_last_outcome(), "")
+        
 
         return result
 
 
     def __connect(self):
+        """ INTERNAL USAGE
+        """
         try:
             self.__if_cmd = telnetlib.Telnet()
             self.__if_cmd.open(self.__the_ip, self.__the_port)
@@ -457,6 +469,8 @@ class Plugin1850TL1():
 
 
     def __disconnect(self):
+        """ INTERNAL USAGE
+        """
         try:
             self.__do(self.__if_eve, "CANC-USER;", "COMPLD", None)
             self.__do(self.__if_cmd, "CANC-USER;", "COMPLD", None)
@@ -488,11 +502,15 @@ class Plugin1850TL1():
 
 
     def thr_event_terminate(self):
+        """ TODO
+        """
         with self.__thread_lock:
             self.__do_event_loop = False
 
 
     def __thr_manager(self):
+        """ INTERNAL USAGE
+        """
         # thread main
         print("Entro in __thr_manager")
         while True:
@@ -507,6 +525,8 @@ class Plugin1850TL1():
 
 
     def __thr_init(self):
+        """ INTERNAL USAGE
+        """
         connected = False
 
         while not connected:
@@ -525,6 +545,8 @@ class Plugin1850TL1():
 
 
     def __thr_event_loop(self):
+        """ INTERNAL USAGE
+        """
         while True:
             with self.__thread_lock:
                 do_repeat = self.__do_event_loop
@@ -542,10 +564,10 @@ class Plugin1850TL1():
 
                 if match_idx == -1:
                     # Timeout Detected
-                    timeoutDetected = True
+                    timeout_detected = True
                     break
                 else:
-                    timeoutDetected = False
+                    timeout_detected = False
 
                 if msg_tmp.find("\r\n\n") == -1:
                     echo = echo + msg_tmp
@@ -569,12 +591,32 @@ class Plugin1850TL1():
 
             msg_str = re.sub('(\r\n)+', "\r\n", msg_str, 0)
 
-            if not timeoutDetected:
+            if not timeout_detected:
                 if self.__enable_collect:
-                    codedMsg = TL1Facility.decode(msg_str)
-                    # self.__f.writelines(TL1Facility.encode(codedMsg, "JSON"))
+                    coded_msg = TL1Facility.decode(msg_str)
+                    # self.__f.writelines(TL1Facility.encode(coded_msg, "JSON"))
                     self.__f.writelines("{:s}\n{:s}\n".format("-" * 80, msg_str))
 
+
+    def __t_success(self, title, elapsed_time, out_text):
+        """ INTERNAL USAGE
+        """
+        if self.__krepo:
+            self.__krepo.add_success(self, title, elapsed_time, out_text)
+
+
+    def __t_failure(self, title, e_time, out_text, err_text, log_text=None):
+        """ INTERNAL USAGE
+        """
+        if self.__krepo:
+            self.__krepo.add_failure(self, title, e_time, out_text, err_text, log_text)
+
+
+    def __t_skipped(self, title, e_time, out_text, err_text, skip_text=None):
+        """ INTERNAL USAGE
+        """
+        if self.__krepo:
+            self.__krepo.add_skipped(self, title, e_time, out_text, err_text, skip_text)
 
 
 
