@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+"""
 ###############################################################################
 # MODULE: kunit.py
 #
@@ -6,6 +7,7 @@
 # DATE  : 29/07/2015
 #
 ###############################################################################
+"""
 
 import os
 import datetime
@@ -30,6 +32,7 @@ class Kunit:
         self.frameStatus = None # object's frameStatus
         self.name = None # object name
         self.__dir = None # test dir
+
         self.__fn   = '{:s}.XML'.format(os.path.splitext(fileName)[0])
         self.__clnm = os.path.splitext(os.path.basename(self.__fn))[0]
         self.__cnt  = 0
@@ -48,7 +51,7 @@ class Kunit:
         try:
             os.chmod(self.__fn, 0o666)
         except:
-            pass      
+            pass
         self.__f.writelines('<?xml version="1.0" encoding="UTF-8"?>\n')
         self.__f.writelines('<testsuite>\n')
         self.frameStatus = True
@@ -77,18 +80,18 @@ class Kunit:
         self.__f.writelines(self.__make_test_case(ref_obj, title, delta_t))
         self.__make_system_out(out_text)
         self.__f.writelines('\t</testcase>\n')
-        '''
-        The following code is used in case we have to fill up also the xml part related to any open kunit child
-        For example for any TPSBlock opened inside testcase istance
-        '''
+        #
+        # The following code is used in case we have to fill up also the xml part related to any open kunit child
+        # For example for any TPSBlock opened inside testcase istance
         for child in self.children:
-          if child.frameStatus:
-            child.__st = None
-            child.__f.writelines(child.__make_test_case(ref_obj, title, delta_t))
-            child.__make_system_out(out_text)
-            child.__f.writelines('\t</testcase>\n')
+            if child.frameStatus:
+                child.__st = None
+                child.__f.writelines(child.__make_test_case(ref_obj, title, delta_t))
+                child.__make_system_out(out_text)
+                child.__f.writelines('\t</testcase>\n')
 
 
+    #pylint: disable=too-many-arguments
     def add_failure(self, ref_obj, title, elapsed_time, out_text, err_text, log_text=None):
         """ Inject a FAILURE record on xml result file
             ref_obj      : reference to an Equipment variable (could be None)
@@ -109,21 +112,23 @@ class Kunit:
         self.__make_system_out(out_text)
         self.__make_system_err(err_text)
         self.__f.writelines('\t</testcase>\n')
-        '''
-        The following code is used in case we have to fill up also the xml part related to any open kunit child
-        For example for any TPSBlock opened inside testcase istance
-        '''
+        #
+        # The following code is used in case we have to fill up also the xml part related to any open kunit child
+        # For example for any TPSBlock opened inside testcase istance
+        #
         for child in self.children:
-          if child.frameStatus:
-            child.__st = None
-            row1 = child.__make_test_case(ref_obj, title, delta_t)
-            child.__f.writelines(row1)
-            child.__make_log_error(log_text)
-            child.__make_system_out(out_text)
-            child.__make_system_err(err_text)
-            child.__f.writelines('\t</testcase>\n')
+            if child.frameStatus:
+                child.__st = None
+                row1 = child.__make_test_case(ref_obj, title, delta_t)
+                child.__f.writelines(row1)
+                child.__make_log_error(log_text)
+                child.__make_system_out(out_text)
+                child.__make_system_err(err_text)
+                child.__f.writelines('\t</testcase>\n')
+    #pylint: enable=too-many-arguments
 
 
+    #pylint: disable=too-many-arguments
     def add_skipped(self, ref_obj, title, elapsed_time, out_text, err_text, skip_text=None):
         """ Inject a SKIPPED record on xml result file
             ref_obj      : reference to an Equipment variable (could be None)
@@ -144,20 +149,20 @@ class Kunit:
         self.__make_system_out(out_text)
         self.__make_system_err(err_text)
         self.__f.writelines('\t</testcase>\n')
-        '''
-        The following code is used in case we have to fill up also the xml part related to any open kunit child
-        For example for any TPSBlock opened inside testcase istance
-        '''
+        #
+        # The following code is used in case we have to fill up also the xml part related to any open kunit child
+        # For example for any TPSBlock opened inside testcase istance
+        #
         for child in self.children:
-          if child.frameStatus:
-            child.__st = None
-            row1 = child.__make_test_case(ref_obj, title, delta_t)
-            child.__f.writelines(row1)
-            child.__make_skipped(skip_text)
-            child.__make_system_out(out_text)
-            child.__make_system_err(err_text)
-            child.__f.writelines('\t</testcase>\n')
-
+            if child.frameStatus:
+                child.__st = None
+                row1 = child.__make_test_case(ref_obj, title, delta_t)
+                child.__f.writelines(row1)
+                child.__make_skipped(skip_text)
+                child.__make_system_out(out_text)
+                child.__make_system_err(err_text)
+                child.__f.writelines('\t</testcase>\n')
+    #pylint: enable=too-many-arguments
 
 
     def start_time(self):
@@ -169,16 +174,16 @@ class Kunit:
         """
         self.__st = datetime.datetime.now()
 
-      
+
     def start_tps_block(self, tps_area, tps_name):
         '''
         Start an official block containg all code related to aspecific TPS (Test Procedure)
         calling this function into testcase object will generate a specific XML report file for each TPSName provided
         '''
-        tpsreport = None     
+        tpsreport = None
         for mychild in self.children:
             if mychild.name == self.__dir + '/' + os.path.splitext(os.path.splitext(self.__clnm)[0])[0] + '.' + tps_area +'_'+ tps_name + '.XML':
-                tpsreport = mychild 
+                tpsreport = mychild
                 break
         else:
             tpsreport=Kunit(self.__dir + '/' + os.path.splitext(os.path.splitext(self.__clnm)[0])[0] + '.' + tps_area +'_'+ tps_name + '.XML')
@@ -197,10 +202,12 @@ class Kunit:
 
 
     def __make_test_case(self, ref_obj, title, elapsed_time):
-        try:
-            obj_name = ref_obj.getLabel()
-        except:
+        """ INTERNAL USAGE
+        """
+        if ref_obj is None:
             obj_name = ""
+        else:
+            obj_name = ref_obj.getLabel()
 
         self.__cnt = self.__cnt + 1
 
@@ -216,6 +223,8 @@ class Kunit:
 
 
     def __make_system_out(self, out_text):
+        """ INTERNAL USAGE
+        """
         self.__f.writelines('\t\t<system-out>\n')
         self.__f.writelines('\t\t\t<![CDATA[\n')
         self.__f.writelines(out_text + '\n')
@@ -224,6 +233,8 @@ class Kunit:
 
 
     def __make_system_err(self, out_text):
+        """ INTERNAL USAGE
+        """
         self.__f.writelines('\t\t<system-err>\n')
         self.__f.writelines('\t\t\t<![CDATA[\n')
         self.__f.writelines(out_text + '\n')
@@ -232,6 +243,8 @@ class Kunit:
 
 
     def __make_log_error(self, out_text):
+        """ INTERNAL USAGE
+        """
         self.__f.writelines('\t\t<failure>\n')
         self.__f.writelines('\t\t\t<![CDATA[\n')
         if out_text is not None:
@@ -242,6 +255,8 @@ class Kunit:
 
 
     def __make_skipped(self, out_text):
+        """ INTERNAL USAGE
+        """
         self.__f.writelines('\t\t<skipped>\n')
         self.__f.writelines('\t\t\t<![CDATA[\n')
         if out_text != None:
