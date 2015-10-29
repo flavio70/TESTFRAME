@@ -31,17 +31,21 @@ if __name__ == "__main__":
 
     tabEqpt = TEquipment
 
-
-    for r in tabEqpt.objects.all():
-        eType = getEqptTypeName(r.t_equip_type_id_type.id_type)
-        eLoc  = getEqptLocation(r.t_location_id_location.id_location)
-        eIP   = getEqptIP(r.id_equipment)
-        res='{:5s} {:10s} {:10s} {:20s} {:20s} {:20s}'.format(
-                str(r.id_equipment),
-                eType,
-                eLoc,
-                str(r.name),
-                eIP,
-                str(r.owner)
-            )
-        print(res)
+    if True:
+        for r in tabEqpt.objects.all():
+            eType = getEqptTypeName(r.t_equip_type_id_type.id_type)
+            eLoc  = getEqptLocation(r.t_location_id_location.id_location)
+            eIP   = getEqptIP(r.id_equipment)
+            res='{:5s} {:10s} {:10s} {:20s} {:20s} {:20s}'.format(
+                    str(r.id_equipment),
+                    eType,
+                    eLoc,
+                    str(r.name),
+                    eIP,
+                    str(r.owner)
+                )
+            print(res)
+    else:
+        tt = TEquipType
+        for r in tt.objects.all().order_by('name'):
+            print(r.name)

@@ -25,52 +25,45 @@ class Kunit:
         """
         self.__cnt  = 0     # counter of atomic test
         self.__st   = None  # test execution starting time
-        self.__dir  = None  # test dir
+
+        # Base path of xml result area
+        self.__dir  = os.path.split(os.path.abspath(fileName))[0]
+
+        # xml file name (path complete)
+        master_file_name   = '{:s}.XML'.format(os.path.splitext(fileName)[0])
+
+        # basic name of test, i.e. without path and suffix
+        self.__clnm = os.path.splitext(os.path.basename(master_file_name))[0]
 
         # Lista dei file di report
         self.__reports = { }
 
+        self.frame_open(master_file_name)
 
-        # per ogni report file
-        # dizionario con chiave filename e contenuto file descriptor
-        self.__fn   = None  # xml file name
-        self.__clnm = None  # basic name of test, i.e. without path and suffix
-        self.__f    = None  # file descriptor
 
-        self.children = None # object's children list
-        self.frame_status = None # object's frameStatus
-        self.name = None # object name
-
-        self.__fn   = '{:s}.XML'.format(os.path.splitext(fileName)[0])
-        self.__clnm = os.path.splitext(os.path.basename(self.__fn))[0]
-
-        self.__dir = os.path.split(os.path.abspath(fileName))[0]
-        self.children = []
-        self.frame_status = False
-        self.name = fileName
-
-    def __str__(self):
-        return self.__fn
-
-    def frame_open(self):
+    def frame_open(self, file_name):
         """ Start xml composition
         """
-        self.__f = open(self.__fn, "w")
+        self.__reports[file_name] = open(file_name, "w")
         try:
-            os.chmod(self.__fn, 0o666)
+            os.chmod(file_name, 0o666)
         except:
             pass
-        self.__f.writelines('<?xml version="1.0" encoding="UTF-8"?>\n')
-        self.__f.writelines('<testsuite>\n')
-        self.frame_status = True
+
+        self.__reports[file_name].writelines('<?xml version="1.0" encoding="UTF-8"?>\n')
+        self.__reports[file_name].writelines('<testsuite>\n')
 
 
-    def frame_close(self):
+    def frame_close(self, file_name=None):
         """ Close xml composition
         """
-        self.__f.writelines('</testsuite>\n')
-        self.__f.close()
-        self.frame_status = False
+        if file_name is None:
+            for elem in self.__reports:
+                self.__reports[elem].writelines('</testsuite>\n')
+                self.__reports[elem].close()
+        else:
+            self.__reports[file_name].writelines('</testsuite>\n')
+            self.__reports[file_name].close()
 
 
     def add_success(self, ref_obj, title, elapsed_time, out_text):
@@ -84,19 +77,16 @@ class Kunit:
             delta_t = str((datetime.datetime.now() - self.__st).total_seconds())
         else:
             delta_t = elapsed_time
+
         self.__st = None
-        self.__f.writelines(self.__make_test_case(ref_obj, title, delta_t))
-        self.__make_system_out(out_text)
-        self.__f.writelines('\t</testcase>\n')
-        #
-        # The following code is used in case we have to fill up also the xml part related to any open kunit child
-        # For example for any TPSBlock opened inside testcase istance
-        for child in self.children:
-            if child.frame_status:
-                child.__st = None
-                child.__f.writelines(child.__make_test_case(ref_obj, title, delta_t))
-                child.__make_system_out(out_text)
-                child.__f.writelines('\t</testcase>\n')
+        self.__cnt = self.__cnt + 1
+
+        for elem in self.__reports:
+            file_desc = self.__reports[elem]
+
+            block = "{:s}{:s}\t</testcase>\n".format(self.__make_test_case(ref_obj, title, delta_t, self.__cnt),
+                                                     self.__make_system_out(out_text))
+            file_desc.writelines(block)
 
 
     #pylint: disable=too-many-arguments
@@ -113,26 +103,18 @@ class Kunit:
             delta_t = str((datetime.datetime.now() - self.__st).total_seconds())
         else:
             delta_t = elapsed_time
+
         self.__st = None
-        row = self.__make_test_case(ref_obj, title, delta_t)
-        self.__f.writelines(row)
-        self.__make_log_error(log_text)
-        self.__make_system_out(out_text)
-        self.__make_system_err(err_text)
-        self.__f.writelines('\t</testcase>\n')
-        #
-        # The following code is used in case we have to fill up also the xml part related to any open kunit child
-        # For example for any TPSBlock opened inside testcase istance
-        #
-        for child in self.children:
-            if child.frame_status:
-                child.__st = None
-                row1 = child.__make_test_case(ref_obj, title, delta_t)
-                child.__f.writelines(row1)
-                child.__make_log_error(log_text)
-                child.__make_system_out(out_text)
-                child.__make_system_err(err_text)
-                child.__f.writelines('\t</testcase>\n')
+        self.__cnt = self.__cnt + 1
+
+        for elem in self.__reports:
+            file_desc = self.__reports[elem]
+
+            block = "{:s}{:s}{:s}{:s}\t</testcase>\n".format(self.__make_test_case(ref_obj, title, delta_t, self.__cnt),
+                                                             self.__make_log_error(log_text),
+                                                             self.__make_system_out(out_text),
+                                                             self.__make_system_err(err_text))
+            file_desc.writelines(block)
     #pylint: enable=too-many-arguments
 
 
@@ -150,26 +132,18 @@ class Kunit:
             delta_t = str((datetime.datetime.now() - self.__st).total_seconds())
         else:
             delta_t = elapsed_time
+
         self.__st = None
-        row = self.__make_test_case(ref_obj, title, delta_t)
-        self.__f.writelines(row)
-        self.__make_skipped(skip_text)
-        self.__make_system_out(out_text)
-        self.__make_system_err(err_text)
-        self.__f.writelines('\t</testcase>\n')
-        #
-        # The following code is used in case we have to fill up also the xml part related to any open kunit child
-        # For example for any TPSBlock opened inside testcase istance
-        #
-        for child in self.children:
-            if child.frame_status:
-                child.__st = None
-                row1 = child.__make_test_case(ref_obj, title, delta_t)
-                child.__f.writelines(row1)
-                child.__make_skipped(skip_text)
-                child.__make_system_out(out_text)
-                child.__make_system_err(err_text)
-                child.__f.writelines('\t</testcase>\n')
+        self.__cnt = self.__cnt + 1
+
+        for elem in self.__reports:
+            file_desc = self.__reports[elem]
+
+            block = "{:s}{:s}{:s}{:s}\t</testcase>\n".format(self.__make_test_case(ref_obj, title, delta_t, self.__cnt),
+                                                             self.__make_skipped(skip_text),
+                                                             self.__make_system_out(out_text),
+                                                             self.__make_system_err(err_text))
+            file_desc.writelines(block)
     #pylint: enable=too-many-arguments
 
 
@@ -193,20 +167,10 @@ class Kunit:
                                                      os.path.splitext(os.path.splitext(self.__clnm)[0])[0],
                                                      tps_area,
                                                      tps_name)
-        tpsreport = None
 
-        for mychild in self.children:
-            if mychild.name == file_name:
-                tpsreport = mychild
-                break
-        else:
-            tpsreport = Kunit(file_name)
-            self.children.append(tpsreport)
+        self.__reports[file_name] = None
 
-        if not tpsreport.frame_status:
-            tpsreport.frame_open()
-
-        print(tpsreport.__fn)
+        self.frame_open(file_name)
 
 
     def stop_tps_block(self, tps_area, tps_name):
@@ -218,22 +182,20 @@ class Kunit:
                                                      os.path.splitext(os.path.splitext(self.__clnm)[0])[0],
                                                      tps_area,
                                                      tps_name)
-        for mychild in self.children:
-            if mychild.__fn == file_name:
-                mychild.frame_close()
+        self.frame_close(file_name)
+
+        self.__reports.pop(file_name)
 
 
-    def __make_test_case(self, ref_obj, title, elapsed_time):
+    def __make_test_case(self, ref_obj, title, elapsed_time, counter):
         """ INTERNAL USAGE
         """
-        if ref_obj is None:
+        try:
+            obj_name = ref_obj.get_label()
+        except Exception as eee:
             obj_name = ""
-        else:
-            obj_name = ref_obj.getLabel()
 
-        self.__cnt = self.__cnt + 1
-
-        t_title = '{:05n} [{:s}] {:.100}'.format(self.__cnt, obj_name, title.replace("&", "&amp;"))
+        t_title = '{:05n} [{:s}] {:.100}'.format(counter, obj_name, title.replace("&", "&amp;"))
         t_now = str(datetime.datetime.now())
 
         msg = '\t<testcase classname="{:s}" name="{:s}" timestamp="{:s}" time="{:s}">\n'.format(\
@@ -247,45 +209,47 @@ class Kunit:
     def __make_system_out(self, out_text):
         """ INTERNAL USAGE
         """
-        self.__f.writelines('\t\t<system-out>\n')
-        self.__f.writelines('\t\t\t<![CDATA[\n')
-        self.__f.writelines(out_text + '\n')
-        self.__f.writelines('\t\t\t]]>\n')
-        self.__f.writelines('\t\t</system-out>\n')
+        return  '\t\t<system-out>\n'    +\
+                '\t\t\t<![CDATA[\n'     +\
+                out_text                +\
+                '\n\t\t\t]]>\n'         +\
+                '\t\t</system-out>\n'
 
 
     def __make_system_err(self, out_text):
         """ INTERNAL USAGE
         """
-        self.__f.writelines('\t\t<system-err>\n')
-        self.__f.writelines('\t\t\t<![CDATA[\n')
-        self.__f.writelines(out_text + '\n')
-        self.__f.writelines('\t\t\t]]>\n')
-        self.__f.writelines('\t\t</system-err>\n')
+        return  '\t\t<system-err>\n'    +\
+                '\t\t\t<![CDATA[\n'     +\
+                out_text                +\
+                '\n\t\t\t]]>\n'         +\
+                '\t\t</system-err>\n'
 
 
     def __make_log_error(self, out_text):
         """ INTERNAL USAGE
         """
-        self.__f.writelines('\t\t<failure>\n')
-        self.__f.writelines('\t\t\t<![CDATA[\n')
-        if out_text is not None:
-            self.__f.writelines(out_text)
-        self.__f.writelines('\n')
-        self.__f.writelines('\t\t\t]]>\n')
-        self.__f.writelines('\t\t</failure>\n')
+        if out_text is None:
+            out_text = ""
+
+        return  '\t\t<failure>\n'       +\
+                '\t\t\t<![CDATA[\n'     +\
+                out_text                +\
+                '\n\t\t\t]]>\n'         +\
+                '\t\t</failure>\n'
 
 
     def __make_skipped(self, out_text):
         """ INTERNAL USAGE
         """
-        self.__f.writelines('\t\t<skipped>\n')
-        self.__f.writelines('\t\t\t<![CDATA[\n')
-        if out_text != None:
-            self.__f.writelines(out_text)
-        self.__f.writelines('\n')
-        self.__f.writelines('\t\t\t]]>\n')
-        self.__f.writelines('\t\t</skipped>\n')
+        if out_text is None:
+            out_text = ""
+
+        return  '\t\t<skipped>\n'       +\
+                '\t\t\t<![CDATA[\n'     +\
+                out_text                +\
+                '\n\t\t\t]]>\n'         +\
+                '\t\t</skipped>\n'
 
 
 
@@ -295,16 +259,12 @@ if __name__ == "__main__":
     print("DEBUG")
     kun = Kunit("/users/ghelfc/domain.prova.py")
 
-    kun.frame_open()
-
     kun.start_time()
     # simulo un tempo di esecuzione
     time.sleep(3)
 
     kun.start_tps_block("DATA", "1.2.3")
     kun.start_tps_block("TDM",  "5.3.6")
-
-    print(kun.children)
 
     kun.add_success(None, "TL1 AAA", None, "TESTO")
     kun.add_failure(None, "TL1 BBB", "120.0", "DENY detected", "internal timeout", "traccia")
@@ -314,7 +274,8 @@ if __name__ == "__main__":
     kun.add_skipped(None, "CLI AAA", "0.0", "TESTO", "not applicable")
     kun.add_success(None, "TL1 DDD", "2.3", "TESTO")
 
-    kun.start_tps_block("TDM",  "5.3.6")
+    kun.stop_tps_block("DATA", "1.2.3")
+
     kun.add_success(None, "TL1 EEE", "2.8", "TESTO")
 
     kun.frame_close()

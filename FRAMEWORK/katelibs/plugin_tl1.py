@@ -358,7 +358,7 @@ class Plugin1850TL1():
         """ INTERNAL USAGE
         """
         if self.__krepo:
-            self.__krepo.startTime()
+            self.__krepo.start_time()
 
         # Trash all trailing characters from stream
         while str(channel.read_very_eager().strip(), 'utf-8') != "":
