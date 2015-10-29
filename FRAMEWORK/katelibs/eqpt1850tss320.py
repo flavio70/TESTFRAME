@@ -14,7 +14,7 @@ import equipment
 import facility1850
 import access1850
 import plugin_tl1
-from KateLibs.database import *
+from database import *
 
 
 

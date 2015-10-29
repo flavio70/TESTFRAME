@@ -23,22 +23,30 @@ class Kunit:
         """
         fileName : test's file name
         """
-        self.__fn   = None  # xml file name
-        self.__cnt  = None  # counter of atomic test
-        self.__clnm = None  # basic name of test, i.e. without path and suffix
+        self.__cnt  = 0     # counter of atomic test
         self.__st   = None  # test execution starting time
+        self.__dir  = None  # test dir
+
+        # Lista dei file di report
+        self.__reports = { }
+
+
+        # per ogni report file
+        # dizionario con chiave filename e contenuto file descriptor
+        self.__fn   = None  # xml file name
+        self.__clnm = None  # basic name of test, i.e. without path and suffix
         self.__f    = None  # file descriptor
+
         self.children = None # object's children list
-        self.frameStatus = None # object's frameStatus
+        self.frame_status = None # object's frameStatus
         self.name = None # object name
-        self.__dir = None # test dir
 
         self.__fn   = '{:s}.XML'.format(os.path.splitext(fileName)[0])
         self.__clnm = os.path.splitext(os.path.basename(self.__fn))[0]
-        self.__cnt  = 0
+
         self.__dir = os.path.split(os.path.abspath(fileName))[0]
         self.children = []
-        self.frameStatus = False
+        self.frame_status = False
         self.name = fileName
 
     def __str__(self):
@@ -54,7 +62,7 @@ class Kunit:
             pass
         self.__f.writelines('<?xml version="1.0" encoding="UTF-8"?>\n')
         self.__f.writelines('<testsuite>\n')
-        self.frameStatus = True
+        self.frame_status = True
 
 
     def frame_close(self):
@@ -62,7 +70,7 @@ class Kunit:
         """
         self.__f.writelines('</testsuite>\n')
         self.__f.close()
-        self.frameStatus = False
+        self.frame_status = False
 
 
     def add_success(self, ref_obj, title, elapsed_time, out_text):
@@ -84,7 +92,7 @@ class Kunit:
         # The following code is used in case we have to fill up also the xml part related to any open kunit child
         # For example for any TPSBlock opened inside testcase istance
         for child in self.children:
-            if child.frameStatus:
+            if child.frame_status:
                 child.__st = None
                 child.__f.writelines(child.__make_test_case(ref_obj, title, delta_t))
                 child.__make_system_out(out_text)
@@ -117,7 +125,7 @@ class Kunit:
         # For example for any TPSBlock opened inside testcase istance
         #
         for child in self.children:
-            if child.frameStatus:
+            if child.frame_status:
                 child.__st = None
                 row1 = child.__make_test_case(ref_obj, title, delta_t)
                 child.__f.writelines(row1)
@@ -154,7 +162,7 @@ class Kunit:
         # For example for any TPSBlock opened inside testcase istance
         #
         for child in self.children:
-            if child.frameStatus:
+            if child.frame_status:
                 child.__st = None
                 row1 = child.__make_test_case(ref_obj, title, delta_t)
                 child.__f.writelines(row1)
@@ -180,15 +188,24 @@ class Kunit:
         Start an official block containg all code related to aspecific TPS (Test Procedure)
         calling this function into testcase object will generate a specific XML report file for each TPSName provided
         '''
+
+        file_name = "{:s}/{:s}.{:s}_{:s}.XML".format(self.__dir,
+                                                     os.path.splitext(os.path.splitext(self.__clnm)[0])[0],
+                                                     tps_area,
+                                                     tps_name)
         tpsreport = None
+
         for mychild in self.children:
-            if mychild.name == self.__dir + '/' + os.path.splitext(os.path.splitext(self.__clnm)[0])[0] + '.' + tps_area +'_'+ tps_name + '.XML':
+            if mychild.name == file_name:
                 tpsreport = mychild
                 break
         else:
-            tpsreport=Kunit(self.__dir + '/' + os.path.splitext(os.path.splitext(self.__clnm)[0])[0] + '.' + tps_area +'_'+ tps_name + '.XML')
+            tpsreport = Kunit(file_name)
             self.children.append(tpsreport)
-        if not tpsreport.frameStatus: tpsreport.frame_open()
+
+        if not tpsreport.frame_status:
+            tpsreport.frame_open()
+
         print(tpsreport.__fn)
 
 
@@ -197,8 +214,13 @@ class Kunit:
         Stop the block containing the code related to the specific TPS (test Procedure)
         This function will terminate the specific XML report file related to TPSName test id
         '''
-        for c in self.children:
-            if c.__fn == self.__dir + '/' + os.path.splitext(os.path.splitext(self.__clnm)[0])[0] + '.' + tps_area +'_'+ tps_name + '.XML': c.frame_close()
+        file_name = "{:s}/{:s}.{:s}_{:s}.XML".format(self.__dir,
+                                                     os.path.splitext(os.path.splitext(self.__clnm)[0])[0],
+                                                     tps_area,
+                                                     tps_name)
+        for mychild in self.children:
+            if mychild.__fn == file_name:
+                mychild.frame_close()
 
 
     def __make_test_case(self, ref_obj, title, elapsed_time):
@@ -278,22 +300,21 @@ if __name__ == "__main__":
     kun.start_time()
     # simulo un tempo di esecuzione
     time.sleep(3)
-    kun.add_success(None,
-                    "TL1 command1",
-                    None,
-                    "aaaaaaaaaaaaabbbbbbbbbbbbbbbbbbbbbbccccccccccccccc")
 
-    kun.add_failure(None,
-                    "TL1 command with many arguments",
-                    "120.0",
-                    "DENY detected",
-                    "internal timeout",
-                    "http://ip:port/path/xxx.html")
+    kun.start_tps_block("DATA", "1.2.3")
+    kun.start_tps_block("TDM",  "5.3.6")
 
-    kun.add_skipped(None,
-                    "CLI command1",
-                    "0.0",
-                    "asdasdkjakjsdjioafdioufsdosduiafsd",
-                    "not applicable")
+    print(kun.children)
+
+    kun.add_success(None, "TL1 AAA", None, "TESTO")
+    kun.add_failure(None, "TL1 BBB", "120.0", "DENY detected", "internal timeout", "traccia")
+
+    kun.stop_tps_block("TDM",  "5.3.6")
+
+    kun.add_skipped(None, "CLI AAA", "0.0", "TESTO", "not applicable")
+    kun.add_success(None, "TL1 DDD", "2.3", "TESTO")
+
+    kun.start_tps_block("TDM",  "5.3.6")
+    kun.add_success(None, "TL1 EEE", "2.8", "TESTO")
 
     kun.frame_close()
