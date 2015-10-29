@@ -15,11 +15,11 @@ import os
 
 # Getting Django Setting (settings.py) and setting basic configuration for DJANGO DB connection
 # settings.py file must be in ./DB_API_CONF folder
-os.environ.setdefault("DJANGO_SETTINGS_MODULE", "DB_API_CONF.settings")
+os.environ.setdefault("DJANGO_SETTINGS_MODULE", "katelibs.DB_API_CONF.settings")
 
 #import all objects defined in models.py
 #models.py module must be placed in ./DB_API_LIB folder
-from DB_API_LIB.models import *
+from katelibs.DB_API_LIB.models import *
 
 
 
