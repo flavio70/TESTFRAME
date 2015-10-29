@@ -6,7 +6,7 @@
 @Description: This module is used for general test case implementation.
     Provides test class definition and common functions
 """
-from KateLibs.kunit import Kunit
+from kunit import Kunit
 import os
 import json
 import argparse
