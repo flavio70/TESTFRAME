@@ -9,7 +9,7 @@ Module used to drive Jenkins jobs
 import os
 import argparse
 from git import Repo
-from KateLibs.kunit import Kunit
+from katelibs.kunit import Kunit
 
 JenkinsHome = os.environ['JENKINS_HOME']
 JobWorkspace = os.environ['WORKSPACE']
