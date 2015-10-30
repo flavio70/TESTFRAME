@@ -6,15 +6,14 @@ Module used to drive Jenkins jobs
 @AUTHOR: F.Ippolito
 @DATE  : 02/09/2015
 """
-import os
+import os, sys
 import argparse
 from git import Repo
 from katelibs.kunit import Kunit
+from katelibs.database import *
 
-JenkinsHome = os.environ['JENKINS_HOME']
-JobWorkspace = os.environ['WORKSPACE']
 
-def printFRMWRKdata():
+def printFRMWRKdata(JenkinsHome, JobWorkspace):
     """
     print Framework environemnt data into Kunit format
     """
@@ -32,7 +31,6 @@ def printFRMWRKdata():
     print('API version: ' + frmwrkVersionShort)
     xmlReport = JobWorkspace + '/test-reports/EnvSettings.FrameworkAPI.XML'
     r = Kunit(xmlReport)
-    r.frame_open()
     r.start_time()
     r.add_success(None, "KATE API: " + frmwrkVersionShort, None, frmwrkVersionLong)
     r.frame_close()
@@ -44,9 +42,18 @@ def main():
     """
     parser = argparse.ArgumentParser()
     parser.add_argument("inputSuite", help="The suite test file to be processed")
+    parser.add_argument("KateRunId", help="K@TE Run Id reference used to relate execution to MySQL DB", nargs='?', default=None)
     args = parser.parse_args()
+    print(args)
+
+    try:
+        JenkinsHome = os.environ['JENKINS_HOME']
+        JobWorkspace = os.environ['WORKSPACE']
+    except:
+        sys.exit('Exiting ... \nError getting os environment JENKINS Data')
+
     print('Processing suite; ', args.inputSuite)
-    printFRMWRKdata()
+    printFRMWRKdata(JenkinsHome, JobWorkspace)
     with open(args.inputSuite) as f:
         for line in f:
             os.system(line)
