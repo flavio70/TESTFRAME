@@ -52,7 +52,6 @@ class TestCase(object):
         '''
         print('\nInitializing ', self.fn, ' environment ...')
         self.print_prs()
-        self.report.frame_open()
         print('DONE \n')
 
     def close(self):

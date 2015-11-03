@@ -58,7 +58,9 @@ class TL1Facility():
                 if line.strip() == "":
                     continue
 
-                msg['SID'], msg['DATE'], msg['TIME'] = line.split()
+                msg['SID']  = " ".join(line.split()[:-2]).replace('"', '')
+                msg['DATE'] = line.split()[-2]
+                msg['TIME'] = line.split()[-1]
                 f_header = False
                 continue
 
@@ -341,20 +343,19 @@ class Plugin1850TL1():
         return self.__last_status
 
 
-    def do(self, cmd, policy="COMPLD", match=None):
+    def do(self, cmd, policy="COMPLD"):
         """ Send the specified TL1 command to equipment.
             It is possible specify an error behaviour and/or a matching string
             cmd     : the TL1 command string
             policy  : "CMPLD" -> specify if a positive result has been expected (default behaviour)
                       "DENY"  -> specify if a negative result has been expected
-            match   : an optional matching string to seek on command's output.
                       It is ignored when policy="DENY"
         """
 
-        return self.__do(self.__if_cmd, cmd, policy, match)
+        return self.__do(self.__if_cmd, cmd, policy)
 
 
-    def __do(self, channel, cmd, policy, match):
+    def __do(self, channel, cmd, policy):
         """ INTERNAL USAGE
         """
         if self.__krepo:
@@ -372,52 +373,56 @@ class Plugin1850TL1():
             else:
                 print("sending [" + cmd + "] (EVENT INTERFACE)")
             channel.write(cmd.encode())
-        #except (socket.error, EOFError) as eee:
         except Exception as eee:
             msg = "Error in tl1.do({:s})\nException: {:s}".format(cmd, str(eee))
             print(msg)
             self.__disconnect()
             self.__connect()
 
-        keepalive_count_max = 100
-        keepalive_count    = 0
-        msg_str  = ""
 
-        while True:
-            res_list  = channel.expect([b"\n\>", b"\n\;"])
-            match_idx = res_list[0]
-            msg_tmp   = str(res_list[2], 'utf-8')
+        if cmd.lower() == "canc-user;":
+            msg_str = " CMPLD "
+        else:
+            msg_str  = ""
+            keepalive_count_max = 100
+            keepalive_count = 0
 
-            if msg_tmp.find("\r\n\n") == -1:
-                continue
+            while True:
+                res_list  = channel.expect([b"\n\>", b"\n\;"])
+                match_idx = res_list[0]
+                msg_tmp   = str(res_list[2], 'utf-8')
 
-            resp_part_list = msg_tmp.split("\r\n\n")
-            msg_tmp        = "\r\n\n".join(resp_part_list[1:])
-
-            if match_idx ==  1:
-                if     msg_tmp.find(" REPT ") != -1:
+                if msg_tmp.find("\r\n\n") == -1:
                     continue
 
-                elif   msg_tmp.find("KEEP ALIVE MESSAGE") != -1 :
-                    keepalive_count = keepalive_count + 1
-                    if keepalive_count == keepalive_count_max:
-                        return 1
-                    continue
+                resp_part_list = msg_tmp.split("\r\n\n")
+                msg_tmp        = "\r\n\n".join(resp_part_list[1:])
 
-                else:
-                    msg_str = msg_str + re.sub('(\r\n)+', "\r\n", msg_tmp, 0)
-                    if verb_lower != "ed-pid"  and  verb_lower != "act-user":
-                        if msg_str.count(";") > 1:
-                            return 1
-                    if msg_str.strip() == ";":
+                if match_idx ==  1:
+                    if     msg_tmp.find(" REPT ") != -1:
                         continue
-                    break
 
-            elif match_idx ==  0:
-                msg_str = msg_str + msg_tmp + "\n"
-                continue
+                    elif   msg_tmp.find("KEEP ALIVE MESSAGE") != -1 :
+                        keepalive_count = keepalive_count + 1
+                        if keepalive_count == keepalive_count_max:
+                            return 1
+                        continue
 
-        msg_str = re.sub('(\r\n)+', "\r\n", msg_str, 0)
+                    else:
+                        msg_str = msg_str + re.sub('(\r\n)+', "\r\n", msg_tmp, 0)
+                        if verb_lower != "ed-pid"  and  verb_lower != "act-user":
+                            if msg_str.count(";") > 1:
+                                return 1
+                        if msg_str.strip() == ";":
+                            continue
+                        break
+
+                elif match_idx ==  0:
+                    msg_str = msg_str + msg_tmp + "\n"
+                    continue
+
+            msg_str = re.sub('(\r\n)+', "\r\n", msg_str, 0)
+
 
         self.__last_output = msg_str
 
@@ -427,7 +432,6 @@ class Plugin1850TL1():
                 result = (policy == "DENY")
             else:
                 result = False
-
         elif   cmd.lower() == "canc-user;":
             self.__last_status = "CMPLD"
             result = (policy == "CMPLD")
@@ -445,7 +449,6 @@ class Plugin1850TL1():
             self.__t_success(cmd, None, self.get_last_outcome())
         else:
             self.__t_failure(cmd, None, self.get_last_outcome(), "")
-        
 
         return result
 
@@ -472,17 +475,15 @@ class Plugin1850TL1():
         """ INTERNAL USAGE
         """
         try:
-            self.__do(self.__if_eve, "CANC-USER;", "COMPLD", None)
-            self.__do(self.__if_cmd, "CANC-USER;", "COMPLD", None)
+            self.__do(self.__if_eve, "CANC-USER;", "COMPLD")
+            self.__if_eve = None
+
         except Exception as eee:
             msg = "Error in disconnection - {:s}".format(str(eee))
             print(msg)
 
         try:
-            self.__if_eve.close()
-            self.__if_eve = None
-
-            self.__if_cmd.close()
+            self.__do(self.__if_cmd, "CANC-USER;", "COMPLD")
             self.__if_cmd = None
         except Exception as eee:
             msg = "Error in disconnection - {:s}".format(str(eee))
@@ -539,8 +540,7 @@ class Plugin1850TL1():
             if self.__enable_collect:
                 connected = self.__do(  self.__if_eve,
                                         "ACT-USER::admin:MYTAG::Alcatel1;",
-                                        policy="CMPLD",
-                                        match=None  )
+                                        policy="CMPLD"  )
             time.sleep(1)
 
 
@@ -663,9 +663,71 @@ M  792 DENY\n\
 ;\n\
 "
 
-    if True:
-        print("[{:s}]\n{:s}".format(msg1, "-" * 80))
-        print(TL1Facility.decode(msg1))
+    msg5 = "\n\
+   \"nodeA - .TDM.EM_TEST.RtrvEqptALL\" 15-10-15 21:47:33\n\
+M  963 COMPLD\n\
+   \"SHELF-1-1::PROVISIONEDTYPE=UNVRSL320,ACTUALTYPE=UNVRSL320,AINSMODE=NOWAIT,SHELFNUM=1,SHELFROLE=MAIN,ALMPROF=LBL-ASAPEQPT-SYSDFLT,REGION=ETSI,PROVMODE=MANEQ-AUTOFC:IS\"\n\
+   \"EC320-1-1-1::PROVISIONEDTYPE=EC320,ACTUALTYPE=UNKNOWN,AINSMODE=NOWAIT,ALMPROF=LBL-ASAPEQPT-SYSDFLT,REGION=ETSI,PROVMODE=MANEQ-AUTOFC:OOS-AU,WRK&FLT\"\n\
+   \"MDL-1-1-2::AUTOPROV=OFF:OOS-AUMA,UAS&UEQ\"\n\
+   \"MDL-1-1-3::AUTOPROV=OFF:OOS-AUMA,UAS&UEQ\"\n\
+   \"MDL-1-1-4::AUTOPROV=OFF:OOS-AUMA,UAS&UEQ\"\n\
+   \"MDL-1-1-5::AUTOPROV=OFF:OOS-AUMA,UAS&UEQ\"\n\
+   \"MDL-1-1-6::AUTOPROV=OFF:OOS-AUMA,UAS&UEQ\"\n\
+   \"MDL-1-1-7::AUTOPROV=OFF:OOS-AUMA,UAS&UEQ\"\n\
+   \"MDL-1-1-8::AUTOPROV=OFF:OOS-AUMA,UAS&UEQ\"\n\
+   \"MDL-1-1-9::AUTOPROV=OFF:OOS-AUMA,UAS&UEQ\"\n\
+   \"MT320-1-1-10::PROVISIONEDTYPE=MT320,ACTUALTYPE=UNKNOWN,AINSMODE=NOWAIT,ALMPROF=LBL-ASAPEQPT-SYSDFLT,REGION=ETSI,PROVMODE=MANEQ-AUTOFC:OOS-AU,WRK&UEQ\"\n\
+   \"MT320-1-1-11::PROVISIONEDTYPE=MT320,ACTUALTYPE=UNKNOWN,AINSMODE=NOWAIT,ALMPROF=LBL-ASAPEQPT-SYSDFLT,REGION=ETSI,PROVMODE=MANEQ-AUTOFC:OOS-AU,STBYH&UEQ\"\n\
+   \"MDL-1-1-12::AUTOPROV=OFF:OOS-AUMA,UAS&UEQ\"\n\
+   \"MDL-1-1-13::AUTOPROV=OFF:OOS-AUMA,UAS&UEQ\"\n\
+   \"MDL-1-1-14::AUTOPROV=OFF:OOS-AUMA,UAS&UEQ\"\n\
+   \"MDL-1-1-15::AUTOPROV=OFF:OOS-AUMA,UAS&UEQ\"\n\
+   \"MDL-1-1-16::AUTOPROV=OFF:OOS-AUMA,UAS&UEQ\"\n\
+   \"MDL-1-1-17::AUTOPROV=OFF:OOS-AUMA,UAS&UEQ\"\n\
+   \"PP1GE-1-1-18::PROVISIONEDTYPE=PP1GE,ACTUALTYPE=UNKNOWN,AINSMODE=NOWAIT,ALMPROF=LBL-ASAPEQPT-SYSDFLT,REGION=ETSI,PROVMODE=MANEQ-AUTOFC:OOS-AU,FLT\"\n\
+   \"MDL-1-1-18-1::AUTOPROV=OFF:OOS-AUMA,UAS&UEQ\"\n\
+   \"MDL-1-1-18-2::AUTOPROV=OFF:OOS-AUMA,UAS&UEQ\"\n\
+   \"MDL-1-1-18-3::AUTOPROV=OFF:OOS-AUMA,UAS&UEQ\"\n\
+   \"MDL-1-1-18-4::AUTOPROV=OFF:OOS-AUMA,UAS&UEQ\"\n\
+   \"MDL-1-1-18-5::AUTOPROV=OFF:OOS-AUMA,UAS&UEQ\"\n\
+   \"MDL-1-1-18-6::AUTOPROV=OFF:OOS-AUMA,UAS&UEQ\"\n\
+   \"MDL-1-1-18-7::AUTOPROV=OFF:OOS-AUMA,UAS&UEQ\"\n\
+   \"MDL-1-1-18-8::AUTOPROV=OFF:OOS-AUMA,UAS&UEQ\"\n\
+   \"MDL-1-1-18-9::AUTOPROV=OFF:OOS-AUMA,UAS&UEQ\"\n\
+   \"MDL-1-1-18-10::AUTOPROV=OFF:OOS-AUMA,UAS&UEQ\"\n\
+   \"MDL-1-1-19::AUTOPROV=OFF:OOS-AUMA,UAS&UEQ\"\n\
+   \"MDL-1-1-20::AUTOPROV=OFF:OOS-AUMA,UAS&UEQ\"\n\
+   \"MDL-1-1-21::AUTOPROV=OFF:OOS-AUMA,UAS&UEQ\"\n\
+   \"MDL-1-1-22::AUTOPROV=OFF:OOS-AUMA,UAS&UEQ\"\n\
+   \"MDL-1-1-23::AUTOPROV=OFF:OOS-AUMA,UAS&UEQ\"\n\
+   \"MDL-1-1-24::AUTOPROV=OFF:OOS-AUMA,UAS&UEQ\"\n\
+   \"MDL-1-1-25::AUTOPROV=OFF:OOS-AUMA,UAS&UEQ\"\n\
+   \"MDL-1-1-26::AUTOPROV=OFF:OOS-AUMA,UAS&UEQ\"\n\
+   \"MDL-1-1-27::AUTOPROV=OFF:OOS-AUMA,UAS&UEQ\"\n\
+   \"MDL-1-1-28::AUTOPROV=OFF:OOS-AUMA,UAS&UEQ\"\n\
+   \"MDL-1-1-29::AUTOPROV=OFF:OOS-AUMA,UAS&UEQ\"\n\
+   \"MDL-1-1-30::AUTOPROV=OFF:OOS-AUMA,UAS&UEQ\"\n\
+   \"MDL-1-1-31::AUTOPROV=OFF:OOS-AUMA,UAS&UEQ\"\n\
+   \"MDL-1-1-32::AUTOPROV=OFF:OOS-AUMA,UAS&UEQ\"\n\
+   \"MDL-1-1-33::AUTOPROV=OFF:OOS-AUMA,UAS&UEQ\"\n\
+   \"MDL-1-1-34::AUTOPROV=OFF:OOS-AUMA,UAS&UEQ\"\n\
+   \"MDL-1-1-35::AUTOPROV=OFF:OOS-AUMA,UAS&UEQ\"\n\
+   \"MDL-1-1-36::AUTOPROV=OFF:OOS-AUMA,UAS&UEQ\"\n\
+   \"POW320-1-1-37::PROVISIONEDTYPE=PSF320,ACTUALTYPE=UNKNOWN,AINSMODE=NOWAIT,ALMPROF=LBL-ASAPEQPT-SYSDFLT,REGION=ETSI,PROVMODE=MANEQ-AUTOFC:OOS-AU,MEA\"\n\
+   \"MDL-1-1-38::AUTOPROV=OFF:OOS-AUMA,UAS&UEQ\"\n\
+   \"POW320-1-1-39::PROVISIONEDTYPE=PSF320,ACTUALTYPE=UNKNOWN,AINSMODE=NOWAIT,ALMPROF=LBL-ASAPEQPT-SYSDFLT,REGION=ETSI,PROVMODE=MANEQ-AUTOFC:OOS-AU,MEA\"\n\
+   \"FAN320-1-1-40::PROVISIONEDTYPE=FAN320,ACTUALTYPE=UNKNOWN,AINSMODE=NOWAIT,ALMPROF=LBL-ASAPEQPT-SYSDFLT,REGION=ETSI,PROVMODE=MANEQ-AUTOFC:OOS-AU,FLT\"\n\
+   \"FAN320-1-1-41::PROVISIONEDTYPE=FAN320,ACTUALTYPE=UNKNOWN,AINSMODE=NOWAIT,ALMPROF=LBL-ASAPEQPT-SYSDFLT,REGION=ETSI,PROVMODE=MANEQ-AUTOFC:OOS-AU,FLT\"\n\
+   \"TBUS-1-1-42::PROVISIONEDTYPE=TBUS320,ACTUALTYPE=UNKNOWN,AINSMODE=NOWAIT,ALMPROF=LBL-ASAPEQPT-SYSDFLT,REGION=ETSI,PROVMODE=MANEQ-AUTOFC:IS\"\n\
+   \"TBUS-1-1-43::PROVISIONEDTYPE=TBUS320,ACTUALTYPE=UNKNOWN,AINSMODE=NOWAIT,ALMPROF=LBL-ASAPEQPT-SYSDFLT,REGION=ETSI,PROVMODE=MANEQ-AUTOFC:IS\"\n\
+   /* RTRV-EQPT::ALL [963] (536871273) */\n\
+;\n\
+"
+
+    if False:
+        print("[{:s}]\n{:s}".format(msg5, "-" * 80))
+        print(TL1Facility.decode(msg5))
+        sys.exit(0)
 
         print("#" * 80)
 
@@ -715,12 +777,13 @@ M  792 DENY\n\
         # DB Inizializzato
         tl1.do("ACT-USER::admin:MYTAG::Alcatel1;")
         tl1.event_collection_start()
-        time.sleep(10)
+        time.sleep(2)
         tl1.do("ENT-EQPT::PP1GE-1-1-18::::PROVISIONEDTYPE=PP1GE:IS;")
-        time.sleep(15)
+        time.sleep(5)
         tl1.do("RTRV-EQPT::ALL;")
         res = tl1.get_last_outcome()
-        print(TL1Facility.decode(res))
+        print(res)
+        #print(TL1Facility.decode(res))
         tl1.do("RMV-EQPT::PP1GE-1-1-18;")
         tl1.do("DLT-EQPT::PP1GE-1-1-18;")
 

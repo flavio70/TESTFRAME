@@ -30,21 +30,23 @@ class Kunit:
         self.__dir  = os.path.split(os.path.abspath(fileName))[0]
 
         # xml file name (path complete)
-        master_file_name   = '{:s}.XML'.format(os.path.splitext(fileName)[0])
+        self.master_file_name   = '{:s}.XML'.format(os.path.splitext(fileName)[0])
 
         # basic name of test, i.e. without path and suffix
-        self.__clnm = os.path.splitext(os.path.basename(master_file_name))[0]
+        #self.__clnm = os.path.splitext(os.path.basename(master_file_name))[0]
+        self.__clnm = { }
 
         # Lista dei file di report
         self.__reports = { }
 
-        self.frame_open(master_file_name)
+        self.frame_open(self.master_file_name)
 
 
     def frame_open(self, file_name):
         """ Start xml composition
         """
         self.__reports[file_name] = open(file_name, "w")
+        self.__clnm[file_name] = os.path.splitext(os.path.basename(file_name))[0]
         try:
             os.chmod(file_name, 0o666)
         except:
@@ -83,8 +85,9 @@ class Kunit:
 
         for elem in self.__reports:
             file_desc = self.__reports[elem]
+            file_clnm = self.__clnm[elem]
 
-            block = "{:s}{:s}\t</testcase>\n".format(self.__make_test_case(ref_obj, title, delta_t, self.__cnt),
+            block = "{:s}{:s}\t</testcase>\n".format(self.__make_test_case(ref_obj, file_clnm, title, delta_t, self.__cnt),
                                                      self.__make_system_out(out_text))
             file_desc.writelines(block)
 
@@ -109,8 +112,9 @@ class Kunit:
 
         for elem in self.__reports:
             file_desc = self.__reports[elem]
+            file_clnm = self.__clnm[elem]
 
-            block = "{:s}{:s}{:s}{:s}\t</testcase>\n".format(self.__make_test_case(ref_obj, title, delta_t, self.__cnt),
+            block = "{:s}{:s}{:s}{:s}\t</testcase>\n".format(self.__make_test_case(ref_obj, file_clnm, title, delta_t, self.__cnt),
                                                              self.__make_log_error(log_text),
                                                              self.__make_system_out(out_text),
                                                              self.__make_system_err(err_text))
@@ -138,8 +142,9 @@ class Kunit:
 
         for elem in self.__reports:
             file_desc = self.__reports[elem]
+            file_clnm = self.__clnm[elem]
 
-            block = "{:s}{:s}{:s}{:s}\t</testcase>\n".format(self.__make_test_case(ref_obj, title, delta_t, self.__cnt),
+            block = "{:s}{:s}{:s}{:s}\t</testcase>\n".format(self.__make_test_case(ref_obj, file_clnm, title, delta_t, self.__cnt),
                                                              self.__make_skipped(skip_text),
                                                              self.__make_system_out(out_text),
                                                              self.__make_system_err(err_text))
@@ -164,11 +169,12 @@ class Kunit:
         '''
 
         file_name = "{:s}/{:s}.{:s}_{:s}.XML".format(self.__dir,
-                                                     os.path.splitext(os.path.splitext(self.__clnm)[0])[0],
+                                                     os.path.splitext(os.path.splitext(self.__clnm[self.master_file_name])[0])[0],
                                                      tps_area,
                                                      tps_name)
 
         self.__reports[file_name] = None
+        self.__clnm[file_name] = None
 
         self.frame_open(file_name)
 
@@ -179,15 +185,16 @@ class Kunit:
         This function will terminate the specific XML report file related to TPSName test id
         '''
         file_name = "{:s}/{:s}.{:s}_{:s}.XML".format(self.__dir,
-                                                     os.path.splitext(os.path.splitext(self.__clnm)[0])[0],
+                                                     os.path.splitext(os.path.splitext(self.__clnm[self.master_file_name])[0])[0],
                                                      tps_area,
                                                      tps_name)
         self.frame_close(file_name)
 
         self.__reports.pop(file_name)
+        self.__clnm.pop(file_name)
 
 
-    def __make_test_case(self, ref_obj, title, elapsed_time, counter):
+    def __make_test_case(self, ref_obj, clnm, title, elapsed_time, counter):
         """ INTERNAL USAGE
         """
         try:
@@ -199,7 +206,7 @@ class Kunit:
         t_now = str(datetime.datetime.now())
 
         msg = '\t<testcase classname="{:s}" name="{:s}" timestamp="{:s}" time="{:s}">\n'.format(\
-                        self.__clnm,
+                        clnm,
                         t_title,
                         t_now,
                         elapsed_time)

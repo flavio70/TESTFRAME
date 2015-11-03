@@ -10,15 +10,16 @@
 import os
 import time
 import string
-import equipment
-import facility1850
-import access1850
-import plugin_tl1
-from database import *
+from katelibs.equipment import Equipment
+from katelibs.facility1850 import IP, NetIF, SerIF
+from katelibs.access1850 import SER1850, SSH1850
+from katelibs.plugin_tl1 import TL1Facility, Plugin1850TL1
+from katelibs.database import *
+from katelibs.kunit import Kunit
 
 
 
-class Eqpt1850TSS320(equipment.Equipment):
+class Eqpt1850TSS320(Equipment):
     """
     1850TSS320 Equipment descriptor. Implements specific operations
     """
@@ -39,11 +40,11 @@ class Eqpt1850TSS320(equipment.Equipment):
         self.__get_eqpt_info_from_db(ID)
 
         flc1ser = self.__ser.get_val(1)
-        self.__ser_con = access1850.SER1850( (flc1ser[0], flc1ser[1]) )
+        self.__ser_con = SER1850( (flc1ser[0], flc1ser[1]) )
 
         self.__open_main_ssh_connection()
 
-        self.tl1 = plugin_tl1.Plugin1850TL1(self.__net.get_ip_str(), krepo=self.__krepo, eRef=self)
+        self.tl1 = Plugin1850TL1(self.__net.get_ip_str(), krepo=self.__krepo, eRef=self)
 
 
     def clean_up(self):
@@ -159,7 +160,7 @@ class Eqpt1850TSS320(equipment.Equipment):
         return True
 
         try:
-            tmpsh = access1850.SSH1850(flc_ip)
+            tmpsh = SSH1850(flc_ip)
             tmpsh.telnet_tunnel(slc_ip)
             tmpsh.send_bm_command(slc_ip, "reboot")
             tmpsh.close_ssh()
@@ -405,9 +406,9 @@ class Eqpt1850TSS320(equipment.Equipment):
         else:
             eth_adapter = "q"
 
-        ip  = facility1850.IP(e_ip)
-        nm  = facility1850.IP(e_nm)
-        gw  = facility1850.IP(e_gw)
+        ip  = IP(e_ip)
+        nm  = IP(e_nm)
+        gw  = IP(e_gw)
 
         print("  Name   : " + e_name)
         print("  Type   : " + e_type)
@@ -417,20 +418,20 @@ class Eqpt1850TSS320(equipment.Equipment):
                                                             gw.get_val(),
                                                             ip.evaluate_mac()))
 
-        self.__net = facility1850.NetIF(ip, nm, gw, ip.evaluate_mac(), eth_adapter)
-        self.__ser = facility1850.SerIF()
+        self.__net = NetIF(ip, nm, gw, ip.evaluate_mac(), eth_adapter)
+        self.__ser = SerIF()
 
         tabSer = TSerial
         tabNet = TNet
         for r in tabSer.objects.all():
             if r.t_equipment_id_equipment.id_equipment == ID:
                 sIP = tabNet.objects.get(id_ip=r.t_net_id_ip.id_ip)
-                self.__ser.set_serial_to_slot(r.slot, facility1850.IP(sIP.ip), r.port)
+                self.__ser.set_serial_to_slot(r.slot, IP(sIP.ip), r.port)
                 print("  Serial : {:2d} <--> {:s}:{:d}".format(r.slot, sIP.ip, r.port))
 
 
     def __open_main_ssh_connection(self):
-        self.__net_con = access1850.SSH1850(self.__net.get_ip_str())
+        self.__net_con = SSH1850(self.__net.get_ip_str())
 
 
     def __close_main_ssh_connection(self):
@@ -462,9 +463,9 @@ class Eqpt1850TSS320(equipment.Equipment):
 
 if __name__ == '__main__':
     print("DEBUG Eqpt1850TSS320")
-
+    r=Kunit('pippo')
     #nodeA = Eqpt1850TSS320("nodeA", 1024)
-    nodeB = Eqpt1850TSS320("nodeB", 1025)
+    nodeB = Eqpt1850TSS320("nodeB", 1025, krepo=r)
 
     #nodeB.INSTALL("StartApp DWL 1850TSS320M 1850TSS320M V7.10.10-J041 151.98.16.7 0 /users/TOOLS/SCRIPTS/pkgStore_04/pkgStoreArea4x/alc-tss/base00.24/int/LIV_ALC-TSS_DR4-24J_BASE00.24.01__VM_PKG058/target/MAIN_RELEASE_71/swp_gccpp/1850TSS320-7.10.10-J041 4gdwl 4gdwl2k12 true")
 
@@ -479,7 +480,7 @@ if __name__ == '__main__':
 
     print("STATUS := " + nodeB.tl1.get_last_cmd_status() + "\nOUTPUT [" + nodeB.tl1.get_last_outcome() + "]")
 
-    time.sleep(20)
+    time.sleep(10)
 
     nodeB.clean_up()
 
