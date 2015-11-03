@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 """
 ###############################################################################
-# MODULE: kunit.py
+# MODULE: plugin_tl1.py
 #
 # AUTHOR: C.Ghelfi
 # DATE  : 29/07/2015
@@ -358,7 +358,7 @@ class Plugin1850TL1():
         """ INTERNAL USAGE
         """
         if self.__krepo:
-            self.__krepo.start_time()
+            self.__krepo.startTime()
 
         # Trash all trailing characters from stream
         while str(channel.read_very_eager().strip(), 'utf-8') != "":
