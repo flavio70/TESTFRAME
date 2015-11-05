@@ -41,10 +41,14 @@ class Eqpt1850TSS320(Equipment):
 
         flc1ser = self.__ser.get_val(1)
         self.__ser_con = SER1850( (flc1ser[0], flc1ser[1]) )
+        print("Serial access available")
 
-        self.__open_main_ssh_connection()
+        #self.__open_main_ssh_connection()
+        self.__net_con = SSH1850(self.__net.get_ip_str())
+        print("ssh configured (not opened yet)")
 
         self.tl1 = Plugin1850TL1(self.__net.get_ip_str(), krepo=self.__krepo, eRef=self)
+        print("TL1 Plugin available")
 
 
     def clean_up(self):
@@ -55,7 +59,7 @@ class Eqpt1850TSS320(Equipment):
         """ Initialize Network configuration of Equipment
         """
         if self.__krepo:
-            self.__krepo.startTime()
+            self.__krepo.start_time()
 
         if self.__is_reachable_by_ip():
             print("Equipment '" + self.get_label() + "' reachable by IP " + self.__net.get_ip_str())
@@ -67,13 +71,16 @@ class Eqpt1850TSS320(Equipment):
             dev     = self.__net.get_dev()
             cmd_ifdn = "ifconfig {:s} down".format(dev)
             cmd_hwet = "ifconfig {:s} hw ether {:s}".format(dev, self.__net.get_mac())
-            cmd_ipad = "ifconfig {:s} {:s} netmask {:s}".format(dev, self.__net.get_ip_str(), self.__net.get_nm_str())
+            cmd_ipad = "ifconfig {:s} {:s} netmask {:s}".format(dev,
+                                                                self.__net.get_ip_str(),
+                                                                self.__net.get_nm_str())
             cmd_ifup = "ifconfig {:s} up".format(dev)
             cmd_rout = "route add default gw {:s}".format(self.__net.get_gw_str())
 
             max_iterations = 50
 
             for i in range(1, max_iterations+1):
+                print("trying to connect (#{:d}/{:d})".format(i, max_iterations))
                 self.__ser_con.send_cmd_simple(cmd_ifdn)
                 time.sleep(3)
                 self.__ser_con.send_cmd_simple(cmd_hwet)
@@ -94,8 +101,7 @@ class Eqpt1850TSS320(Equipment):
 
             for i in range(1, max_iterations+1):
                 if not self.__is_reachable_by_ip():
-                    msg = "Equipment still not reachable. Retrying... [{:d}/{:d}]".format(i, max_iterations)
-                    print(msg)
+                    print("Equipment still not reachable. Retrying... [{:d}/{:d}]".format(i, max_iterations))
                     time.sleep(10)
                 else:
                     self.__t_success("CONFIGURE IP", None, "Equipment reachable")
@@ -113,7 +119,7 @@ class Eqpt1850TSS320(Equipment):
         print("DHCP DOWN")
 
         if self.__krepo:
-            self.__krepo.startTime()
+            self.__krepo.start_time()
 
         res = self.__net_con.send_cmd_and_check("/etc/rc.d/init.d/dhcp stop", "Stopping DHCP server: dhcpd")
         if res == False:
@@ -131,12 +137,12 @@ class Eqpt1850TSS320(Equipment):
         print("REBOOT FLC MAIN")
 
         if self.__krepo:
-            self.__krepo.startTime()
+            self.__krepo.start_time()
 
         self.__net_con.send_cmd_simple("flc_reboot")
 
         klist = [b'Start BOOT image V', b'Restarting system']
-        res = self.__ser_con.EXPECT(klist)
+        res = self.__ser_con.expect(klist)
         if res[0] == 0  or  res[0] == 1:
             print("FLC RESTARTED")
             self.__t_success("FLC REBOOT", None, "FLC restarted")
@@ -180,7 +186,7 @@ class Eqpt1850TSS320(Equipment):
         print("SCRATCH DB...")
 
         if self.__krepo:
-            self.__krepo.startTime()
+            self.__krepo.start_time()
 
         self.__net_con.send_cmd_simple("/bin/rm -fr /pureNeApp/FLC/DB/*")
 
@@ -207,7 +213,7 @@ class Eqpt1850TSS320(Equipment):
         max_iterations = 50
 
         if self.__krepo:
-            self.__krepo.startTime()
+            self.__krepo.start_time()
 
         # Check for running application processes
         res = False
@@ -264,21 +270,22 @@ class Eqpt1850TSS320(Equipment):
 
 
     def flc_load_swp(self, swp_string):
-        """ Load the specified SWP
+        """ Load the specified SWP. The equipment must be reachable by ip address
             swp_string : the StartApp string
         """
         print("LOADING SWP ON '" + self.get_label() + "'")
         print("SWP STRING: '" + swp_string + "'")
 
         if self.__krepo:
-            self.__krepo.startTime()
+            self.__krepo.start_time()
 
         if self.__is_reachable_by_ip():
             print("SSH ACCESS")
             res = self.__net_con.send_cmd_and_check(swp_string, "EC_SetSwVersionActive status SUCCESS")
         else:
-            print("SERIAL ACCESS")
-            res = self.__ser_con.send_cmd_and_check(swp_string, "EC_SetSwVersionActive status SUCCESS")
+            #res = self.__ser_con.send_cmd_and_check(swp_string, "EC_SetSwVersionActive status SUCCESS")
+            print("Unreachable node")
+            res = False
 
         if res == False:
             print("SWP LOAD ERROR")
@@ -443,21 +450,21 @@ class Eqpt1850TSS320(Equipment):
         """ INTERNAL USAGE
         """
         if self.__krepo:
-            self.__krepo.add_success(self.__eqpt_ref, title, elapsed_time, out_text)
+            self.__krepo.add_success(self, title, elapsed_time, out_text)
 
 
     def __t_failure(self, title, e_time, out_text, err_text, log_text=None):
         """ INTERNAL USAGE
         """
         if self.__krepo:
-            self.__krepo.add_failure(self.__eqpt_ref, title, e_time, out_text, err_text, log_text)
+            self.__krepo.add_failure(self, title, e_time, out_text, err_text, log_text)
 
 
     def __t_skipped(self, title, e_time, out_text, err_text, skip_text=None):
         """ INTERNAL USAGE
         """
         if self.__krepo:
-            self.__krepo.add_skipped(self.__eqpt_ref, title, e_time, out_text, err_text, skip_text)
+            self.__krepo.add_skipped(self, title, e_time, out_text, err_text, skip_text)
 
 
 
@@ -469,19 +476,15 @@ if __name__ == '__main__':
 
     #nodeB.INSTALL("StartApp DWL 1850TSS320M 1850TSS320M V7.10.10-J041 151.98.16.7 0 /users/TOOLS/SCRIPTS/pkgStore_04/pkgStoreArea4x/alc-tss/base00.24/int/LIV_ALC-TSS_DR4-24J_BASE00.24.01__VM_PKG058/target/MAIN_RELEASE_71/swp_gccpp/1850TSS320-7.10.10-J041 4gdwl 4gdwl2k12 true")
 
+    nodeB.flc_ip_config()
     #nodeB.flc_reboot()
     #nodeB.flc_ip_config()
     #nodeB.flc_wait_in_service()
 
-    if nodeB.tl1.do("ACT-USER::admin:MYTAG::Root1850;", policy="DENY"):
-        print("RESULT: SUCCESS")
-    else:
-        print("RESULT: FAILURE")
-
-    print("STATUS := " + nodeB.tl1.get_last_cmd_status() + "\nOUTPUT [" + nodeB.tl1.get_last_outcome() + "]")
-
-    time.sleep(10)
+    time.sleep(2)
 
     nodeB.clean_up()
+
+    r.frame_close()
 
     print("FINE")

@@ -11,6 +11,9 @@
 
 import paramiko
 import telnetlib
+import inspect
+
+myself = lambda: "__name__" + inspect.stack()[1][3]
 
 
 
@@ -37,10 +40,9 @@ class SER1850:
         self.__tn   = None
 
         try:
-            self.__tn = telnetlib.Telnet()
-            self.__tn.open(self.__ip, self.__port)
-            self.__expect(self.__klConnect, 2)    # da togliere ?
-        except EOFError as eee:
+            self.__tn = telnetlib.Telnet(self.__ip, self.__port)
+            self.expect(self.__klConnect, 2)    # da togliere ?
+        except Exception as eee:
             print(str(eee))
 
 
@@ -53,7 +55,7 @@ class SER1850:
             self.__write("\n")
             retry = 1
             while retry == 1:
-                res = self.__expect(self.__klLogin, 10)
+                res = self.expect(self.__klLogin, 10)
                 if   res[0] == 0:
                     self.__write("root")
                 elif res[0] == 1:
@@ -64,13 +66,13 @@ class SER1850:
                     self.__write("alcatel")
                 elif res[0] == 4:
                     retry = 0
-        except (EOFError, OSError) as eee:
+        except Exception as eee:
             print("Error in serial connecting - " + str(eee))
             return False
 
         try:
             self.__write(cmd)
-        except OSError as eee:
+        except Exception as eee:
             print("Error sending command - " + str(eee))
             return False
 
@@ -88,7 +90,7 @@ class SER1850:
             self.__write("\n")
             retry = 1
             while retry == 1:
-                res = self.__expect(self.__klLogin, 10)
+                res = self.expect(self.__klLogin, 10)
                 if   res[0] == 0:
                     self.__write("root")
                 elif res[0] == 1:
@@ -99,13 +101,13 @@ class SER1850:
                     self.__write("alcatel")
                 elif res[0] == 4:
                     retry = 0
-        except (EOFError, OSError) as eee:
+        except Exception as eee:
             print("Error in serial connecting - " + str(eee))
             return False
 
         try:
             self.__write(cmd)
-        except OSError as eee:
+        except Exception as eee:
             print("Error sending command - " + str(eee))
             return False
 
@@ -113,7 +115,7 @@ class SER1850:
             key_list = [b"root@.*#",str.encode(check_ok)]
             retry = 1
             while retry == 1:
-                res = self.__expect(key_list, 10)
+                res = self.expect(key_list, 10)
                 if   res[0] == 0:
                     is_detected = False
                 elif res[0] == 1:
@@ -125,7 +127,7 @@ class SER1850:
             key_list = [b"root@.*#", str.encode(check_ok), str.encode(check_ko)]
             retry = 1
             while retry == 1:
-                res = self.__expect(key_list, 10)
+                res = self.expect(key_list, 10)
                 if   res[0] == 0:
                     is_detected = False
                 elif res[0] == 1:
@@ -142,7 +144,7 @@ class SER1850:
 
 
 
-    def __expect(self, key_list, timeout=__DEFAULT_TIMEOUT):
+    def expect(self, key_list, timeout=__DEFAULT_TIMEOUT):
         """ Wait on stream until an element of key_list will be detected
         """
         self.res  = self.__tn.expect(key_list, timeout=timeout)
@@ -172,7 +174,7 @@ class SSH1850():
         self.__ip   = IP
         self.__sh   = None
 
-        self.__setup_ssh()
+        #self.__setup_ssh()
 
 
     def close_ssh(self):
@@ -185,16 +187,17 @@ class SSH1850():
     def send_cmd_simple(self, cmd):
         """ TODO
         """
+        print("in send_cmd_simple")
         done = False
-
         while not done:
             try:
                 self.__sh.exec_command(cmd)
                 done = True
-            except paramiko.SSHException as eee:
-                msg = "SSH1850: error connectind '{:s}' ({:s}). Retrying...".format(self.__ip, str(eee))
-                print(msg)
+            except Exception as eee:
+                print("SSH1850: error connectind '{:s}' ({:s}). Retrying...".format(self.__ip, str(eee)))
                 self.__setup_ssh()
+
+        print("esco da send_cmd_simple")
 
         return True
 
@@ -202,16 +205,19 @@ class SSH1850():
     def send_cmd_and_check(self, cmd, check_ok):
         """ TODO
         """
+        print("SSH1850::send_cmd_and_check in")
         done = False
 
         while not done:
             try:
                 stdin,stdout,stderr = self.__sh.exec_command(cmd)
                 done = True
-            except paramiko.SSHException as eee:
+            except Exception as eee:
                 msg = "SSH1850: error connectind '{:s}' ({:s}). Retrying...".format(self.__ip, str(eee))
                 print(msg)
                 self.__setup_ssh()
+
+        print("SSH1850::send_cmd_and_check command sent")
 
         if not check_ok:
             found = True
@@ -221,6 +227,8 @@ class SSH1850():
                 res = str(line)[2:-1]
                 if res.find(check_ok) != -1:
                     found = True
+                else:
+                    print("waiting for completing response")
 
             stdin.close()
             stderr.close()
@@ -239,7 +247,7 @@ class SSH1850():
                 stdin,stdout,stderr = self.__sh.exec_command(cmd)
                 print("eseguito [" + cmd + "]")
                 done = True
-            except paramiko.SSHException as eee:
+            except Exception as eee:
                 msg = "SSH1850: error connectind '{:s}' ({:s}). Retrying...".format(self.__ip, str(eee))
                 print(msg)
                 self.__setup_ssh()
@@ -258,9 +266,7 @@ class SSH1850():
         if not self.__sh.get_transport():
             try:
                 self.__sh.connect(self.__ip, username='root', password='alcatel', timeout=10)
-            except (paramiko.BadHostKeyException,
-                    paramiko.AuthenticationException,
-                    paramiko.SSHException) as eee:
+            except Exception as eee:
                 print("SSH1850: error connecting '" + self.__ip + "' (" + str(eee) +")")
                 self.__sh.close()
                 self.__sh = None
@@ -280,9 +286,7 @@ class SSH1850():
         if not self.__sh.get_transport():
             try:
                 self.__sh.connect(self.__ip, username='root', password='alcatel', timeout=10)
-            except (paramiko.BadHostKeyException,
-                    paramiko.AuthenticationException,
-                    paramiko.SSHException) as eee:
+            except Exception as eee:
                 print("SSH1850: error connectind '" + self.__ip + "' (" + str(eee) +")")
                 self.__sh.close()
                 self.__sh = None
@@ -326,9 +330,7 @@ class SSH1850():
 
         try:
             self.__sh.connect(self.__ip, username='root', password='alcatel', timeout=10)
-        except (paramiko.BadHostKeyException,
-                paramiko.AuthenticationException,
-                paramiko.SSHException) as eee:
+        except Exception as eee:
             print("SSH1850: init error for '" + self.__ip + "' - connect - (" + str(eee) +")")
             self.__sh.close()
             self.__sh = None
@@ -344,15 +346,15 @@ if __name__ == "__main__":
     #ser = SER1850( (s.get_val(), 2013) )
 
     #print("OPENING SSH")
-    #net = SSH1850('135.221.125.80')
+    #net = SSH1850('135.221.125.79')
     #print(net.send_cmd_and_capture("date"))
 
     #print("DISABILITO NET")
     #ser.send_cmd_simple("ifconfig eth1 down")
     #time.sleep(1)
-    #ser.send_cmd_simple("ifconfig eth1 hw ether 08:00:87:DD:7D:50")
+    #ser.send_cmd_simple("ifconfig eth1 hw ether 08:00:87:DD:7D:4f")
     #time.sleep(1)
-    #ser.send_cmd_simple("ifconfig eth1 135.221.125.80 netmask 255.255.255.128")
+    #ser.send_cmd_simple("ifconfig eth1 135.221.125.79 netmask 255.255.255.128")
     #time.sleep(3)
     #ser.send_cmd_simple("ifconfig eth1 up")
     #time.sleep(5)
