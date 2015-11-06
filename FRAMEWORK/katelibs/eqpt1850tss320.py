@@ -76,10 +76,15 @@ class Eqpt1850TSS320(Equipment):
             print("Configuring IP address for equipment '" + self.get_label() + "'")
             dev     = self.__net.get_dev()
             cmd_ifdn = "ifconfig {:s} down".format(dev)
-            cmd_hwet = "ifconfig {:s} hw ether {:s}".format(dev, self.__net.get_mac())
-            cmd_ipad = "ifconfig {:s} {:s} netmask {:s}".format(dev,
-                                                                self.__net.get_ip_str(),
-                                                                self.__net.get_nm_str())
+            #cmd_hwet = "ifconfig {:s} hw ether {:s}".format(dev, self.__net.get_mac())
+            #cmd_ipad = "ifconfig {:s} {:s} netmask {:s}".format(dev,
+            #                                                    self.__net.get_ip_str(),
+            #                                                    self.__net.get_nm_str())
+            cmd_ipad = "ifconfig {:s} {:s} netmask {:s} hw ether {:s}".format(\
+                            dev,
+                            self.__net.get_ip_str(),
+                            self.__net.get_nm_str(),
+                            self.__net.get_mac())
             cmd_ifup = "ifconfig {:s} up".format(dev)
             cmd_rout = "route add default gw {:s}".format(self.__net.get_gw_str())
 
@@ -89,8 +94,8 @@ class Eqpt1850TSS320(Equipment):
                 print("trying to connect (#{:d}/{:d})".format(i, max_iterations))
                 self.__ser_con.send_cmd_simple(cmd_ifdn)
                 time.sleep(3)
-                self.__ser_con.send_cmd_simple(cmd_hwet)
-                time.sleep(3)
+                #self.__ser_con.send_cmd_simple(cmd_hwet)
+                #time.sleep(3)
                 self.__ser_con.send_cmd_simple(cmd_ipad)
                 time.sleep(5)
                 self.__ser_con.send_cmd_simple(cmd_ifup)
@@ -107,8 +112,8 @@ class Eqpt1850TSS320(Equipment):
 
             for i in range(1, max_iterations+1):
                 if not self.__is_reachable_by_ip():
-                    print("Equipment still not reachable. Retrying... [{:d}/{:d}]".format(i, max_iterations))
-                    time.sleep(10)
+                    print("Equipment still not reachable. Retrying... [{:02d}/{:d}]".format(i, max_iterations))
+                    time.sleep(15)
                 else:
                     self.__t_success("CONFIGURE IP", None, "Equipment reachable")
                     return True
@@ -371,7 +376,7 @@ class Eqpt1850TSS320(Equipment):
 
     def __is_ongoing_to_address(self, dest_ip):
         # Check if this equipment is able to reach a specified IP address - Command sent to console interface
-        cmd = "ping -c 4 {:s} >/dev/null".format(dest_ip)
+        cmd = "ping -c 4 {:s}".format(dest_ip)
         exp = "4 packets transmitted, 4 received, 0% packet loss,"
         res = self.__ser_con.send_cmd_and_check(cmd, exp)
         print(res)

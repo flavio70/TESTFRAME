@@ -303,7 +303,6 @@ class Plugin1850TL1():
         self.__if_cmd      = None  # main TL1 interface (used for sending usr command)
         self.__if_eve      = None  # secondary TL1 interface (used for capturing events)
         self.__last_output = ""    # store the output of latest TL1 command
-        self.__last_status = ""    # store the status of latest TL1 command ("CMPLD"/"DENY")
 
         # Activating both command and Event interfaces
         #self.__connect("CMD")
@@ -341,19 +340,13 @@ class Plugin1850TL1():
         return self.__last_output
 
 
-    def get_last_cmd_status(self):
-        """ Return the latest TL1 command status ("CMPLD"/"DENY")
-        """
-        return self.__last_status
-
-
     def do(self, cmd, policy="COMPLD", timeout=None, condPST=None, condSST=None):
         """ Send the specified TL1 command to equipment.
             It is possible specify an error behaviour and/or a matching string
             cmd     : the TL1 command string
-            policy  : "CMPLD" -> specify if a positive result has been expected (default behaviour)
-                      "DENY"  -> specify if a negative result has been expected
-                      "COND"  -> specify a conditional command execution (see condXXX parameters)
+            policy  : "COMPLD" -> specify if a positive result has been expected (default behaviour)
+                      "DENY"   -> specify if a negative result has been expected
+                      "COND"   -> specify a conditional command execution (see condXXX parameters)
                       It is ignored when policy="DENY"
             timeout : (secons) timeout to close a conditional command
             condPST : (used only on polity="COND") a COMPLD will be detected if the Primary State
@@ -410,7 +403,7 @@ class Plugin1850TL1():
 
 
         if cmd.lower() == "canc-user;":
-            msg_str = " CMPLD "
+            msg_str = " COMPLD "
         else:
             msg_str  = ""
             keepalive_count_max = 100
@@ -455,24 +448,15 @@ class Plugin1850TL1():
 
             msg_str = re.sub('(\r\n)+', "\r\n", msg_str, 0)
 
-
         self.__last_output = msg_str
 
-        if      msg_str.find(" DENY") != -1:
-            self.__last_status = "DENY"
-            if policy:
-                result = (policy == "DENY")
-            else:
-                result = False
-        elif   cmd.lower() == "canc-user;":
-            self.__last_status = "CMPLD"
-            result = (policy == "CMPLD")
-        elif    msg_str.find(" COMPLD") != -1:
-            self.__last_status = "CMPLD"
-            result = (policy == "CMPLD")
+        if  (msg_str.find(" COMPLD") != -1  or
+             msg_str.find(" DELAY")  != -1  ):
+            # Positive TL1 response
+            result = (policy == "COMPLD")
         else:
-            self.__last_status = "not assigned"
-            result = False
+            # Negative TL1 response
+            result = (policy == "DENY")
 
         # valutare l'espressione regolare prima di restituire result
         # ###
@@ -635,7 +619,7 @@ class Plugin1850TL1():
             if self.__enable_collect:
                 connected = self.__do(  "EVE",
                                         "ACT-USER::admin:MYTAG::Alcatel1;",
-                                        policy="CMPLD",
+                                        policy="COMPLD",
                                         timeout=None,
                                         condPST=None,
                                         condSST=None  )
