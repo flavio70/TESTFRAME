@@ -390,6 +390,9 @@ class Plugin1850TL1():
         verb_lower = cmd.replace(";", "").split(":")[0].lower().replace("\r", "").replace("\n", "")
 
         # Trash all trailing characters from stream
+        if self.__read_all(channel):
+            print("error in sending tl1 command")
+
         to_repeat = True
         while to_repeat:
             try:
@@ -402,12 +405,8 @@ class Plugin1850TL1():
                 theIF = self.__connect(channel)
 
         # Sending command to interface
-        try:
-            theIF.write(cmd.encode())
-        except Exception as eee:
-            print("Error in tl1.do({:s})\nException: {:s}".format(cmd, str(eee)))
-            # renewing interface
-            theIF = self.__connect(channel)
+        if self.__write(channel, cmd) == False:
+            print("error in sending tl1 command")
 
 
         if cmd.lower() == "canc-user;":
@@ -418,7 +417,10 @@ class Plugin1850TL1():
             keepalive_count = 0
 
             while True:
-                res_list  = theIF.expect([b"\n\>", b"\n\;"])
+                res_list  = self.__expect(channel, [b"\n\>", b"\n\;"])
+                if res_list == ([], [], []):
+                    print("error in sending tl1 command")
+
                 match_idx = res_list[0]
                 msg_tmp   = str(res_list[2], 'utf-8')
 
@@ -478,6 +480,67 @@ class Plugin1850TL1():
         print("DEBUG: result := " + str(result))
 
         return result
+
+
+    def __read_all(self, channel):
+        """ INTERNAL USAGE
+        """
+        if channel == "CMD":
+            theIF = self.__if_cmd
+        else:
+            theIF = self.__if_eve
+
+        for retry in (1,2):
+            try:
+                while str(theIF.read_very_eager().strip(), 'utf-8') != "":
+                    pass
+                return True
+            except Exception as eee:
+                print("TL1 interface not available - retry...")
+                # renewing interface
+                theIF = self.__connect(channel)
+
+        return False
+
+
+    def __write(self, channel, cmd):
+        """ INTERNAL USAGE
+        """
+        if channel == "CMD":
+            theIF = self.__if_cmd
+        else:
+            theIF = self.__if_eve
+
+        for retry in (1,2):
+            try:
+                theIF.write(cmd.encode())
+                return True
+            except Exception as eee:
+                print("TL1 interface not available - retry...")
+                # renewing interface
+                theIF = self.__connect(channel)
+
+        return False
+
+
+    def __expect(self, channel, key_list):
+        """ INTERNAL USAGE
+        """
+        if channel == "CMD":
+            theIF = self.__if_cmd
+        else:
+            theIF = self.__if_eve
+
+        for retry in (1,2):
+            try:
+                res_list = theIF.expect(key_list)
+                return res_list
+            except Exception as eee:
+                print("TL1 interface not available - retry...")
+                # renewing interface
+                theIF = self.__connect(channel)
+
+        return [],[],[]
 
 
     def __connect(self, channel):

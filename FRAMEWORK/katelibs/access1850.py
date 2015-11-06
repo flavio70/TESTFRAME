@@ -11,6 +11,7 @@
 
 import paramiko
 import telnetlib
+import os
 import inspect
 
 myself = lambda: "__name__" + inspect.stack()[1][3]
@@ -185,10 +186,19 @@ class SSH1850():
 
 
     def send_cmd_simple(self, cmd):
-        """ TODO
+        """ Send a specified command to equipment using SSH connection.
+            If connection is down, a reconnection is done
+            cmd : a UNIX command
         """
-        print("in send_cmd_simple")
+        print("SSH1850::send_cmd_simple in")
+        if not self.__is_reachable_by_ip():
+            self.__setup_ssh()
+            if self.__sh is None:
+                print("SSH1850::send_cmd_simple - cannot connect")
+                return False
+
         done = False
+
         while not done:
             try:
                 self.__sh.exec_command(cmd)
@@ -203,9 +213,19 @@ class SSH1850():
 
 
     def send_cmd_and_check(self, cmd, check_ok):
-        """ TODO
+        """ Send a specified command to equipment using SSH connection.
+            If connection is down, a reconnection is done
+            cmd      : a UNIX command
+            check_ok : (optional) string to check on command stdout response
         """
         print("SSH1850::send_cmd_and_check in")
+
+        if not self.__is_reachable_by_ip():
+            self.__setup_ssh()
+            if self.__sh is None:
+                print("SSH1850::send_cmd_and_check - cannot connect")
+                return False
+
         done = False
 
         while not done:
@@ -217,8 +237,6 @@ class SSH1850():
                 print(msg)
                 self.__setup_ssh()
 
-        print("SSH1850::send_cmd_and_check command sent")
-
         if not check_ok:
             found = True
         else:
@@ -227,8 +245,6 @@ class SSH1850():
                 res = str(line)[2:-1]
                 if res.find(check_ok) != -1:
                     found = True
-                else:
-                    print("waiting for completing response")
 
             stdin.close()
             stderr.close()
@@ -237,8 +253,18 @@ class SSH1850():
 
 
     def send_cmd_and_capture(self, cmd):
-        """ TODO
+        """ Send a specified command to equipment using SSH connection; the stdout result is returned to caller
+            If connection is down, a reconnection is done
+            cmd : a UNIX command
         """
+        print("SSH1850::send_cmd_and_capture in")
+
+        if not self.__is_reachable_by_ip():
+            self.__setup_ssh()
+            if self.__sh is None:
+                print("SSH1850::send_cmd_and_capture - cannot connect")
+                return False
+
         done = False
 
         while not done:
@@ -334,6 +360,14 @@ class SSH1850():
             print("SSH1850: init error for '" + self.__ip + "' - connect - (" + str(eee) +")")
             self.__sh.close()
             self.__sh = None
+
+
+    def __is_reachable_by_ip(self):
+        # Verify IP connection from network to this equipment
+        cmd = "ping -c 2 {:s} >/dev/null".format(self.__ip)
+        if os.system(cmd) == 0:
+            return True
+        return False
 
 
 

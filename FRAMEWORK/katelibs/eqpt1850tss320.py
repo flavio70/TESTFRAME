@@ -10,12 +10,13 @@
 import os
 import time
 import string
+import socket
 from katelibs.equipment import Equipment
 from katelibs.facility1850 import IP, NetIF, SerIF
 from katelibs.access1850 import SER1850, SSH1850
 from katelibs.plugin_tl1 import TL1Facility, Plugin1850TL1
-from katelibs.database import *
 from katelibs.kunit import Kunit
+from katelibs.database import *
 
 
 
@@ -25,8 +26,9 @@ class Eqpt1850TSS320(Equipment):
     """
 
     def __init__(self, label, ID, krepo=None):
-        """ label : equipment name used on Report file
-            ID    : equipment ID (see T_EQUIPMENT table on K@TE DB)
+        """ label   : equipment name used on Report file
+            ID      : equipment ID (see T_EQUIPMENT table on K@TE DB)
+            krepo   : reference to kunit report instance
         """
         self.__krepo    = krepo     # result report (Kunit class instance)
         self.__net_con  = None      # main 1850 IP Connection
@@ -41,14 +43,18 @@ class Eqpt1850TSS320(Equipment):
 
         flc1ser = self.__ser.get_val(1)
         self.__ser_con = SER1850( (flc1ser[0], flc1ser[1]) )
-        print("Serial access available")
+        print("Serial console available")
 
         #self.__open_main_ssh_connection()
         self.__net_con = SSH1850(self.__net.get_ip_str())
-        print("ssh configured (not opened yet)")
+        print("SSH configured")
 
         self.tl1 = Plugin1850TL1(self.__net.get_ip_str(), krepo=self.__krepo, eRef=self)
-        print("TL1 Plugin available")
+        print("TL1 Plugin configured")
+
+        # CLI
+        # self.cli = Plugin1850CLI(self.__net.get_ip_str(), krepo=self.__krepo, eRef=self)
+        # print("CLI Plugin configured")
 
 
     def clean_up(self):
@@ -161,7 +167,7 @@ class Eqpt1850TSS320(Equipment):
         flc_ip = self.__net.get_ip_str()
         slc_ip = "100.0.1.{:s}".format(slot)
 
-        if not self.__is_reachable_by_ip(slc_ip):
+        if not self.__is_ongoing_to_address(slc_ip):
             self.__t_skipped("SLC "+ str(slot) + " REBOOT", None, "SLC not present", "")
         return True
 
@@ -279,13 +285,10 @@ class Eqpt1850TSS320(Equipment):
         if self.__krepo:
             self.__krepo.start_time()
 
-        if self.__is_reachable_by_ip():
-            print("SSH ACCESS")
-            res = self.__net_con.send_cmd_and_check(swp_string, "EC_SetSwVersionActive status SUCCESS")
-        else:
-            #res = self.__ser_con.send_cmd_and_check(swp_string, "EC_SetSwVersionActive status SUCCESS")
-            print("Unreachable node")
-            res = False
+        if not self.__is_reachable_by_ip():
+            self.flc_ip_config()
+
+        res = self.__net_con.send_cmd_and_check(swp_string, "EC_SetSwVersionActive status SUCCESS")
 
         if res == False:
             print("SWP LOAD ERROR")
@@ -367,17 +370,17 @@ class Eqpt1850TSS320(Equipment):
 
 
     def __is_ongoing_to_address(self, dest_ip):
-        cmd = "ping -c 4 {:s}".format(dest_ip)
+        # Check if this equipment is able to reach a specified IP address - Command sent to console interface
+        cmd = "ping -c 4 {:s} >/dev/null".format(dest_ip)
         exp = "4 packets transmitted, 4 received, 0% packet loss,"
         res = self.__ser_con.send_cmd_and_check(cmd, exp)
         print(res)
         return res
 
 
-    def __is_reachable_by_ip(self, eqpt_ip=None):
-        if not eqpt_ip:
-            eqpt_ip = self.__net.get_ip_str()
-        cmd = "ping -c 4 {:s}".format(eqpt_ip)
+    def __is_reachable_by_ip(self):
+        # Verify IP connection from network to this equipment
+        cmd = "ping -c 2 {:s} >/dev/null".format(self.__net.get_ip_str())
         if os.system(cmd) == 0:
             return True
         return False
