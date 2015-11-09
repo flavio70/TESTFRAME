@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 """
 ###############################################################################
-# MODULE: kunit.py
+# MODULE: plugin_tl1.py
 #
 # AUTHOR: C.Ghelfi
 # DATE  : 29/07/2015
@@ -286,6 +286,8 @@ class Plugin1850TL1():
     """
     TL1 plugin for 1850TSS Equipment
     """
+    TL1_TIMEOUT = 1200   # defalt timeout for commands result
+
 
     def __init__(self, IP, PORT=3083, krepo=None, eRef=None):
         """
@@ -301,10 +303,11 @@ class Plugin1850TL1():
         self.__if_cmd      = None  # main TL1 interface (used for sending usr command)
         self.__if_eve      = None  # secondary TL1 interface (used for capturing events)
         self.__last_output = ""    # store the output of latest TL1 command
-        self.__last_status = ""    # store the status of latest TL1 command ("CMPLD"/"DENY")
 
         # Activating both command and Event interfaces
-        self.__connect()
+        #self.__connect("CMD")
+        #self.__connect("EVE")
+        print("tl1 connect skipped")
 
         # File for Event collector
         self.__fn   = "collector.log"   # temporaneo
@@ -328,7 +331,7 @@ class Plugin1850TL1():
     def __del__(self):
         """ INTERNAL USAGE
         """
-        self.__disconnect()
+        # self.__disconnect()
 
 
     def get_last_outcome(self):
@@ -337,58 +340,80 @@ class Plugin1850TL1():
         return self.__last_output
 
 
-    def get_last_cmd_status(self):
-        """ Return the latest TL1 command status ("CMPLD"/"DENY")
-        """
-        return self.__last_status
-
-
-    def do(self, cmd, policy="COMPLD"):
+    def do(self, cmd, policy="COMPLD", timeout=None, condPST=None, condSST=None):
         """ Send the specified TL1 command to equipment.
             It is possible specify an error behaviour and/or a matching string
             cmd     : the TL1 command string
-            policy  : "CMPLD" -> specify if a positive result has been expected (default behaviour)
-                      "DENY"  -> specify if a negative result has been expected
+            policy  : "COMPLD" -> specify if a positive result has been expected (default behaviour)
+                      "DENY"   -> specify if a negative result has been expected
+                      "COND"   -> specify a conditional command execution (see condXXX parameters)
                       It is ignored when policy="DENY"
+            timeout : (secons) timeout to close a conditional command
+            condPST : (used only on polity="COND") a COMPLD will be detected if the Primary State
+                      for involved AID goes to specified value. The timeout parameters will be
+                      evaluated in order to close procedure
+            condSST : (used only on polity="COND") a COMPLD will be detected if the Secondary State
+                      for involved AID goes to specified value. The timeout parameters will be
+                      evaluated in order to close procedure
         """
 
-        return self.__do(self.__if_cmd, cmd, policy)
-
-
-    def __do(self, channel, cmd, policy):
-        """ INTERNAL USAGE
-        """
         if self.__krepo:
             self.__krepo.start_time()
 
-        # Trash all trailing characters from stream
-        while str(channel.read_very_eager().strip(), 'utf-8') != "":
-            pass
+        result = self.__do("CMD", cmd, policy, timeout, condPST, condSST)
+
+        if result:
+            self.__t_success(cmd, None, self.get_last_outcome())
+        else:
+            self.__t_failure(cmd, None, self.get_last_outcome(), "")
+
+        return result
+
+
+    def __do(self, channel, cmd, policy, timeout, condPST, condSST):
+        """ INTERNAL USAGE
+        """
+        if channel == "CMD":
+            print("sending [{:s}]".format(cmd))
+            theIF = self.__if_cmd
+        else:
+            print("sending [{:s}] (EVENT INTERFACE)".format(cmd))
+            theIF = self.__if_eve
 
         verb_lower = cmd.replace(";", "").split(":")[0].lower().replace("\r", "").replace("\n", "")
 
-        try:
-            if channel == self.__if_cmd:
-                print("sending [" + cmd + "]")
-            else:
-                print("sending [" + cmd + "] (EVENT INTERFACE)")
-            channel.write(cmd.encode())
-        except Exception as eee:
-            msg = "Error in tl1.do({:s})\nException: {:s}".format(cmd, str(eee))
-            print(msg)
-            self.__disconnect()
-            self.__connect()
+        # Trash all trailing characters from stream
+        if self.__read_all(channel):
+            print("error in sending tl1 command")
+
+        to_repeat = True
+        while to_repeat:
+            try:
+                while str(theIF.read_very_eager().strip(), 'utf-8') != "":
+                    pass
+                to_repeat = False
+            except Exception as eee:
+                print("Error in tl1.do({:s})\nException: {:s}".format(cmd, str(eee)))
+                # renewing interface
+                theIF = self.__connect(channel)
+
+        # Sending command to interface
+        if self.__write(channel, cmd) == False:
+            print("error in sending tl1 command")
 
 
         if cmd.lower() == "canc-user;":
-            msg_str = " CMPLD "
+            msg_str = " COMPLD "
         else:
             msg_str  = ""
             keepalive_count_max = 100
             keepalive_count = 0
 
             while True:
-                res_list  = channel.expect([b"\n\>", b"\n\;"])
+                res_list  = self.__expect(channel, [b"\n\>", b"\n\;"])
+                if res_list == ([], [], []):
+                    print("error in sending tl1 command")
+
                 match_idx = res_list[0]
                 msg_tmp   = str(res_list[2], 'utf-8')
 
@@ -423,71 +448,125 @@ class Plugin1850TL1():
 
             msg_str = re.sub('(\r\n)+', "\r\n", msg_str, 0)
 
-
         self.__last_output = msg_str
 
-        if      msg_str.find(" DENY") != -1:
-            self.__last_status = "DENY"
-            if policy:
-                result = (policy == "DENY")
-            else:
-                result = False
-        elif   cmd.lower() == "canc-user;":
-            self.__last_status = "CMPLD"
-            result = (policy == "CMPLD")
-        elif    msg_str.find(" COMPLD") != -1:
-            self.__last_status = "CMPLD"
-            result = (policy == "CMPLD")
+        if  (msg_str.find(" COMPLD") != -1  or
+             msg_str.find(" DELAY")  != -1  ):
+            # Positive TL1 response
+            result = (policy == "COMPLD")
         else:
-            self.__last_status = "not assigned"
-            result = False
+            # Negative TL1 response
+            result = (policy == "DENY")
 
         # valutare l'espressione regolare prima di restituire result
         # ###
 
-        if result:
-            self.__t_success(cmd, None, self.get_last_outcome())
-        else:
-            self.__t_failure(cmd, None, self.get_last_outcome(), "")
+        print("DEBUG: result := " + str(result))
 
         return result
 
 
-    def __connect(self):
+    def __read_all(self, channel):
         """ INTERNAL USAGE
         """
-        try:
-            self.__if_cmd = telnetlib.Telnet()
-            self.__if_cmd.open(self.__the_ip, self.__the_port)
-        except Exception as eee:
-            msg = "Error in connecting __if_cmd - {:s}".format(str(eee))
-            print(msg)
+        if channel == "CMD":
+            theIF = self.__if_cmd
+        else:
+            theIF = self.__if_eve
 
-        try:
-            self.__if_eve = telnetlib.Telnet()
-            self.__if_eve.open(self.__the_ip, self.__the_port)
-        except Exception as eee:
-            msg = "Error in connecting __if_eve - {:s}".format(str(eee))
-            print(msg)
+        for retry in (1,2):
+            try:
+                while str(theIF.read_very_eager().strip(), 'utf-8') != "":
+                    pass
+                return True
+            except Exception as eee:
+                print("TL1 interface not available - retry...")
+                # renewing interface
+                theIF = self.__connect(channel)
+
+        return False
+
+
+    def __write(self, channel, cmd):
+        """ INTERNAL USAGE
+        """
+        if channel == "CMD":
+            theIF = self.__if_cmd
+        else:
+            theIF = self.__if_eve
+
+        for retry in (1,2):
+            try:
+                theIF.write(cmd.encode())
+                return True
+            except Exception as eee:
+                print("TL1 interface not available - retry...")
+                # renewing interface
+                theIF = self.__connect(channel)
+
+        return False
+
+
+    def __expect(self, channel, key_list):
+        """ INTERNAL USAGE
+        """
+        if channel == "CMD":
+            theIF = self.__if_cmd
+        else:
+            theIF = self.__if_eve
+
+        for retry in (1,2):
+            try:
+                res_list = theIF.expect(key_list)
+                return res_list
+            except Exception as eee:
+                print("TL1 interface not available - retry...")
+                # renewing interface
+                theIF = self.__connect(channel)
+
+        return [],[],[]
+
+
+    def __connect(self, channel):
+        """ INTERNAL USAGE
+        """
+        if channel == "CMD":
+            try:
+                print("(re)connecting TL1...")
+                self.__if_cmd = telnetlib.Telnet(self.__the_ip, self.__the_port, 5)
+                print("... TL1 interface for commands ready.")
+            except Exception as eee:
+                print("TL1: error connecting CMD channel - {:s}".format(str(eee)))
+                print(self.__if_cmd)
+            return self.__if_cmd
+        else:
+            try:
+                self.__if_eve = telnetlib.Telnet(self.__the_ip, self.__the_port, 5)
+                print("... TL1 interface for events ready.")
+            except Exception as eee:
+                print("TL1: error connecting EVE channel - {:s}".format(str(eee)))
+                print(self.__if_cmd)
+            return self.__if_eve
 
 
     def __disconnect(self):
         """ INTERNAL USAGE
         """
         try:
-            self.__do(self.__if_eve, "CANC-USER;", "COMPLD")
-            self.__if_eve = None
-
+            self.__do("EVE", "CANC-USER;", "COMPLD", None, None, None)
         except Exception as eee:
             msg = "Error in disconnection - {:s}".format(str(eee))
             print(msg)
+
+        self.__if_eve = None
 
         try:
-            self.__do(self.__if_cmd, "CANC-USER;", "COMPLD")
-            self.__if_cmd = None
+            self.__do("CMD", "CANC-USER;", "COMPLD", None, None, None)
         except Exception as eee:
             msg = "Error in disconnection - {:s}".format(str(eee))
             print(msg)
+
+        self.__if_cmd = None
 
 
     def event_collection_start(self):
@@ -538,9 +617,12 @@ class Plugin1850TL1():
                 break
 
             if self.__enable_collect:
-                connected = self.__do(  self.__if_eve,
+                connected = self.__do(  "EVE",
                                         "ACT-USER::admin:MYTAG::Alcatel1;",
-                                        policy="CMPLD"  )
+                                        policy="COMPLD",
+                                        timeout=None,
+                                        condPST=None,
+                                        condSST=None  )
             time.sleep(1)
 
 
@@ -555,7 +637,6 @@ class Plugin1850TL1():
                 break
 
             msg_str  = ""
-            echo    = ""
 
             while True:
                 res_list  = self.__if_eve.expect([b"\n\>", b"\n\;"], timeout=10)
@@ -570,11 +651,9 @@ class Plugin1850TL1():
                     timeout_detected = False
 
                 if msg_tmp.find("\r\n\n") == -1:
-                    echo = echo + msg_tmp
                     continue
 
                 resp_part_list = msg_tmp.split("\r\n\n")
-                echo           = echo + resp_part_list[0]
                 msg_tmp        = "\r\n\n".join(resp_part_list[1:])
 
                 if   match_idx ==  1:
@@ -762,7 +841,7 @@ M  963 COMPLD\n\
 
         sys.exit(0)
 
-    tl1 = Plugin1850TL1("135.221.125.80")
+    tl1 = Plugin1850TL1("135.221.125.79")
 
     if False:
         # DB PULITO
@@ -778,9 +857,9 @@ M  963 COMPLD\n\
         tl1.do("ACT-USER::admin:MYTAG::Alcatel1;")
         tl1.event_collection_start()
         time.sleep(2)
-        tl1.do("ENT-EQPT::PP1GE-1-1-18::::PROVISIONEDTYPE=PP1GE:IS;")
-        time.sleep(5)
-        tl1.do("RTRV-EQPT::ALL;")
+        tl1.do("ENT-EQPT::PP1GE-1-1-18::::PROVISIONEDTYPE=PP1GE:IS;", policy="COND", condPST="IS")
+        time.sleep(30)
+        tl1.do("RTRV-EQPT::MDL-1-1-18;")
         res = tl1.get_last_outcome()
         print(res)
         #print(TL1Facility.decode(res))
