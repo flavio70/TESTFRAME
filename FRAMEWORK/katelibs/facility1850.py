@@ -54,9 +54,7 @@ class IP:
         """ Get unique MAC Address using IP value
         """
         if self.__ip:
-            print(self.__ip)
             ip_num = self.__ip.split('.')
-            print(ip_num)
             msg = "08:00:{:02X}:{:02X}:{:02X}:{:02X}".format(int(ip_num[0]),
                                                              int(ip_num[1]),
                                                              int(ip_num[2]),

@@ -304,11 +304,6 @@ class Plugin1850TL1():
         self.__if_eve      = None  # secondary TL1 interface (used for capturing events)
         self.__last_output = ""    # store the output of latest TL1 command
 
-        # Activating both command and Event interfaces
-        #self.__connect("CMD")
-        #self.__connect("EVE")
-        print("tl1 connect skipped")
-
         # File for Event collector
         self.__fn   = "collector.log"   # temporaneo
         self.__f = open(self.__fn, "w")
@@ -383,23 +378,12 @@ class Plugin1850TL1():
         verb_lower = cmd.replace(";", "").split(":")[0].lower().replace("\r", "").replace("\n", "")
 
         # Trash all trailing characters from stream
-        if self.__read_all(channel):
-            print("error in sending tl1 command")
-
-        to_repeat = True
-        while to_repeat:
-            try:
-                while str(theIF.read_very_eager().strip(), 'utf-8') != "":
-                    pass
-                to_repeat = False
-            except Exception as eee:
-                print("Error in tl1.do({:s})\nException: {:s}".format(cmd, str(eee)))
-                # renewing interface
-                theIF = self.__connect(channel)
+        if self.__read_all(channel) == False:
+            print("error [1] sending TL1 command [{:s}]".format(cmd))
 
         # Sending command to interface
         if self.__write(channel, cmd) == False:
-            print("error in sending tl1 command")
+            print("error [2] sending TL1 command [{:s}]".format(cmd))
 
 
         if cmd.lower() == "canc-user;":
@@ -412,7 +396,7 @@ class Plugin1850TL1():
             while True:
                 res_list  = self.__expect(channel, [b"\n\>", b"\n\;"])
                 if res_list == ([], [], []):
-                    print("error in sending tl1 command")
+                    print("error [3] sending TL1 command [{:s}]".format(cmd))
 
                 match_idx = res_list[0]
                 msg_tmp   = str(res_list[2], 'utf-8')
@@ -461,7 +445,7 @@ class Plugin1850TL1():
         # valutare l'espressione regolare prima di restituire result
         # ###
 
-        print("DEBUG: result := " + str(result))
+        print("DEBUG: result := {:s}\n".format(str(result)))
 
         return result
 
@@ -480,9 +464,7 @@ class Plugin1850TL1():
                     pass
                 return True
             except Exception as eee:
-                print("TL1 interface not available - retry...")
-                # renewing interface
-                theIF = self.__connect(channel)
+                theIF = self.__connect(channel)     # renewing interface
 
         return False
 
@@ -500,9 +482,7 @@ class Plugin1850TL1():
                 theIF.write(cmd.encode())
                 return True
             except Exception as eee:
-                print("TL1 interface not available - retry...")
-                # renewing interface
-                theIF = self.__connect(channel)
+                theIF = self.__connect(channel)     # renewing interface
 
         return False
 
@@ -520,9 +500,7 @@ class Plugin1850TL1():
                 res_list = theIF.expect(key_list)
                 return res_list
             except Exception as eee:
-                print("TL1 interface not available - retry...")
-                # renewing interface
-                theIF = self.__connect(channel)
+                theIF = self.__connect(channel)     # renewing interface
 
         return [],[],[]
 
@@ -531,21 +509,21 @@ class Plugin1850TL1():
         """ INTERNAL USAGE
         """
         if channel == "CMD":
+            print("(re)CONNECTING TL1...")
             try:
-                print("(re)connecting TL1...")
                 self.__if_cmd = telnetlib.Telnet(self.__the_ip, self.__the_port, 5)
-                print("... TL1 interface for commands ready.")
             except Exception as eee:
                 print("TL1: error connecting CMD channel - {:s}".format(str(eee)))
-                print(self.__if_cmd)
+            print("... TL1 INTERFACE for commands ready.")
             return self.__if_cmd
+
         else:
+            print("(re)CONNECTING TL1 (Event channel)...")
             try:
                 self.__if_eve = telnetlib.Telnet(self.__the_ip, self.__the_port, 5)
-                print("... TL1 interface for events ready.")
             except Exception as eee:
                 print("TL1: error connecting EVE channel - {:s}".format(str(eee)))
-                print(self.__if_cmd)
+            print("... TL1 INTERFACE for events ready.")
             return self.__if_eve
 
 
@@ -592,7 +570,6 @@ class Plugin1850TL1():
         """ INTERNAL USAGE
         """
         # thread main
-        print("Entro in __thr_manager")
         while True:
             with self.__thread_lock:
                 do_repeat = self.__do_event_loop

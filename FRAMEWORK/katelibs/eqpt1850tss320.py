@@ -43,14 +43,11 @@ class Eqpt1850TSS320(Equipment):
 
         flc1ser = self.__ser.get_val(1)
         self.__ser_con = SER1850( (flc1ser[0], flc1ser[1]) )
-        print("Serial console available")
 
         #self.__open_main_ssh_connection()
         self.__net_con = SSH1850(self.__net.get_ip_str())
-        print("SSH configured")
 
         self.tl1 = Plugin1850TL1(self.__net.get_ip_str(), krepo=self.__krepo, eRef=self)
-        print("TL1 Plugin configured")
 
         # CLI
         # self.cli = Plugin1850CLI(self.__net.get_ip_str(), krepo=self.__krepo, eRef=self)
@@ -403,7 +400,7 @@ class Eqpt1850TSS320(Equipment):
 
 
     def __get_eqpt_info_from_db(self, ID):
-        print("CONFIGURATION EQUIPMENT ID = " + str(ID))
+        print("CONFIGURATION EQUIPMENT ID := {:d}".format(ID))
         tabEqpt  = TEquipment
 
         e_name    = tabEqpt.objects.get(id_equipment=ID).name
@@ -411,8 +408,6 @@ class Eqpt1850TSS320(Equipment):
         e_type    = tabEqpt.objects.get(id_equipment=ID).t_equip_type_id_type.name
 
         e_ip,e_nm,e_gw  = self.__get_net_info(ID)
-
-        print(e_ip,e_nm,e_gw)
 
         if   e_type_id == 1  or  e_type_id == 3:
             eth_adapter = "eth1"
