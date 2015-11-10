@@ -14,7 +14,7 @@ import socket
 from katelibs.equipment import Equipment
 from katelibs.facility1850 import IP, NetIF, SerIF
 from katelibs.access1850 import SER1850, SSH1850
-from katelibs.plugin_tl1 import TL1Facility, Plugin1850TL1
+from katelibs.plugin_tl1 import TL1message, Plugin1850TL1
 from katelibs.kunit import Kunit
 from katelibs.database import *
 
