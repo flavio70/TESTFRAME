@@ -15,6 +15,7 @@ import threading
 import time
 import os
 import sys
+import json
 
 
 class TL1message():
@@ -26,23 +27,23 @@ class TL1message():
             Structured representation of generic TL1 Message
             A dictionary with following elements will be generated for a TL1 response message:
             - common for all message types:
-                'SID'        : the equipment's SID
-                'DATE'       : timestamp (date)
-                'TIME'       : timestamp (time)
-                'MSG_CODE'   : 'M' / '*C' / '**' / '*' / 'A'
-                'TAG'        : the message TAG
+                'C_SID'     : the equipment's SID
+                'C_DATE'    : timestamp (date)
+                'C_TIME'    : timestamp (time)
+                'C_CODE'    : 'M' / '*C' / '**' / '*' / 'A'
+                'C_TAG'     : the message TAG
             - only for Commands Response:
-                'CMD_CMPL'   : COMPLD / DELAY / DENY / PRTL / RTRV
-                'CMD_BODY_OK': Body Section(Only for successfull command response)
-                               list of 1 or more items - Dictionary:
+                'R_STATUS'  : COMPLD / DELAY / DENY / PRTL / RTRV
+                'R_BODY_OK' : Body Section(Only for successfull command response)
+                              list of 1 or more items - Dictionary:
                                  aid : AID of element (key for dictionary)
                                      'VALUES' : sequence ATTR=Value
                                      'STATE'  : Primary and Secondary state
-                'CMD_BODY_KO': Body Section (Only for failure command response)
+                'R_BODY_KO' : Body Section (Only for failure command response)
                                list of two string response specification
             - only for Spontaneous Messages:
-                'EVE_VMM'    : Verb and modifiers
-                'EVE_BODY'   : dictionary
+                'S_VMM'     : Verb and modifiers
+                'S_BODY'    : dictionary
         """
 
         self.__m_plain = tl1_msg    # Plain ascii TL1 Message Response
@@ -50,7 +51,7 @@ class TL1message():
         self.__m_event = None       # True is the message is a Spontaneous Message
 
         if tl1_msg is not None  and  tl1_msg != "":
-            self.__m_coded = self.encode()
+            self.encode()
 
 
     def encode(self):
@@ -68,28 +69,29 @@ class TL1message():
                 if line.strip() == "":
                     continue
 
-                self.__m_coded['SID']  = " ".join(line.split()[:-2]).replace('"', '')
-                self.__m_coded['DATE'] = line.split()[-2]
-                self.__m_coded['TIME'] = line.split()[-1]
+                self.__m_coded['C_SID']  = " ".join(line.split()[:-2]).replace('"', '')
+                self.__m_coded['C_DATE'] = line.split()[-2]
+                self.__m_coded['C_TIME'] = line.split()[-1]
                 f_header = False
                 continue
 
             if f_ident:
                 words = line.split()
                 self.__m_event = ( words[0] == '*C' or
-                                    words[0] == '**' or
-                                    words[0] == '*'  or
-                                    words[0] == 'A'  )
+                                   words[0] == '**' or
+                                   words[0] == '*'  or
+                                   words[0] == 'A'  )
 
-                self.__m_coded['MSG_CODE'] = words[0]
-                self.__m_coded['TAG']      = words[1]
+                self.__m_coded['C_CODE'] = words[0]
+                self.__m_coded['C_TAG']  = words[1]
 
                 if self.__m_event:
-                    self.__m_coded['EVE_VMM']     = words[2:]
+                    self.__m_coded['S_VMM'] = words[2:]
                 else:
-                    self.__m_coded['CMD_CMPL']    = words[2]
-                    self.__m_coded['CMD_BODY_OK'] = {}
-                    self.__m_coded['CMD_BODY_KO'] = []
+                    self.__m_coded['R_STATUS']  = words[2]
+                    self.__m_coded['R_BODY_OK'] = {}
+                    self.__m_coded['R_BODY_KO'] = []
+                    self.__m_coded['R_ERROR']   = ""
 
                 f_ident = False
                 continue
@@ -98,30 +100,30 @@ class TL1message():
                 if self.__m_event:
                     # Event Response
                     words = line.strip().replace('"', '').split(':')
-                    self.__m_coded['EVE_AID']    = words[0]
-                    self.__m_coded['EVE_TEXT']   = words[1]
+                    self.__m_coded['EVE_AID']  = words[0]
+                    self.__m_coded['EVE_TEXT'] = words[1]
                     f_block = False
                     continue
 
                 # Command Response
                 stripped_line = line.strip()
                 if ( stripped_line.find('/*') != -1                                     and
-                     stripped_line.find("[{:s}]".format(self.__m_coded['TAG'])) != -1   and
+                     stripped_line.find("[{:s}]".format(self.__m_coded['C_TAG'])) != -1 and
                      stripped_line.find('*/') != -1                                     ):
                     # REMARK found - closing capture
                     break
-                if self.__m_coded['CMD_CMPL'] == "COMPLD":
+                if self.__m_coded['R_STATUS'] == "COMPLD":
                     words = stripped_line.replace('"', '').split(':')
                     row = {}
                     row[ words[0] ] = {'VALUES' : words[2], 'STATE' : words[3]}
-                    self.__m_coded['CMD_BODY_OK'].update(row)
-                elif self.__m_coded['CMD_CMPL'] == "DENY":
+                    self.__m_coded['R_BODY_OK'].update(row)
+                elif self.__m_coded['R_STATUS'] == "DENY":
                     if len(stripped_line) == 4:
-                        self.__m_coded['CMD_ERR'] = stripped_line
+                        self.__m_coded['R_ERROR'] = stripped_line
                     else:
-                        self.__m_coded['CMD_BODY_KO'].append(stripped_line)
+                        self.__m_coded['R_BODY_KO'].append(stripped_line)
                 else:
-                    print("[{:s}] NON ANCORA GESTITO".format(self.__m_coded['CMD_CMPL']))
+                    print("[{:s}] NON ANCORA GESTITO".format(self.__m_coded['R_STATUS']))
                 continue
 
             if line == ';':
@@ -137,9 +139,9 @@ class TL1message():
         if   codec == "ASCII":
             pass
         elif codec == "JSON":
-            pass
+            new_msg = json.dumps(self.__m_coded, indent=4, sort_keys=True)
         else:
-            pass
+            print("Codec not managed")
 
         return new_msg
 
@@ -147,25 +149,25 @@ class TL1message():
     def get_sid(self):
         """ Return the SID
         """
-        return self.__m_coded['SID']
+        return self.__m_coded['C_SID']
 
 
     def get_time_stamp(self):
         """ Return a couple of string (date, time) for Message Time Stamp
         """
-        return self.__m_coded['DATE'], self.__m_coded['TIME']
+        return self.__m_coded['C_DATE'], self.__m_coded['C_TIME']
 
 
     def get_message_code(self):
         """ Return the TL1 Message code as follow: "M" / "**" / "*C" / "*" / "A"
         """
-        return self.__m_coded['MSG_CODE']
+        return self.__m_coded['C_CODE']
 
 
     def get_tag(self):
         """ Return the TL1 Tag
         """
-        return self.__m_coded['TAG']
+        return self.__m_coded['C_TAG']
 
 
     def get_cmd_status(self):
@@ -173,10 +175,12 @@ class TL1message():
             result := True/False (True for TL1 respone message, False for spontaneous messages)
             code   := "COMPLD" / "DENY" / None     (None for spontaneous messages)
         """
+        print(self.__m_coded)
+        print(self.__m_event)
         if self.__m_event:
             return False, None
 
-        return True, self.__m_coded['CMD_CMPL']
+        return True, self.__m_coded['R_STATUS']
 
 
     def get_cmd_aid_list(self):
@@ -189,7 +193,7 @@ class TL1message():
         if self.get_cmd_status() != (True, "COMPLD"):
             return None
 
-        return list(self.__m_coded['CMD_BODY_OK'].keys())
+        return list(self.__m_coded['R_BODY_OK'].keys())
 
 
     def get_cmd_status_value(self, aid):
@@ -202,7 +206,7 @@ class TL1message():
         if self.get_cmd_status() != (True, "COMPLD"):
             return None
 
-        the_elem = self.__m_coded['CMD_BODY_OK'].get(aid)
+        the_elem = self.__m_coded['R_BODY_OK'].get(aid)
         if the_elem is None:
             return None, None
 
@@ -219,7 +223,7 @@ class TL1message():
         if self.get_cmd_status() != (True, "COMPLD"):
             return None
 
-        for  i  in  self.__m_coded['CMD_BODY_OK'].get(aid)['VALUES'].split(','):
+        for  i  in  self.__m_coded['R_BODY_OK'].get(aid)['VALUES'].split(','):
             the_attr, the_value = i.split('=')
             if the_attr == attr:
                 return the_value
@@ -235,10 +239,10 @@ class TL1message():
         if self.__m_event:
             return False, None, None
 
-        if self.__m_coded['CMD_CMPL'] != "DENY":
+        if self.__m_coded['R_STATUS'] != "DENY":
             return False, None, None
 
-        return True, self.__m_coded['CMD_ERR'], self.__m_coded['CMD_BODY_KO']
+        return True, self.__m_coded['R_ERROR'], self.__m_coded['R_BODY_KO']
 
 
 
@@ -810,9 +814,10 @@ M  963 COMPLD\n\
 ;\n\
 "
 
-    if False:
-        print("[{:s}]\n{:s}".format(msg5, "-" * 80))
-        mm = TL1message(msg5)
+    if True:
+        #print("[{:s}]\n{:s}".format(msg1, "-" * 80))
+        mm = TL1message(msg3)
+        print(mm.decode("JSON"))
         sys.exit(0)
 
         print("#" * 80)
