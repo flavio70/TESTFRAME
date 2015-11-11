@@ -146,11 +146,11 @@ class Plugin1850CLI():
         """
 
         # Activating cli command interface
-        if not cli.connect():
+        if not self.connect():
             return 
 
         if self.__krepo:
-            self.__krepo.startTime()
+            self.__krepo.start_time()
 
         # Trash all trailing characters from stream
         while str(self.__if_cmd.read_very_eager().strip(), 'utf-8') != "":

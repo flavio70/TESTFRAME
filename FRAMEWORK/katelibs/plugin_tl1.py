@@ -175,8 +175,6 @@ class TL1message():
             result := True/False (True for TL1 respone message, False for spontaneous messages)
             code   := "COMPLD" / "DENY" / None     (None for spontaneous messages)
         """
-        print(self.__m_coded)
-        print(self.__m_event)
         if self.__m_event:
             return False, None
 
