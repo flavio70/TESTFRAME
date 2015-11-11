@@ -15,238 +15,213 @@ import threading
 import time
 import os
 import sys
+import json
 
 
-class TL1Facility():
+class TL1message():
     """ Collection of TL1 facilities
     """
 
-    @staticmethod
-    def decode(tl1_msg):
-        """ Decompose an ASCII TL1 Message response to structured format
-            tl1_msg : plain TL1 message (both Response or autonomous type)
-            Return Value: a dictionary filled with following elements:
-                - for all message type
-                    'SID'        : the equipment's SID
-                    'DATE'       : timestamp (date)
-                    'TIME'       : timestamp (time)
-                    'MSG_CODE'   : 'M' / '*C' / '**' / '*' / 'A'
-                    'TAG'        : the message TAG
-                - for Commands
-                    'CMD_CMPL'   : COMPLD / DELAY / DENY / PRTL / RTRV
-                    'CMD_BODY_OK': Body Section(Only for successfull command response)
-                                   list of 1 or more items - Dictionary:
-                                     aid : AID of element (key for dictionary)
-                                         'VALUES' : sequence ATTR=Value
-                                         'STATE'  : Primary and Secondary state
-                    'CMD_BODY_KO': Body Section (Only for failure command response)
-                                   list of two string response specification
-                - for Spontaneous Message
-                    'EVE_VMM'    : Verb and modifiers
-                    'EVE_BODY'   : dictionary
+    def __init__(self, tl1_msg):
         """
+            Structured representation of generic TL1 Message
+            A dictionary with following elements will be generated for a TL1 response message:
+            - common for all message types:
+                'C_SID'     : the equipment's SID
+                'C_DATE'    : timestamp (date)
+                'C_TIME'    : timestamp (time)
+                'C_CODE'    : 'M' / '*C' / '**' / '*' / 'A'
+                'C_TAG'     : the message TAG
+            - only for Commands Response:
+                'R_STATUS'  : COMPLD / DELAY / DENY / PRTL / RTRV
+                'R_BODY_OK' : Body Section(Only for successfull command response)
+                              list of 1 or more items - Dictionary:
+                                 aid : AID of element (key for dictionary)
+                                     'VALUES' : sequence ATTR=Value
+                                     'STATE'  : Primary and Secondary state
+                'R_BODY_KO' : Body Section (Only for failure command response)
+                               list of two string response specification
+            - only for Spontaneous Messages:
+                'S_VMM'     : Verb and modifiers
+                'S_BODY'    : dictionary
+        """
+
+        self.__m_plain = tl1_msg    # Plain ascii TL1 Message Response
+        self.__m_coded = {}         # Coded Tl1 Message Response (dictionary)
+        self.__m_event = None       # True is the message is a Spontaneous Message
+
+        if tl1_msg is not None  and  tl1_msg != "":
+            self.encode()
+
+
+    def encode(self):
+        """ Decompose an ASCII TL1 Message response to structured format
+        """
+        self.__m_event = False
+        self.__m_coded = {}
+
         f_header = True
         f_ident  = True
         f_block  = True
 
-        is_event = False
-
-        msg = {}    # Dictionary of decomposed TL1 message
-
-        for line in tl1_msg.split('\n'):
+        for line in self.__m_plain.split('\n'):
             if f_header:
                 if line.strip() == "":
                     continue
 
-                msg['SID']  = " ".join(line.split()[:-2]).replace('"', '')
-                msg['DATE'] = line.split()[-2]
-                msg['TIME'] = line.split()[-1]
+                self.__m_coded['C_SID']  = " ".join(line.split()[:-2]).replace('"', '')
+                self.__m_coded['C_DATE'] = line.split()[-2]
+                self.__m_coded['C_TIME'] = line.split()[-1]
                 f_header = False
                 continue
 
             if f_ident:
                 words = line.split()
-                is_event = TL1Facility.__is_event(words[0])
+                self.__m_event = ( words[0] == '*C' or
+                                   words[0] == '**' or
+                                   words[0] == '*'  or
+                                   words[0] == 'A'  )
 
-                msg['MSG_CODE'] = words[0]
-                msg['TAG']      = words[1]
+                self.__m_coded['C_CODE'] = words[0]
+                self.__m_coded['C_TAG']  = words[1]
 
-                if is_event:
-                    msg['EVE_VMM']     = words[2:]
+                if self.__m_event:
+                    self.__m_coded['S_VMM'] = words[2:]
                 else:
-                    msg['CMD_CMPL']    = words[2]
-                    msg['CMD_BODY_OK'] = {}
-                    msg['CMD_BODY_KO'] = []
+                    self.__m_coded['R_STATUS']  = words[2]
+                    self.__m_coded['R_BODY_OK'] = {}
+                    self.__m_coded['R_BODY_KO'] = []
+                    self.__m_coded['R_ERROR']   = ""
 
                 f_ident = False
                 continue
 
             if f_block:
-                if is_event:
+                if self.__m_event:
                     # Event Response
                     words = line.strip().replace('"', '').split(':')
-                    msg['EVE_AID']    = words[0]
-                    msg['EVE_TEXT']   = words[1]
+                    self.__m_coded['EVE_AID']  = words[0]
+                    self.__m_coded['EVE_TEXT'] = words[1]
                     f_block = False
                     continue
 
                 # Command Response
                 stripped_line = line.strip()
-                if ( stripped_line.find('/*') != -1                      and
-                     stripped_line.find("[{:s}]".format(msg['TAG'])) != -1 and
-                     stripped_line.find('*/') != -1                      ):
+                if ( stripped_line.find('/*') != -1                                     and
+                     stripped_line.find("[{:s}]".format(self.__m_coded['C_TAG'])) != -1 and
+                     stripped_line.find('*/') != -1                                     ):
                     # REMARK found - closing capture
                     break
-                if msg['CMD_CMPL'] == "COMPLD":
+                if self.__m_coded['R_STATUS'] == "COMPLD":
                     words = stripped_line.replace('"', '').split(':')
                     row = {}
                     row[ words[0] ] = {'VALUES' : words[2], 'STATE' : words[3]}
-                    msg['CMD_BODY_OK'].update(row)
-                elif msg['CMD_CMPL'] == "DENY":
+                    self.__m_coded['R_BODY_OK'].update(row)
+                elif self.__m_coded['R_STATUS'] == "DENY":
                     if len(stripped_line) == 4:
-                        msg['CMD_ERR'] = stripped_line
+                        self.__m_coded['R_ERROR'] = stripped_line
                     else:
-                        msg['CMD_BODY_KO'].append(stripped_line)
+                        self.__m_coded['R_BODY_KO'].append(stripped_line)
                 else:
-                    print("[{:s}] NON ANCORA GESTITO".format(msg['CMD_CMPL']))
+                    print("[{:s}] NON ANCORA GESTITO".format(self.__m_coded['R_STATUS']))
                 continue
 
             if line == ';':
                 # TERMINATOR found - closing capture
                 break
 
-        return msg
 
-
-    @staticmethod
-    def encode(msg, codec="ASCII"):
+    def decode(self, codec="ASCII"):
         """ Format the structured TL1 message to supplied coded
-            msg   : structured TL1 Message
             codec : "ASCII" / "JSON"
         """
         new_msg = ""
         if   codec == "ASCII":
             pass
         elif codec == "JSON":
-            pass
+            new_msg = json.dumps(self.__m_coded, indent=4, sort_keys=True)
         else:
-            pass
+            print("Codec not managed")
 
         return new_msg
 
 
-    @staticmethod
-    def get_sid(msg):
-        """ Analize structured TL1 Response
-            msg : structured TL1 Message
-            Return value:
-                sid
+    def get_sid(self):
+        """ Return the SID
         """
-        return msg['SID']
+        return self.__m_coded['C_SID']
 
 
-    @staticmethod
-    def get_time_stamp(msg):
-        """ Analize structured TL1 Response
-            msg : structured TL1 Message
-            Return value:
-                (date, time)
+    def get_time_stamp(self):
+        """ Return a couple of string (date, time) for Message Time Stamp
         """
-        return msg['DATE'], msg['TIME']
+        return self.__m_coded['C_DATE'], self.__m_coded['C_TIME']
 
 
-    @staticmethod
-    def get_message_code(msg):
-        """ Analize structured TL1 Response
-            msg : structured TL1 Message
-            Return value:
-                code    := "M" / "**" / "*C" / "*" / "A"
+    def get_message_code(self):
+        """ Return the TL1 Message code as follow: "M" / "**" / "*C" / "*" / "A"
         """
-        return msg['MSG_CODE']
+        return self.__m_coded['C_CODE']
 
 
-    @staticmethod
-    def get_tag(msg):
-        """ Analize structured TL1 Response
-            msg : structured TL1 Message
-            Return value:
-                tag
+    def get_tag(self):
+        """ Return the TL1 Tag
         """
-        return msg['TAG']
+        return self.__m_coded['C_TAG']
 
 
-    @staticmethod
-    def get_cmd_status(msg):
-        """ Analize structured TL1 Response
-            msg : structured TL1 Message
-            Return value:
-                (True, code)    with code := "COMPLD" / "DENY"
-                (False, None)   if supplied mes isn't a command response
+    def get_cmd_status(self):
+        """ Return a couple (result, code) as follow:
+            result := True/False (True for TL1 respone message, False for spontaneous messages)
+            code   := "COMPLD" / "DENY" / None     (None for spontaneous messages)
         """
-        if TL1Facility.__is_event(msg['MSG_CODE']):
+        if self.__m_event:
             return False, None
 
-        return True, msg['CMD_CMPL']
+        return True, self.__m_coded['R_STATUS']
 
 
-    @staticmethod
-    def get_cmd_aid_list(msg):
-        """ Analize structured TL1 Response
-            msg : structured TL1 Message
-            Return value:
-                list of AIDs found
-                None if msg isnt a COMPLETED TL1 command response
+    def get_cmd_aid_list(self):
+        """ Return the AID list found on message
+            If TL1 Message is a spontaneous message, or the command is failed, a None is returned
         """
-        if TL1Facility.__is_event(msg['MSG_CODE']):
-            print("EVENTO")
+        if self.__m_event:
             return None
 
-        if TL1Facility.get_cmd_status(msg) != (True, "COMPLD"):
-            print("COMANDO FALLITO")
+        if self.get_cmd_status() != (True, "COMPLD"):
             return None
 
-        return list(msg['CMD_BODY_OK'].keys())
+        return list(self.__m_coded['R_BODY_OK'].keys())
 
 
-    @staticmethod
-    def get_cmd_status_value(msg, aid):
-        """ Analize structured TL1 Response
-            msg  : structured TL1 Message
-            aid  : an AID
-            Return value:
-                (pst,sst)   primary and secondary state
-                (None,None) if msg isnt a COMPLETED TL1 command response
+    def get_cmd_status_value(self, aid):
+        """ Return a couple (pst,sst) for command response
+            (None, None) for not completed TL1 Messages
         """
-        if TL1Facility.__is_event(msg['MSG_CODE']):
+        if self.__m_event:
             return None
 
-        if TL1Facility.get_cmd_status(msg) != (True, "COMPLD"):
+        if self.get_cmd_status() != (True, "COMPLD"):
             return None
 
-        the_elem = msg['CMD_BODY_OK'].get(aid)
-        if the_elem is not None:
-            return the_elem['STATE'].split(',')
-        else:
+        the_elem = self.__m_coded['R_BODY_OK'].get(aid)
+        if the_elem is None:
             return None, None
 
+        return the_elem['STATE'].split(',')
 
-    @staticmethod
-    def get_cmd_attr_value(msg, aid, attr):
-        """ Analize structured TL1 Response
-            msg  : structured TL1 Message
-            aid  : an AID
-            attr : a specific Attribute Name
-            Return value:
-                attribute value (None if supplied aid or attr isn't found)
-                None if msg isnt a COMPLETED TL1 command response
+
+    def get_cmd_attr_value(self, aid, attr):
+        """ Return the value for specified attribute and AID
+            None if wrong parameters are supplied
         """
-        if TL1Facility.__is_event(msg['MSG_CODE']):
+        if self.__m_event:
             return None
 
-        if TL1Facility.get_cmd_status(msg) != (True, "COMPLD"):
+        if self.get_cmd_status() != (True, "COMPLD"):
             return None
 
-        for  i  in  msg['CMD_BODY_OK'].get(aid)['VALUES'].split(','):
+        for  i  in  self.__m_coded['R_BODY_OK'].get(aid)['VALUES'].split(','):
             the_attr, the_value = i.split('=')
             if the_attr == attr:
                 return the_value
@@ -254,31 +229,19 @@ class TL1Facility():
         return None
 
 
-    @staticmethod
-    def get_cmd_error_frame(msg):
-        """ Analize structured TL1 Response
-            msg : structured TL1 Message
-            Return value:
-                (True, str1, str2)    str1 and str contains the DENY response values
-                (False, None, None)   if supplied msg isn't a command response
+    def get_cmd_error_frame(self):
+        """ Return a tuple (result, str1, str2) for a DENY response message
+            'result' is False if the message isn't a command response
+            'str1' and 'str2' contanis the DENY reponse values
         """
-        if TL1Facility.__is_event(msg['MSG_CODE']):
+        if self.__m_event:
             return False, None, None
 
-        if msg['CMD_CMPL'] != "DENY":
+        if self.__m_coded['R_STATUS'] != "DENY":
             return False, None, None
 
-        return True, msg['CMD_ERR'], msg['CMD_BODY_KO']
+        return True, self.__m_coded['R_ERROR'], self.__m_coded['R_BODY_KO']
 
-
-    @staticmethod
-    def __is_event(msg_code):
-        """ INTERNAL USAGE
-        """
-        return ( msg_code == '*C' or
-                 msg_code == '**' or
-                 msg_code == '*'  or
-                 msg_code == 'A'  )
 
 
 
@@ -335,6 +298,60 @@ class Plugin1850TL1():
         return self.__last_output
 
 
+    def do_until(self, cmd, timeout=None, condPST=None, condSST=None):
+        """ Send the specified TL1 command to equipment until almost one of conditions will be
+            reached.
+            cmd     : the TL1 command string
+            timeout : (secons) timeout to terminate loop
+            condPST : a COMPLD will be detected if the Primary State
+                      for involved AID goes to specified value. The timeout parameters will be
+                      evaluated in order to close procedure
+            condSST : a COMPLD will be detected if the Secondary State
+                      for involved AID goes to specified value. The timeout parameters will be
+                      evaluated in order to close procedure
+        """
+        if timeout is None:
+            timeout = self.TL1_TIMEOUT
+
+        error_msg = ""
+
+        if self.__krepo:
+            self.__krepo.start_time()
+
+        ending_time = int(time.time()) + timeout
+
+        while True:
+            result = self.__do("CMD", cmd, "COMPLD", timeout)
+
+            if int(time.time()) <= ending_time:
+                msg_coded = TL1message(self.__last_output)
+                aid_list = msg_coded.get_cmd_aid_list()
+                pst,sst = msg_coded.get_cmd_status_value(aid_list[0])
+                if pst is not None:
+                    if pst == condPST:
+                        result = True
+                        break
+                else:
+                    error_msg = "No AID found on TL1 response"
+                    result = False
+                    break
+                time.sleep(1)
+            else:
+                print("TIMEOUT ON TL1::do()")
+                error_msg = "TIMEOUT ({:d}s) DETECTED ON SENDING '{:s}'".format(timeout, cmd)
+                result = False
+                break
+
+        print("DEBUG: result := {:s} - errmsg := [{:s}]\n".format(str(result), error_msg))
+
+        if result:
+            self.__t_success(cmd, None, self.get_last_outcome())
+        else:
+            self.__t_failure(cmd, None, self.get_last_outcome(), error_msg)
+
+        return result
+
+
     def do(self, cmd, policy="COMPLD", timeout=None, condPST=None, condSST=None):
         """ Send the specified TL1 command to equipment.
             It is possible specify an error behaviour and/or a matching string
@@ -344,36 +361,58 @@ class Plugin1850TL1():
                       "COND"   -> specify a conditional command execution (see condXXX parameters)
                       It is ignored when policy="DENY"
             timeout : (secons) timeout to close a conditional command
-            condPST : (used only on polity="COND") a COMPLD will be detected if the Primary State
+            condPST : (used only on policy="COND") a COMPLD will be detected if the Primary State
                       for involved AID goes to specified value. The timeout parameters will be
                       evaluated in order to close procedure
-            condSST : (used only on polity="COND") a COMPLD will be detected if the Secondary State
+            condSST : (used only on policy="COND") a COMPLD will be detected if the Secondary State
                       for involved AID goes to specified value. The timeout parameters will be
                       evaluated in order to close procedure
         """
+
+        if policy == "COND":
+            if condPST is None  and  condSST is None:
+                print("ATTENZIONE: ALMENO UNO TRA condPST e condSST deve essere valorizzato")
+                return False
+
+        if timeout is None:
+            timeout = self.TL1_TIMEOUT
+
+        error_msg = ""
 
         if self.__krepo:
             self.__krepo.start_time()
 
-        result = self.__do("CMD", cmd, policy, timeout, condPST, condSST)
+        result = self.__do("CMD", cmd, policy, timeout)
+
+        if result  and  policy == "COND":
+            # Evaluation of result conditions
+            msg_coded = TL1message(self.__last_output)
+            aid_list = msg_coded.get_cmd_aid_list()
+            pst,sst = msg_coded.get_cmd_status_value(aid_list[0])
+
+            if pst is not None:
+                result = (pst == condPST)
+            else:
+                error_msg = "No AID found on TL1 response"
+                result = False
+
+        print("DEBUG: result := {:s} - errmsg := [{:s}]\n".format(str(result), error_msg))
 
         if result:
             self.__t_success(cmd, None, self.get_last_outcome())
         else:
-            self.__t_failure(cmd, None, self.get_last_outcome(), "")
+            self.__t_failure(cmd, None, self.get_last_outcome(), error_msg)
 
         return result
 
 
-    def __do(self, channel, cmd, policy, timeout, condPST, condSST):
+    def __do(self, channel, cmd, policy, timeout):
         """ INTERNAL USAGE
         """
         if channel == "CMD":
             print("sending [{:s}]".format(cmd))
-            theIF = self.__if_cmd
         else:
             print("sending [{:s}] (EVENT INTERFACE)".format(cmd))
-            theIF = self.__if_eve
 
         verb_lower = cmd.replace(";", "").split(":")[0].lower().replace("\r", "").replace("\n", "")
 
@@ -432,8 +471,6 @@ class Plugin1850TL1():
 
             msg_str = re.sub('(\r\n)+', "\r\n", msg_str, 0)
 
-        self.__last_output = msg_str
-
         if  (msg_str.find(" COMPLD") != -1  or
              msg_str.find(" DELAY")  != -1  ):
             # Positive TL1 response
@@ -442,10 +479,7 @@ class Plugin1850TL1():
             # Negative TL1 response
             result = (policy == "DENY")
 
-        # valutare l'espressione regolare prima di restituire result
-        # ###
-
-        print("DEBUG: result := {:s}\n".format(str(result)))
+        self.__last_output = msg_str
 
         return result
 
@@ -454,17 +488,17 @@ class Plugin1850TL1():
         """ INTERNAL USAGE
         """
         if channel == "CMD":
-            theIF = self.__if_cmd
+            tl1_interface = self.__if_cmd
         else:
-            theIF = self.__if_eve
+            tl1_interface = self.__if_eve
 
         for retry in (1,2):
             try:
-                while str(theIF.read_very_eager().strip(), 'utf-8') != "":
+                while str(tl1_interface.read_very_eager().strip(), 'utf-8') != "":
                     pass
                 return True
             except Exception as eee:
-                theIF = self.__connect(channel)     # renewing interface
+                tl1_interface = self.__connect(channel)     # renewing interface
 
         return False
 
@@ -473,16 +507,16 @@ class Plugin1850TL1():
         """ INTERNAL USAGE
         """
         if channel == "CMD":
-            theIF = self.__if_cmd
+            tl1_interface = self.__if_cmd
         else:
-            theIF = self.__if_eve
+            tl1_interface = self.__if_eve
 
         for retry in (1,2):
             try:
-                theIF.write(cmd.encode())
+                tl1_interface.write(cmd.encode())
                 return True
             except Exception as eee:
-                theIF = self.__connect(channel)     # renewing interface
+                tl1_interface = self.__connect(channel)     # renewing interface
 
         return False
 
@@ -491,16 +525,16 @@ class Plugin1850TL1():
         """ INTERNAL USAGE
         """
         if channel == "CMD":
-            theIF = self.__if_cmd
+            tl1_interface = self.__if_cmd
         else:
-            theIF = self.__if_eve
+            tl1_interface = self.__if_eve
 
         for retry in (1,2):
             try:
-                res_list = theIF.expect(key_list)
+                res_list = tl1_interface.expect(key_list)
                 return res_list
             except Exception as eee:
-                theIF = self.__connect(channel)     # renewing interface
+                tl1_interface = self.__connect(channel)     # renewing interface
 
         return [],[],[]
 
@@ -531,7 +565,7 @@ class Plugin1850TL1():
         """ INTERNAL USAGE
         """
         try:
-            self.__do("EVE", "CANC-USER;", "COMPLD", None, None, None)
+            self.__do("EVE", "CANC-USER;", "COMPLD", None)
         except Exception as eee:
             msg = "Error in disconnection - {:s}".format(str(eee))
             print(msg)
@@ -539,7 +573,7 @@ class Plugin1850TL1():
         self.__if_eve = None
 
         try:
-            self.__do("CMD", "CANC-USER;", "COMPLD", None, None, None)
+            self.__do("CMD", "CANC-USER;", "COMPLD", None)
         except Exception as eee:
             msg = "Error in disconnection - {:s}".format(str(eee))
             print(msg)
@@ -597,9 +631,7 @@ class Plugin1850TL1():
                 connected = self.__do(  "EVE",
                                         "ACT-USER::admin:MYTAG::Alcatel1;",
                                         policy="COMPLD",
-                                        timeout=None,
-                                        condPST=None,
-                                        condSST=None  )
+                                        timeout=None    )
             time.sleep(1)
 
 
@@ -649,8 +681,8 @@ class Plugin1850TL1():
 
             if not timeout_detected:
                 if self.__enable_collect:
-                    coded_msg = TL1Facility.decode(msg_str)
-                    # self.__f.writelines(TL1Facility.encode(coded_msg, "JSON"))
+                    msg_coded = TL1message(msg_str)
+                    # self.__f.writelines(msg_coded.decode("JSON"))
                     self.__f.writelines("{:s}\n{:s}\n".format("-" * 80, msg_str))
 
 
@@ -780,41 +812,42 @@ M  963 COMPLD\n\
 ;\n\
 "
 
-    if False:
-        print("[{:s}]\n{:s}".format(msg5, "-" * 80))
-        print(TL1Facility.decode(msg5))
+    if True:
+        #print("[{:s}]\n{:s}".format(msg1, "-" * 80))
+        mm = TL1message(msg3)
+        print(mm.decode("JSON"))
         sys.exit(0)
 
         print("#" * 80)
 
         print("[{:s}]\n{:s}".format(msg3, "-" * 80))
-        mm = TL1Facility.decode(msg3)
+        mm = TL1message(msg3)
         print(mm)
         print("@@@")
-        lista = TL1Facility.get_cmd_aid_list(mm)
-        #print(lista[0] + " " + TL1Facility.get_cmd_status_value(mm, lista[0])[0])
-        #print(lista[0] + " " + TL1Facility.get_cmd_status_value(mm, lista[0])[1])
-        #print(lista[1] + " " + TL1Facility.get_cmd_status_value(mm, lista[1])[0])
-        #print(lista[1] + " " + TL1Facility.get_cmd_status_value(mm, lista[1])[1])
-        print(TL1Facility.get_cmd_attr_value(mm, "EC320-1-1-1", "REGION"))
-        print(TL1Facility.get_cmd_attr_value(mm, "EC320-1-1-1", "PIPPO"))
-        print(TL1Facility.get_cmd_attr_value(mm, "MDL-1-1-18", "AUTOPROV"))
+        lista = mm.get_cmd_aid_list()
+        #print(lista[0] + " " + mm.get_cmd_status_value(lista[0])[0])
+        #print(lista[0] + " " + mm.get_cmd_status_value(lista[0])[1])
+        #print(lista[1] + " " + mm.get_cmd_status_value(lista[1])[0])
+        #print(lista[1] + " " + mm.get_cmd_status_value(lista[1])[1])
+        print(mm.get_cmd_attr_value("EC320-1-1-1", "REGION"))
+        print(mm.get_cmd_attr_value("EC320-1-1-1", "PIPPO"))
+        print(mm.get_cmd_attr_value("MDL-1-1-18", "AUTOPROV"))
         print("@@@")
 
         print("#" * 80)
 
         print("[{:s}]\n{:s}".format(msg4, "-" * 80))
-        mm = TL1Facility.decode(msg4)
+        mm = TL1message(msg4)
         print(mm)
         if False:
-            v1,v2,v3 = TL1Facility.get_cmd_error_frame(mm)
+            v1,v2,v3 = mm.get_cmd_error_frame()
             if v1:
                 print("ERRORE: " + v2)
                 print(v3[0])
                 print(v3[1])
 
             print("-" * 80)
-        #TL1Facility.encode(m, "ASCII")
+        #mm.encode("ASCII")
 
         sys.exit(0)
 
@@ -839,7 +872,6 @@ M  963 COMPLD\n\
         tl1.do("RTRV-EQPT::MDL-1-1-18;")
         res = tl1.get_last_outcome()
         print(res)
-        #print(TL1Facility.decode(res))
         tl1.do("RMV-EQPT::PP1GE-1-1-18;")
         tl1.do("DLT-EQPT::PP1GE-1-1-18;")
 

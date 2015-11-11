@@ -14,7 +14,8 @@ import socket
 from katelibs.equipment import Equipment
 from katelibs.facility1850 import IP, NetIF, SerIF
 from katelibs.access1850 import SER1850, SSH1850
-from katelibs.plugin_tl1 import TL1Facility, Plugin1850TL1
+from katelibs.plugin_tl1 import TL1message, Plugin1850TL1
+from katelibs.plugin_cli import Plugin1850CLI
 from katelibs.kunit import Kunit
 from katelibs.database import *
 
@@ -36,6 +37,7 @@ class Eqpt1850TSS320(Equipment):
         self.__net      = {}        # IP address informations (from DB)
         self.__ser      = {}        # Serial(s) informations (from DB)
         self.tl1        = None      # main TL1 channel (used to send user command to equipment)
+        self.cli        = None      # CLI channel (used to send user command to equipment)
 
         super().__init__(label, ID)
 
@@ -44,17 +46,15 @@ class Eqpt1850TSS320(Equipment):
         flc1ser = self.__ser.get_val(1)
         self.__ser_con = SER1850( (flc1ser[0], flc1ser[1]) )
 
-        #self.__open_main_ssh_connection()
         self.__net_con = SSH1850(self.__net.get_ip_str())
 
         self.tl1 = Plugin1850TL1(self.__net.get_ip_str(), krepo=self.__krepo, eRef=self)
 
-        # CLI
-        # self.cli = Plugin1850CLI(self.__net.get_ip_str(), krepo=self.__krepo, eRef=self)
-        # print("CLI Plugin configured")
+        self.cli = Plugin1850CLI(self.__net.get_ip_str(), krepo=self.__krepo, eRef=self)
 
 
     def clean_up(self):
+        self.cli.disconnect()
         self.tl1.thr_event_terminate()
 
 
