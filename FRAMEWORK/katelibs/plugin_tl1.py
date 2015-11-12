@@ -199,10 +199,10 @@ class TL1message():
             (None, None) for not completed TL1 Messages
         """
         if self.__m_event:
-            return None
+            return None, None
 
         if self.get_cmd_status() != (True, "COMPLD"):
-            return None
+            return None, None
 
         the_elem = self.__m_coded['R_BODY_OK'].get(aid)
         if the_elem is None:
@@ -268,9 +268,9 @@ class Plugin1850TL1():
         self.__last_output = ""    # store the output of latest TL1 command
 
         # File for Event collector
-        self.__fn   = "collector.log"   # temporaneo
-        self.__f = open(self.__fn, "w")
-        os.chmod(self.__fn, 0o644)
+        collector_fn = "collector.log"   # temporaneo
+        self.__f = open(collector_fn, "w")
+        os.chmod(collector_fn, 0o644)
 
         # Semaphore for TL1 Event Collector info area
         self.__thread_lock    = threading.Lock()
@@ -492,12 +492,12 @@ class Plugin1850TL1():
         else:
             tl1_interface = self.__if_eve
 
-        for retry in (1,2):
+        for _ in (1,2):
             try:
                 while str(tl1_interface.read_very_eager().strip(), 'utf-8') != "":
                     pass
                 return True
-            except Exception as eee:
+            except Exception:
                 tl1_interface = self.__connect(channel)     # renewing interface
 
         return False
@@ -511,11 +511,11 @@ class Plugin1850TL1():
         else:
             tl1_interface = self.__if_eve
 
-        for retry in (1,2):
+        for _ in (1,2):
             try:
                 tl1_interface.write(cmd.encode())
                 return True
-            except Exception as eee:
+            except Exception:
                 tl1_interface = self.__connect(channel)     # renewing interface
 
         return False
@@ -529,11 +529,11 @@ class Plugin1850TL1():
         else:
             tl1_interface = self.__if_eve
 
-        for retry in (1,2):
+        for _ in (1,2):
             try:
                 res_list = tl1_interface.expect(key_list)
                 return res_list
-            except Exception as eee:
+            except Exception:
                 tl1_interface = self.__connect(channel)     # renewing interface
 
         return [],[],[]
@@ -682,8 +682,7 @@ class Plugin1850TL1():
             if not timeout_detected:
                 if self.__enable_collect:
                     msg_coded = TL1message(msg_str)
-                    # self.__f.writelines(msg_coded.decode("JSON"))
-                    self.__f.writelines("{:s}\n{:s}\n".format("-" * 80, msg_str))
+                    self.__f.writelines("{:s}\n".format(msg_coded.decode("JSON")))
 
 
     def __t_success(self, title, elapsed_time, out_text):

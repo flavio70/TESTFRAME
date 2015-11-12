@@ -61,9 +61,11 @@ class Kunit:
         """
         if file_name is None:
             for elem in self.__reports:
+                print("@@" + elem)
                 self.__reports[elem].writelines('</testsuite>\n')
                 self.__reports[elem].close()
         else:
+            print("**" + file_name)
             self.__reports[file_name].writelines('</testsuite>\n')
             self.__reports[file_name].close()
 
