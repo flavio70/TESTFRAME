@@ -31,13 +31,15 @@ class Eqpt1850TSS320(Equipment):
             ID      : equipment ID (see T_EQUIPMENT table on K@TE DB)
             krepo   : reference to kunit report instance
         """
+        # Public members:
+        self.tl1        = None      # main TL1 channel (used to send user command to equipment)
+        self.cli        = None      # CLI channel (used to send user command to equipment)
+        # Private members:
         self.__krepo    = krepo     # result report (Kunit class instance)
         self.__net_con  = None      # main 1850 IP Connection
         self.__ser_con  = None      # main 1850 Serial Connection (i.e. FLC 1 console)
         self.__net      = {}        # IP address informations (from DB)
         self.__ser      = {}        # Serial(s) informations (from DB)
-        self.tl1        = None      # main TL1 channel (used to send user command to equipment)
-        self.cli        = None      # CLI channel (used to send user command to equipment)
 
         super().__init__(label, ID)
 
@@ -73,10 +75,6 @@ class Eqpt1850TSS320(Equipment):
             print("Configuring IP address for equipment '" + self.get_label() + "'")
             dev     = self.__net.get_dev()
             cmd_ifdn = "ifconfig {:s} down".format(dev)
-            #cmd_hwet = "ifconfig {:s} hw ether {:s}".format(dev, self.__net.get_mac())
-            #cmd_ipad = "ifconfig {:s} {:s} netmask {:s}".format(dev,
-            #                                                    self.__net.get_ip_str(),
-            #                                                    self.__net.get_nm_str())
             cmd_ipad = "ifconfig {:s} {:s} netmask {:s} hw ether {:s}".format(\
                             dev,
                             self.__net.get_ip_str(),
@@ -91,8 +89,6 @@ class Eqpt1850TSS320(Equipment):
                 print("trying to connect (#{:d}/{:d})".format(i, max_iterations))
                 self.__ser_con.send_cmd_simple(cmd_ifdn)
                 time.sleep(3)
-                #self.__ser_con.send_cmd_simple(cmd_hwet)
-                #time.sleep(3)
                 self.__ser_con.send_cmd_simple(cmd_ipad)
                 time.sleep(5)
                 self.__ser_con.send_cmd_simple(cmd_ifup)
@@ -290,23 +286,27 @@ class Eqpt1850TSS320(Equipment):
         if not self.__is_reachable_by_ip():
             self.flc_ip_config()
 
-        res = self.__net_con.send_cmd_and_check(swp_string, "EC_SetSwVersionActive status SUCCESS")
-
-        if res == False:
-            print("SWP LOAD ERROR")
-            self.__t_failure("SWP LOAD", None, "error in loading SWP", "")
+        if self.flc_check_running_swp():
+            print("SWP ALREADY RUNNING")
+            res = True
+            self.__t_skipped("SWP LOAD", None, "SWP already running", "")
         else:
-            print("SWP LOADING TERMINATE")
-            self.__t_success("SWP LOAD", None, "SWP correctly load")
+            res = self.__net_con.send_cmd_and_check(swp_string, "EC_SetSwVersionActive status SUCCESS")
+
+            if res == False:
+                print("SWP LOAD ERROR")
+                self.__t_failure("SWP LOAD", None, "error in loading SWP", "")
+            else:
+                print("SWP LOADING TERMINATE")
+                self.__t_success("SWP LOAD", None, "SWP correctly load")
 
         return res
 
 
-    def flc_check_running_swp(self, swp_id):
+    def flc_check_running_swp(self):
         """ Check current SWP
-            swp_id : identifier of release
         """
-        pass
+        return True
 
     def INSTALL(self, swp_string, do_format=False):
         """ Start a complete node installation
