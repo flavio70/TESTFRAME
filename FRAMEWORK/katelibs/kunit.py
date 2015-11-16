@@ -14,6 +14,7 @@ import datetime
 import time
 
 
+
 class Kunit:
     """
     Unit Test Result - JUnit compliant
@@ -62,7 +63,7 @@ class Kunit:
         """
         if file_name is None:
             for elem in self.__reports:
-                print("@@" + elem)
+                print("\nREPORT IN [{:s}]\n".format(elem))
                 self.__reports[elem].writelines('</testsuite>\n')
                 self.__reports[elem].close()
         else:
