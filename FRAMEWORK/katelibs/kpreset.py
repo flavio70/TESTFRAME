@@ -24,15 +24,14 @@ class KPreset():
             test_area      : base path for suite test area
             test_file_name : the test file name
         """
-        #prs_file_name = "{:s}.prs".format(os.path.expanduser(test_file_name))
-        prs_file_name = "{:s}/{:s}.prs".format(test_area, test_file_name)
+        prs_file_name = "{:s}/{:s}.prs".format(os.path.expanduser(test_area), test_file_name)
 
         preset_file = open(prs_file_name)
 
         self.__presets = json.load(preset_file)
         print("-- PRESETTING VALUES ----------------")
         print(self.__presets)
-        print("-------------------------------------")
+        print("-------------------------------------\n")
 
 
     def get_id(self, equip_name):
@@ -52,9 +51,33 @@ class KPreset():
             Return the equipment Type (see K@TE DB, table T_EQUIPMENT_TYPE)
         """
         try:
-            res = int(self.__presets[equip_name]["TYPE"])
+            res = self.__presets[equip_name]["TYPE"]
         except Exception:
-            res = 0
+            res = ""
+
+        return res
+
+
+    def get_elem(self, equip_name, elem):
+        """
+            Return a generic element value for specified equipment
+        """
+        try:
+            res = self.__presets[equip_name][elem]
+        except Exception:
+            res = ""
+
+        return res
+
+
+    def get_from_list(self, equip_name, a_list, elem):
+        """
+            Return a generic element value for specified equipment (list scenario)
+        """
+        try:
+            res = self.__presets[equip_name][a_list][elem]
+        except Exception:
+            res = ""
 
         return res
 
@@ -62,14 +85,23 @@ class KPreset():
 if __name__ == '__main__':
     print("DEBUG KPreset")
 
-    testarea = "~/K_WORKSPACE"
+    testarea = "~/K_WORKSPACE/suite"
     testfilename = "TestExample.py"
 
-    kprs = KPreset(test_area, testfilename)
+    kprs = KPreset(testarea, testfilename)
 
     print("-" * 80)
 
-    print("NE1 id   := " + kprs.get_id("NE1"))
+    print("NE1 id   := " + str(kprs.get_id("NE1")))
     print("NE1 type := " + kprs.get_type("NE1"))
 
-    print("FINE")
+    print("ONT1 id    := " + str(kprs.get_id("ONT1")))
+    print("ONT1 type  := " + kprs.get_type("ONT1"))
+    print("ONT1 USER  := " + str(kprs.get_elem("ONT1", "USER")))
+    print("ONT1 PWD   := " + str(kprs.get_elem("ONT1", "PWD")))
+    print("ONT1 APPL  := " + str(kprs.get_elem("ONT1", "APPL")))
+    print("ONT1 P1    := " + str(kprs.get_from_list("ONT1", "PORTS", "P1")))
+    print("ONT1 P2    := " + str(kprs.get_from_list("ONT1", "PORTS", "P2")))
+    print("ONT1 P3    := " + str(kprs.get_from_list("ONT1", "PORTS", "P3")))
+
+    print("ONT2 Port2 := " + str(kprs.get_from_list("ONT2", "PORTS", "Port2")))

@@ -9,8 +9,7 @@
 
 import os
 import time
-import string
-import socket
+
 from katelibs.kenviron      import KEnvironment
 from katelibs.kpreset       import KPreset
 from katelibs.kunit         import Kunit
