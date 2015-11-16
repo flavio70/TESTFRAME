@@ -19,13 +19,20 @@ class KPreset():
     Describe a Preset for specified Test file
     """
 
-    def __init__(self, test_file_name):
-        prs_file_name = "{:s}.prs".format(os.path.expanduser(test_file_name))
+    def __init__(self, test_area, test_file_name):
+        """ Recover the Presettings for specified Test
+            test_area      : base path for suite test area
+            test_file_name : the test file name
+        """
+        #prs_file_name = "{:s}.prs".format(os.path.expanduser(test_file_name))
+        prs_file_name = "{:s}/{:s}.prs".format(test_area, test_file_name)
 
         preset_file = open(prs_file_name)
 
         self.__presets = json.load(preset_file)
+        print("-- PRESETTING VALUES ----------------")
         print(self.__presets)
+        print("-------------------------------------")
 
 
     def get_id(self, equip_name):
@@ -55,9 +62,10 @@ class KPreset():
 if __name__ == '__main__':
     print("DEBUG KPreset")
 
-    testfilename = "~/TestExample.py"
+    testarea = "~/K_WORKSPACE"
+    testfilename = "TestExample.py"
 
-    kprs = KPreset(testfilename)
+    kprs = KPreset(test_area, testfilename)
 
     print("-" * 80)
 

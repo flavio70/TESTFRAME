@@ -31,7 +31,8 @@ class Kunit:
         self.__dir  = path_repo
 
         # xml file name (path complete)
-        self.master_file_name = '{:s}.XML'.format(os.path.splitext(test_file_name)[0])
+        self.master_file_name = '{:s}/{:s}.XML'.format(path_repo,
+                                                       os.path.splitext(test_file_name)[0])
 
         # basic name of test, i.e. without path and suffix
         self.__clnm = { }

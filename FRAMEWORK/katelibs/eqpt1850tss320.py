@@ -11,13 +11,14 @@ import os
 import time
 import string
 import socket
+from katelibs.kenviron      import KEnvironment
+from katelibs.kpreset       import KPreset
+from katelibs.kunit         import Kunit
 from katelibs.equipment     import Equipment
 from katelibs.facility1850  import IP, NetIF, SerIF
 from katelibs.access1850    import SER1850, SSH1850
 from katelibs.plugin_tl1    import TL1message, Plugin1850TL1
 from katelibs.plugin_cli    import Plugin1850CLI
-from katelibs.kunit         import Kunit
-from katelibs.kpreset       import KPreset
 from katelibs.database      import *
 
 
@@ -27,23 +28,23 @@ class Eqpt1850TSS320(Equipment):
     1850TSS320 Equipment descriptor. Implements specific operations
     """
 
-    def __init__(self, label, kprs, krepo=None):
+    def __init__(self, label, kenv):
         """ label   : equipment name used on Report file
-            kprs    : reference to KPreset presettings instance
-            krepo   : reference to kunit report instance
+            kenv    : instance of KEnvironment (initialized by K@TE FRAMEWORK)
         """
         # Public members:
-        self.tl1        = None      # main TL1 channel (used to send user command to equipment)
-        self.cli        = None      # CLI channel (used to send user command to equipment)
+        self.tl1        = None          # main TL1 channel (used to send user command to equipment)
+        self.cli        = None          # CLI channel (used to send user command to equipment)
         # Private members:
-        self.__krepo    = krepo     # result report (Kunit class instance)
-        self.__net_con  = None      # main 1850 IP Connection
-        self.__ser_con  = None      # main 1850 Serial Connection (i.e. FLC 1 console)
-        self.__net      = {}        # IP address informations (from DB)
-        self.__ser      = {}        # Serial(s) informations (from DB)
-        self.__arch     = None      # Architecture of current Equipment ("STD"/"ENH"/"SIM")
-        self.__swp      = None      # SWP Descriptor
-        self.__prs      = kprs      # Presets for running environment
+        self.__kenv     = kenv          # Kate Environment
+        self.__krepo    = kenv.krepo    # result report (Kunit class instance)
+        self.__prs      = kenv.kprs     # Presets for running environment
+        self.__arch     = None          # Architecture of current Equipment ("STD"/"ENH"/"SIM")
+        self.__swp      = None          # SWP Descriptor
+        self.__net_con  = None          # main 1850 IP Connection
+        self.__ser_con  = None          # main 1850 Serial Connection (i.e. FLC 1 console)
+        self.__net      = {}            # IP address informations (from DB)
+        self.__ser      = {}            # Serial(s) informations (from DB)
 
         super().__init__(label, self.__prs.get_id(label))
 
@@ -54,7 +55,11 @@ class Eqpt1850TSS320(Equipment):
 
         self.__net_con = SSH1850(self.__net.get_ip_str())
 
-        self.tl1 = Plugin1850TL1(self.__net.get_ip_str(), krepo=self.__krepo, eRef=self)
+        tl1_event = "{:s}/{:s}_tl1_event.log".format(kenv.path_collector(), label)
+        self.tl1 = Plugin1850TL1(self.__net.get_ip_str(),
+                                 krepo=self.__krepo,
+                                 eRef=self,
+                                 collector=tl1_event)
 
         self.cli = Plugin1850CLI(self.__net.get_ip_str(), krepo=self.__krepo, eRef=self)
 
