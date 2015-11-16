@@ -13,8 +13,9 @@
 #          - 5xx... Ont-50, Ont-506, Ont-512
 #          - 6xx... Ont-601
 #
-# instrumentONT.py module:  created to drive the connections and common low-level operations
-#                             involving JDSU Optical Network Tester ONT-506/600
+# MODULE: instrumentONT.py  created to drive the connections and common low-level operations
+#                           involving JDSU Optical Network Tester ONT-50/506/512/601
+#
 ###############################################################################
 """
 
@@ -36,36 +37,21 @@ from katelibs.database import *
 
 
 class instrumentONT(Equipment):
-    #     
-    # Krepo-related     
-    #    
-    def __t_success(self, title, elapsed_time, out_text):
-        """ INTERNAL USAGE
-        """
-        if self.__krepo:
-            self.__krepo.add_success(self, title, elapsed_time, out_text)
-
-
-    def __t_failure(self, title, e_time, out_text, err_text, log_text=None):
-        """ INTERNAL USAGE
-        """
-        if self.__krepo:
-            self.__krepo.add_failure(self, title, e_time, out_text, err_text, log_text)
-
-
-    def __t_skipped(self, title, e_time, out_text, err_text, skip_text=None):
-        """ INTERNAL USAGE
-        """
-        if self.__krepo:
-            self.__krepo.add_skipped(self, title, e_time, out_text, err_text, skip_text)
 
     #def __init__(self, label, ID, krepo=None):
     #    """ label   : equipment name used on Report file
     #        ID      : equipment ID (see T_EQUIPMENT table on K@TE DB)
     #        krepo   : reference to kunit report instance
     #    """
+    #       self.super().__init__(label, ID)
+    #       self.__init_from_db(ID) # inizializza i dati di IP, tipo di ONT..
+    def __init__(self, label, ID, krepo=None):
+        """ label   : equipment name used on Report file
+            ID      : equipment ID (see T_EQUIPMENT table on K@TE DB)
+            krepo   : reference to kunit report instance
+        """
 
-    def __init__(self, sessionUser=None, sessionPassword=None, sessionIpAddress="135.221.123.144", telnetPort=5001, krepo=None):  # Ont506 Flavio
+        # def __init__(self, sessionUser=None, sessionPassword=None, sessionIpAddress="135.221.123.144", telnetPort=5001, krepo=None):  # Ont506 Flavio
         # def __init__(self, sessionUser=None, sessionPassword=None, sessionIpAddress="151.98.176.6", telnetPort=5001): # Ont506 ghelfi
         """ sessionUser      : Ont session authentication user
             sessionPassword  : Ont session user's password
@@ -73,17 +59,16 @@ class instrumentONT(Equipment):
             telnetPort       : Telnet port for remote Ont command sessions (default 5001)
         """
         # Session
-        self.__ontType              = "To Be Declared" #  NotInitialized (default) for 5xx Ont50,506,512  6xx for Ont 601
+        self.__ontType              = None #  NotInitialized (default) for 5xx Ont50,506,512  6xx for Ont 601
         # Connection
-        self.__ontUser              = sessionUser      #  Ont session authentication user
-        self.__ontPassword          = sessionPassword  #  Ont session user's password
-        self.__ontIpAddress         = sessionIpAddress #  OntXXX IP address
-        self.__ontTelnetPort        = telnetPort       #  OntXXX telnet port (default 5001)
+        self.__ontUser              = None             #  Ont session authentication user
+        self.__ontPassword          = None             #  Ont session user's password
+        self.__ontIpAddress         = None             #  OntXXX IP address
+        self.__ontTelnetPort        = 5001             #  OntXXX telnet port (default 5001)
         self.__telnetConnection     = None             #  Handler of the established telnet connection
         self.__pingRetryNumber      = 1                #  Retry number for -c ping option
         self.__telnetExpectedPrompt = [b'> ']          #  it must be specified as keys LIST...
         self.__telnetTimeout        = 2
-
         # Session
         self.__sessionName          = None
         # Ont command execution
@@ -97,6 +82,180 @@ class instrumentONT(Equipment):
         self.VcToAu={"VC11":"AU4_C11", "VC12":"AU4_C12", "VC2":"NOTSUPPORTED", "VC3":"AU3_C3", "VC4":"AU4_C4", "VC4_4C":"AU4_4C", "VC4_16C":"AU4_16C", "VC4_64C":"AU4_64C"}
         self.E_TAG = "-10"
         self.__krepo = krepo
+
+        super().__init__(label, ID)
+        self.__get_instrument_info_from_db(ID) # inizializza i dati di IP, tipo di ONT..
+
+
+
+    #     
+    # Krepo-related     
+    #    
+    def __t_success(self, title, elapsed_time, out_text):
+        """ INTERNAL USAGE
+        """
+        if self.__krepo:
+            self.__krepo.add_success(self, title, elapsed_time, out_text)
+
+
+
+    def __t_failure(self, title, e_time, out_text, err_text, log_text=None):
+        """ INTERNAL USAGE
+        """
+        if self.__krepo:
+            self.__krepo.add_failure(self, title, e_time, out_text, err_text, log_text)
+
+
+
+    def __t_skipped(self, title, e_time, out_text, err_text, skip_text=None):
+        """ INTERNAL USAGE
+        """
+        if self.__krepo:
+            self.__krepo.add_skipped(self, title, e_time, out_text, err_text, skip_text)
+
+
+
+    #
+    #  K@TE INTERFACE
+    #
+    def __get_net_info(self, n):
+        tabNet = TNet
+
+        for r in tabNet.objects.all():
+            if r.t_equipment_id_equipment:
+                if r.t_equipment_id_equipment.id_equipment == n:
+                    return r.ip
+
+        return str(None)
+
+
+    def __get_instrument_info_from_db(self, ID):
+        tabEqpt  = TEquipment
+        # get Equipment Type ID for selected ID (i.e. 50 (for ONT506))
+        #instr_type_id = tabEqpt.objects.get(id_equipment=ID).t_equip_type_id_type.id_type
+        # get Equipment Type Name for selected ID (i.e. ONT506)
+        instr_type_name = tabEqpt.objects.get(id_equipment=ID).t_equip_type_id_type.name
+        instr_ip = self.__get_net_info(ID)
+
+        self.__ontIpAddress = instr_ip
+        if   instr_type_name == "ONT50":
+            self.__ontType = "5xx"
+        elif instr_type_name == "ONT506":
+            self.__ontType = "5xx"
+        elif instr_type_name == "ONT512":
+            self.__ontType = "5xx"
+        elif instr_type_name == "ONT601":
+            self.__ontType = "6xx"
+        else:
+            localMessage = "__get_instrument_info_from_db error: Unknown instrument type for the specified ID. ID [{}] Instrument[{}] IpAddr[{}]".format(ID,instr_type_name,instr_ip)
+            print(localMessage) 
+            self.__lcMsg(localMessage)
+            return  
+        #  PASSWORD CABLATE: a regime ricavarle dal DB... (Ask C.Ghelfi)   
+        if  self.__ontType == "5xx":
+            self.__ontUser      ="Automation"             #  Ont session authentication user
+            self.__ontPassword  ="Automation"             #  Ont session user's password
+        else:  # ONT-601
+            self.__ontUser      ="Automation"             #  Ont session authentication user
+            self.__ontPassword  ="Automation"             #  Ont session user's password
+
+        localMessage = "__get_instrument_info_from_db: instrument type specified :ID [{}] Instrument:[{}] IpAddr[{}]".format(ID,instr_type_name,instr_ip)
+        print(localMessage) 
+        self.__lcMsg(localMessage)
+        return  
+ 
+
+
+    def initInstrument(self, localUser, localPwd, localOntIpAddress, myPort):
+        """
+            INITALIZES THE ONT INSTRUMENT TO GET READY TO ACCEPT USER (Library) COMMANDS
+            after this inizialization the user can start to send commands to 
+            the ONT (5xx/6xx) instrument
+        """
+        if self.__ontType  == "6xx":   # ONT-6xx Init
+            localUser="Automation"
+            localPwd="Automation"
+            localOntIpAddress = self.__ontIpAddress
+            myApplication="New-Application"
+
+            # 6xx init
+            #tester = instrumentONT(localUser,localPwd,localOntIpAddress, krepo=r)
+            callResult = self.connect()
+            callResult = self.openPortChannel(myPort)
+
+            # Check declared and found instrument type
+            declaredOntType = self.__ontType
+            callResult = self.getInstrumentId()
+            if declaredOntType == self.__ontType: 
+                localMessage="Instrument declared [{}] and found [{}] consistency verified".format(declaredOntType, self.__ontType)
+                self.__lcMsg(localMessage)
+            else:
+                localMessage="Instrument declared [{}] but not found [{}] please verify DB data for id [{}]".format(declaredOntType, self.__ontType)
+                self.__lcMsg(localMessage)
+                return False, localMessage
+
+            # Unload Application to clean wrong situations...
+            callResult = self.unloadApp(myPort, myApplication)
+            time.sleep(10)
+            #callResult = self.getCurrentlyLoadedApp(myPort)
+            callResult = self.loadApp(myPort, myApplication)
+            time.sleep(20)
+        else:                         # ONT-5xx Init
+            # 5xx init
+            myApplication="SdhBert"
+            #tester = instrumentONT(localUser,localPwd, krepo=r)
+            callResult = self.connect()
+            callResult = self.createSession("SessionLore")
+            callResult = self.selectPort(myPort)
+            callResult = self.getSelectedPorts("")
+
+            # Check declared and found instrument type
+            declaredOntType = self.__ontType
+            callResult = self.getInstrumentId()
+            if declaredOntType == self.__ontType: 
+                localMessage="Instrument declared [{}] and found [{}] consistency verified".format(declaredOntType, self.__ontType)
+                self.__lcMsg(localMessage)
+            else:
+                localMessage="Instrument declared [{}] but found [{}] please verify DB data for id [{}]".format(declaredOntType, self.__ontType)
+                self.__lcMsg(localMessage)
+                return False, localMessage
+            callResult = self.initPortToSocketMap()
+            callResult = self.openPortChannel(myPort)
+            callResult = self.getCurrentlyLoadedApp(myPort)
+            callResult = self.unloadApp(myPort, myApplication)
+            time.sleep(10)
+            callResult = self.loadApp(myPort, myApplication)
+        localMessage="[{}]: initInstrument: instrument correctly initialized".format(self.__ontType)
+        self.__lcMsg(localMessage)
+        return True, localMessage
+
+ 
+
+    def deinitInstrument(self, myPort):
+        """
+            DEINITALIZES THE ONT INSTRUMENT TO FREE IT 
+            after this deinizialization another user can use this Instrument
+            the ONT (5xx/6xx) instrument
+        """
+        if self.__ontType  == "6xx":   
+            # Unload Application to clean wrong situations...
+            myApplication="New-Application"
+            callResult = self.unloadApp(myPort, myApplication)
+            time.sleep(5)
+        else:                         # ONT-5xx Init
+            # 5xx init
+            myApplication="SdhBert"
+            callResult = self.unloadApp(myPort, myApplication)
+            time.sleep(5)
+            callResult = self.deselectPort(myPort)    # uncomment to deselect the specified port
+            callResult = self.deleteSession("SessionLore")
+
+        localMessage="[{}]: deinitInstrument: instrument correctly initialized".format(self.__ontType)
+        self.__lcMsg(localMessage)
+        return True, localMessage
+
+
+
 
     #
     #  INTERNAL UTILITIES
@@ -527,6 +686,7 @@ class instrumentONT(Equipment):
         testInstrumentIdString = self.__getResultString(callResult)
         localMessage = "Id string from instrument [{}]".format(testInstrumentIdString)
         if str(testInstrumentIdString).find("ONT-5") != -1:
+            # test se __ontType e' corretto
             self.__ontType  = "5xx"
             localMessage = "Identified [{}]".format(self.__ontType)
             self.__lcMsg(localMessage)
@@ -668,15 +828,7 @@ class instrumentONT(Equipment):
         if callResult == "1" :
             localMessage="ONT ERROR :PRTM:SEL? answers [{}] ".format(callResult)
             self.__lcMsg(localMessage)
-            callResult = self.rebootSlot(myPort1)
-            localMessage = self.__getResultString(callResult)
-            self.__lcMsg(localMessage)
-            time.sleep(20)
-            callResult = self.rebootSlot(myPort2)
-            localMessage = self.__getResultString(callResult)
-            self.__lcMsg(localMessage)
-            time.sleep(20)
-            callResult = self.rebootSlot(myPort3)
+            callResult = self.rebootSlot(portId)
             localMessage = self.__getResultString(callResult)
             self.__lcMsg(localMessage)
             time.sleep(20)
@@ -725,7 +877,7 @@ class instrumentONT(Equipment):
         """ waits untill all ONT operations pending are completed
             True, <  info string >
             False, < info string >   """
-        methodLocalName = self.__lcCurrentMethodName()
+        #methodLocalName = self.__lcCurrentMethodName()
         operationCompleted = False
         for n in range(0,self.__ontCmdMaxRetry):
             localCommand="*OPC?"
@@ -886,10 +1038,10 @@ class instrumentONT(Equipment):
         #callResult = self.__removeDust(rawCallResult[1]).replace(">","")
         callResult = self.__removeDust(rawCallResult[1]).replace(">","").replace("\"","")
         if  callResult == "":
-            localMessage="No Application Currently Loaded[{}] ".format(callResult)
+            localMessage="No Application Currently Loaded[{}] PortId[{}]".format(callResult, portId)
             callRetCode = False
         else:
-            localMessage="Currently Loaded Application [{}] ".format(callResult)
+            localMessage="Currently Loaded Application [{}] PortId[{}]".format(callResult, portId)
             callRetCode = True
         self.__lcMsg(localMessage)
         return callRetCode, callResult
@@ -906,12 +1058,12 @@ class instrumentONT(Equipment):
         #callResult = self.__removeDust(rawCallResult[1]).replace(">","")
         callResult = self.__removeDust(rawCallResult[1]).replace(">","").replace("\"","")
         if  callResult == "":
-            localMessage="No Application Currently Loaded[{}] ".format(callResult)
+            localMessage="No Application Currently Loaded[{}] PortId[{}]".format(callResult, portId)
             callRetCode = False
             self.__lcMsg(localMessage)
             self.__t_failure(methodLocalName, None, "", localMessage)
         else:
-            localMessage="Currently Loaded Application [{}] ".format(callResult)
+            localMessage="Currently Loaded Application [{}] PortId[{}] ".format(callResult, portId)
             callRetCode = True
             self.__lcMsg(localMessage)
             self.__t_success(methodLocalName, None, localMessage)
@@ -938,10 +1090,10 @@ class instrumentONT(Equipment):
 
         if self.__ontType  == "6xx":
             if applicationName == "New-Application":
-                localMessage = "loadApp: [{}] application name ok".format(applicationName)
+                localMessage = "[{}] loadApp: [{}] application name ok".format(self.__ontType, applicationName)
                 self.__lcMsg(localMessage)
             else:
-                localMessage = "loadApp error: applicationName [{}] not in expected list: [New-Application]".format(applicationName)
+                localMessage = "[{}] loadApp error: applicationName [{}] not in expected list: [New-Application]".format(self.__ontType, applicationName)
                 self.__lcMsg(localMessage)
                 self.__t_failure(methodLocalName, None, "", localMessage)
                 return False, localMessage
@@ -951,10 +1103,10 @@ class instrumentONT(Equipment):
                applicationName == "OTN-G709"     or \
                applicationName == "OTN-G709-SDH" or \
                applicationName == "OTN-G709-SONET":
-                localMessage = "loadApp: application name [{}] ok".format(applicationName)
+                localMessage = "[{}] loadApp: application name [{}] ok".format(self.__ontType, applicationName)
                 self.__lcMsg(localMessage)
             else:
-                localMessage = "loadApp error: applicationName [{}] not in expected list: [SdhBert|SonetBert|OTN-G709|OTN-G709-SDH|OTN-G709-SONET]".format(applicationName)
+                localMessage = "[{}] loadApp error: applicationName [{}] not in expected list: [SdhBert|SonetBert|OTN-G709|OTN-G709-SDH|OTN-G709-SONET]".format(self.__ontType, applicationName)
                 self.__lcMsg(localMessage)
                 self.__t_failure(methodLocalName, None, "", localMessage)
                 return False, localMessage
@@ -969,11 +1121,11 @@ class instrumentONT(Equipment):
             verifyResult = self.__verifyPresenceInCsvFormatAnswer(callResult, applicationName)
             if  verifyResult[0]: # True means: application correctly loaded
                 commandExecTime = (n * self.__ontSleepTimeForRetry)
-                localMessage="Application [{}] loaded in [{}] retries".format(applicationName, n)
+                localMessage="[{}] Application [{}] loaded in [{}] retries".format(self.__ontType, applicationName, n)
                 self.__lcMsg(localMessage)
                 applicationLoaded = True
                 break
-                localMessage="Application [{}] not loaded after [{}] retries".format(applicationName, n)
+                localMessage="[{}] Application [{}] not loaded after [{}] retries".format(self.__ontType, applicationName, n)
             time.sleep(self.__ontSleepTimeForRetry)
         self.__lcMsg(messageFromPort)
         if applicationLoaded == True:
@@ -3462,12 +3614,320 @@ class instrumentONT(Equipment):
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+#######################################################################
+#
+#   MODULE TEST - Test sequences used for DB-Integrated testing
+#
+#######################################################################
+if __name__ == "__main__":   #now use this part
+    print(" ")
+    print("========================================")
+    print("ontXXXDriver DB-Integrated testing debug")
+    print("========================================")
+    #localUser="preint" ghelfi
+    #localPwd="preint"  ghelfi
+
+    # DA AMBIENTE DI ESECUZIONE:
+    currDir,fileName = os.path.split(os.path.realpath(__file__))
+    xmlReport = currDir + '/test-reports/TestSuite.'+ fileName
+    r = Kunit(xmlReport)
+    r.frame_open(xmlReport)
+
+    # PREINIT VARS (from file or ad-hoc class):
+    # 5xx
+    localUser_5xx="Automation"
+    localPwd_5xx="Automation"
+    myPort_5xx="/0/1/1"
+    myApplication1_5xx="SdhBert"
+    myApplication2_5xx="SonetBert"
+
+    # 6xx
+    localUser_6xx="Automation"
+    localPwd_6xx="Automation"
+    myPort_6xx="/0/1/1"
+    myApplication1_6xx="New-Application"
+
+
+  
+    tester_5xx = instrumentONT("tester_5xx", ID=20, krepo=r)
+    tester_6xx = instrumentONT("tester_6xx", ID=21, krepo=r)
+    tester_5xx.initInstrument(localUser_5xx, localPwd_5xx, myApplication1_5xx, myPort_5xx)
+    tester_6xx.initInstrument(localUser_6xx, localPwd_6xx, myApplication1_6xx, myPort_6xx)
+
+
+
+
+
+
+    print("\n\n\n\n\nTESTING SECTION *************************************")
+    input("press enter to continue...")
+    
+
+
+
+
+    tester_5xx.deinitInstrument( myPort_5xx)
+    tester_6xx.deinitInstrument( myPort_6xx)
+
+ 
+
+    print(" ")
+    print("========================================")
+    print("ontXXXDriver DB-Integrated -- END --    ")
+    print("========================================")
+    print(" ")
+
+
+    r.frame_close()
+
+
+
+
+#######################################################################
+#
+#   MODULE TEST - Test sequences used fot ONT5xx testing
+#
+#######################################################################
+if __name__ == "__main__xxx":   #now skip this part
+    print(" ")
+    print("=============================")
+    print("ontXXXDriver 5xx module debug")
+    print("=============================")
+    #localUser="preint" ghelfi
+    #localPwd="preint"  ghelfi
+
+    currDir,fileName = os.path.split(os.path.realpath(__file__))
+    xmlReport = currDir + '/test-reports/TestSuite.'+ fileName
+    r = Kunit(xmlReport)
+    r.frame_open(xmlReport)
+
+    localUser="Automation"
+    localPwd="Automation"
+    myPort1="/0/1/1"
+    myPort2="/0/2/1"
+    myPort3="/0/3/1"
+    myApplication1="SdhBert"
+    myApplication2="SonetBert"
+
+    tester = instrumentONT(localUser,localPwd, krepo=r)
+    callResult = tester.connect()
+    print("tester.connect result: [{}]".format(callResult))
+
+    callResult = tester.createSession("SessionLore")
+    print("tester.createSession result: [{}]".format(callResult))
+
+    #    callResult = tester.waitOpsCompleted()
+    #    print("tester.waitOpsCompleted result: [{}]".format(callResult))
+
+    callResult = tester.selectPort(myPort1)
+    print("tester.selectPort result: [{}]".format(callResult))
+    callResult = tester.selectPort(myPort2)
+    print("tester.selectPort result: [{}]".format(callResult))
+    callResult = tester.selectPort(myPort3)
+    print("tester.selectPort result: [{}]".format(callResult))
+    callResult = tester.getSelectedPorts("")
+    print("tester.getSelectedPorts result: [{}]".format(callResult))
+    callResult = tester.getInstrumentId()
+    print("tester.getInstrumentId result: [{}]".format(callResult))
+
+    #    callResult = tester.getLastError()
+    #    print("tester.getLastError result: [{}]".format(callResult))
+    #    callResult = tester.getAvailablePorts()
+    #    print("tester.getAvailablePorts result: [{}]".format(callResult))
+
+    #    callResult = tester.rebootSlot(myPort1)
+    #    print("*********** callResult: [{}]".format(callResult))
+    #    time.sleep(20)
+
+    #callResult = tester.initOntType()
+    #print("tester.initOntType result: [{}]".format(callResult))
+    #callResult = tester.printOntType()  # uncomment to check the detected Ont Type
+
+    callResult = tester.initPortToSocketMap()
+    print("tester.initPortToSocketMap result: [{}]".format(callResult))
+    #tester.printPortToSocketMap() # uncomment to check if map is initialized
+
+    callResult = tester.openPortChannel(myPort1)
+    print("tester.openPortChannel result: [{}]".format(callResult))
+
+    callResult = tester.getCurrentlyLoadedApp(myPort1)
+    print("tester.getCurrentlyLoadedApp result: [{}]".format(callResult))
+
+    callResult = tester.loadApp(myPort1, myApplication1)
+    print("tester.loadApp result: [{}]".format(callResult))
+
+    #callResult = tester.getSetMeasurementTime(myPort1, 0)
+    #print("tester.getSetMeasurementTime result: [{}]".format(callResult))
+    #callResult = tester.getSetMeasurementTime(myPort1, 123456)
+    #print("tester.getSetMeasurementTime result: [{}]".format(callResult))
+    #callResult = tester.getSetMeasurementTime(myPort1, 0)
+    #print("tester.getSetMeasurementTime result: [{}]".format(callResult))
+    #callResult = tester.retrieveOpticalAlarms(myPort1)
+    #print("tester.retrieveOpticalAlarms result: [{}]".format(callResult))
+    #callResult = tester.retrieveHOAlarms(myPort1)
+    #print("tester.retrieveHOAlarms result: [{}]".format(callResult))
+    #callResult = tester.retrieveLOAlarms(myPort1)
+    #print("tester.retrieveLOAlarms result: [{}]".format(callResult))
+    #callResult = tester.getSetWavelenght(myPort1,"W1310")
+    #print("tester.getSetWavelenght result: [{}]".format(callResult))
+    #callResult = tester.getSetWavelenght(myPort1,"")
+    #print("tester.getSetWavelenght result: [{}]".format(callResult))
+    #callResult = tester.getSetLaserStatus(myPort1,"ON")
+    #print("tester.getSetLaserStatus result: [{}]".format(callResult))
+    #callResult = tester.getSetLaserStatus(myPort1,"")
+    #print("tester.getSetLaserStatus result: [{}]".format(callResult))
+    #callResult = tester.getSetRxBitrate(myPort1,"")
+    #print("tester.getSetRxBitrate result: [{}]".format(callResult))
+    #callResult = tester.getSetRxBitrate(myPort1,"STM1")
+    #print("tester.getSetRxBitrate result: [{}]".format(callResult))
+    #callResult = tester.getSetClockReferenceSource(myPort1,"")
+    #print("tester.getSetClockReferenceSource result: [{}]".format(callResult))
+    #callResult = tester.getSetClockReferenceSource(myPort1,"RX")
+    #print("tester.getSetClockReferenceSource result: [{}]".format(callResult))
+    #callResult = tester.getSetRxBitrate(myPort1,"STM16")
+    #print("tester.getSetRxBitrate result: [{}]".format(callResult))
+    #callResult = tester.getSetTxBitrate(myPort1,"STM16")
+    #print("tester.getSetTxBitrate result: [{}]".format(callResult))
+    #callResult = tester.getSetRxMeasureChannel(myPort1,"1")
+    #print("tester.getSetRxMeasureChannel result: [{}]".format(callResult))
+    #callResult = tester.getSetRxChannelMappingSize(myPort1,"VC12")
+    #print("tester.getSetRxChannelMappingSize result: [{}]".format(callResult))
+    #callResult = tester.getSetRxLoMeasureChannel(myPort1,"4")
+    #print("tester.getSetRxLoMeasureChannel result: [{}]".format(callResult))
+    #callResult = tester.getSetAlarmInsertionType(myPort1,"LOF")
+    #print("tester.getSetAlarmInsertionType result: [{}]".format(callResult))
+    #callResult = tester.getSetAlarmedFramesNumber(myPort1,"222")
+    #print("tester.getSetAlarmedFramesNumber result: [{}]".format(callResult))
+    #callResult = tester.getSetNotAlarmedFramesNumber(myPort1,"444")
+    #print("tester.getSetNotAlarmedFramesNumber result: [{}]".format(callResult))
+    #callResult = tester.getSetAlarmActivation(myPort1,"")
+    #print("tester.getSetAlarmActivation result: [{}]".format(callResult))
+    #callResult = tester.getSetAlarmActivation(myPort1,"OFF")
+    #print("tester.getSetAlarmActivation result: [{}]".format(callResult))
+    #callResult = tester.getSetAlarmInsertionMode(myPort1,"BURST_CONT")
+    #print("tester.getSetAlarmInsertionMode result: [{}]".format(callResult))
+    #callResult = tester.getSetAlarmInsertionType(myPort1,"")
+    #print("tester.getSetAlarmInsertionType result: [{}]".format(callResult))
+    #callResult = tester.getSetNumAlarmedBurstFrames(myPort1,"7")
+    #print("tester.getSetNumAlarmedBurstFrames result: [{}]".format(callResult))
+    #callResult = tester.getSetNumNotAlarmedBurstFrames(myPort1,"")
+    #print("tester.getSetNumNotAlarmedBurstFrames result: [{}]".format(callResult))
+    #callResult = tester.getSetNumNotAlarmedBurstFrames(myPort1,"300")
+    #print("tester.getSetNumNotAlarmedBurstFrames result: [{}]".format(callResult))
+    #callResult = tester.getSetErrorActivation(myPort1,"ON")
+    #print("tester.getSetErrorActivation result: [{}]".format(callResult))
+    #callResult = tester.getSetErrorInsertionMode(myPort1,"ONCE")
+    #print("tester.getSetErrorInsertionMode result: [{}]".format(callResult))
+    #callResult = tester.getSetErrorInsertionType(myPort1,"FAS")
+    #print("tester.getSetErrorInsertionType result: [{}]".format(callResult))
+    #callResult = tester.getSetErrorInsertionType(myPort1,"RSBIP")
+    #print("tester.getSetErrorInsertionType result: [{}]".format(callResult))
+    #callResult = tester.getSetTxBitrate(myPort1,"STM16")
+    #print("tester.getSetTxBitrate result: [{}]".format(callResult))
+    #callResult = tester.getSetTxMeasureChannel(myPort1,"")
+    #print("tester.getSetTxMeasureChannel result: [{}]".format(callResult))
+    #callResult = tester.getSetTxMeasureChannel(myPort1,"7")
+    #print("tester.getSetTxMeasureChannel result: [{}]".format(callResult))
+    #callResult = tester.getSetRxChannelMappingSize(myPort1,"VC12")
+    #print("tester.getSetRxChannelMappingSize result: [{}]".format(callResult))
+    #callResult = tester.getSetTxChannelMappingSize(myPort1,"VC12")
+    #print("tester.getSetTxChannelMappingSize result: [{}]".format(callResult))
+
+
+    #print("\n\n\n\n\nTESTING SECTION START *************************************")
+    #input("press enter to continue...\n")
+
+    #callResult = tester.getSetRxLoMeasureChannel(myPort1,"4")
+    #print("tester.getSetRxLoMeasureChannel result: [{}]".format(callResult))
+    #input("press enter to continue...\n")
+    #callResult = tester.getSetTxLoMeasureChannel(myPort1,"5")
+    #print("tester.getSetTxLoMeasureChannel result: [{}]".format(callResult))
+    #input("press enter to continue...\n")
+
+
+
+    print("\n\n\n\n\nTESTING SECTION STOP *************************************")
+    #input("press enter to continue...")
+
+    callResult = tester.retrieveHOAlarms(myPort1)
+    print("tester.retrieveHOAlarms result: [{}]".format(callResult))
+    callResult = tester.retrieveLOAlarms(myPort1)
+    print("tester.retrieveLOAlarms result: [{}]".format(callResult))
+
+    callResult = tester.retrieveHOLOAlarms(myPort1)
+    print("tester.retrieveHOLOAlarms result: [{}]".format(callResult))
+
+
+
+    callResult = tester.unloadApp(myPort1, myApplication1)
+    print("tester.unloadApp result: [{}]".format(callResult))
+    callResult = tester.deselectPort(myPort1)    # uncomment to deselect the specified port
+    print("tester.deselectPort result: [{}]".format(callResult))
+    callResult = tester.deselectPort(myPort2)   # uncomment to deselect the specified port
+    print("tester.deselectPort result: [{}]".format(callResult))
+    callResult = tester.deselectPort(myPort3)   # uncomment to deselect the specified port
+    print("tester.deselectPort result: [{}]".format(callResult))
+
+    callResult = tester.deleteSession("SessionLore")
+    print("tester.deleteSession result: [{}]".format(callResult))
+
+    print(" ")
+    print("=============================")
+    print("ontXXXDriver 5xx -- END--")
+    print("=============================")
+    print(" ")
+
+    r.frame_close()
+
+    #sys.exit()
+
+
+
+
+
+
+
 #######################################################################
 #
 #   MODULE TEST - Test sequences used for ONT6xx testing
 #
 #######################################################################
-if __name__ == "__main__":
+if __name__ == "__main__xxx":
     print(" ")
     print("=============================")
     print("ontXXXDriver 6xx module debug")
@@ -3757,243 +4217,6 @@ if __name__ == "__main__":
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-#######################################################################
-#
-#   MODULE TEST - Test sequences used fot ONT5xx testing
-#
-#######################################################################
-if __name__ == "__main__xxx":   #now skip this part
-    print(" ")
-    print("=============================")
-    print("ontXXXDriver 5xx module debug")
-    print("=============================")
-    #localUser="preint" ghelfi
-    #localPwd="preint"  ghelfi
-
-    currDir,fileName = os.path.split(os.path.realpath(__file__))
-    xmlReport = currDir + '/test-reports/TestSuite.'+ fileName
-    r = Kunit(xmlReport)
-    r.frame_open(xmlReport)
-
-    localUser="Automation"
-    localPwd="Automation"
-    myPort1="/0/1/1"
-    myPort2="/0/2/1"
-    myPort3="/0/3/1"
-    myApplication1="SdhBert"
-    myApplication2="SonetBert"
-
-    tester = instrumentONT(localUser,localPwd, krepo=r)
-    callResult = tester.connect()
-    print("tester.connect result: [{}]".format(callResult))
-
-    callResult = tester.createSession("SessionLore")
-    print("tester.createSession result: [{}]".format(callResult))
-
-    #    callResult = tester.waitOpsCompleted()
-    #    print("tester.waitOpsCompleted result: [{}]".format(callResult))
-
-    callResult = tester.selectPort(myPort1)
-    print("tester.selectPort result: [{}]".format(callResult))
-    callResult = tester.selectPort(myPort2)
-    print("tester.selectPort result: [{}]".format(callResult))
-    callResult = tester.selectPort(myPort3)
-    print("tester.selectPort result: [{}]".format(callResult))
-    callResult = tester.getSelectedPorts("")
-    print("tester.getSelectedPorts result: [{}]".format(callResult))
-    callResult = tester.getInstrumentId()
-    print("tester.getInstrumentId result: [{}]".format(callResult))
-
-    #    callResult = tester.getLastError()
-    #    print("tester.getLastError result: [{}]".format(callResult))
-    #    callResult = tester.getAvailablePorts()
-    #    print("tester.getAvailablePorts result: [{}]".format(callResult))
-
-    #    callResult = tester.rebootSlot(myPort1)
-    #    print("*********** callResult: [{}]".format(callResult))
-    #    time.sleep(20)
-
-    #callResult = tester.initOntType()
-    #print("tester.initOntType result: [{}]".format(callResult))
-    #callResult = tester.printOntType()  # uncomment to check the detected Ont Type
-
-    callResult = tester.initPortToSocketMap()
-    print("tester.initPortToSocketMap result: [{}]".format(callResult))
-    #tester.printPortToSocketMap() # uncomment to check if map is initialized
-
-    callResult = tester.openPortChannel(myPort1)
-    print("tester.openPortChannel result: [{}]".format(callResult))
-
-    callResult = tester.getCurrentlyLoadedApp(myPort1)
-    print("tester.getCurrentlyLoadedApp result: [{}]".format(callResult))
-
-    callResult = tester.loadApp(myPort1, myApplication1)
-    print("tester.loadApp result: [{}]".format(callResult))
-
-    #callResult = tester.getSetMeasurementTime(myPort1, 0)
-    #print("tester.getSetMeasurementTime result: [{}]".format(callResult))
-    #callResult = tester.getSetMeasurementTime(myPort1, 123456)
-    #print("tester.getSetMeasurementTime result: [{}]".format(callResult))
-    #callResult = tester.getSetMeasurementTime(myPort1, 0)
-    #print("tester.getSetMeasurementTime result: [{}]".format(callResult))
-    #callResult = tester.retrieveOpticalAlarms(myPort1)
-    #print("tester.retrieveOpticalAlarms result: [{}]".format(callResult))
-    #callResult = tester.retrieveHOAlarms(myPort1)
-    #print("tester.retrieveHOAlarms result: [{}]".format(callResult))
-    #callResult = tester.retrieveLOAlarms(myPort1)
-    #print("tester.retrieveLOAlarms result: [{}]".format(callResult))
-    #callResult = tester.getSetWavelenght(myPort1,"W1310")
-    #print("tester.getSetWavelenght result: [{}]".format(callResult))
-    #callResult = tester.getSetWavelenght(myPort1,"")
-    #print("tester.getSetWavelenght result: [{}]".format(callResult))
-    #callResult = tester.getSetLaserStatus(myPort1,"ON")
-    #print("tester.getSetLaserStatus result: [{}]".format(callResult))
-    #callResult = tester.getSetLaserStatus(myPort1,"")
-    #print("tester.getSetLaserStatus result: [{}]".format(callResult))
-    #callResult = tester.getSetRxBitrate(myPort1,"")
-    #print("tester.getSetRxBitrate result: [{}]".format(callResult))
-    #callResult = tester.getSetRxBitrate(myPort1,"STM1")
-    #print("tester.getSetRxBitrate result: [{}]".format(callResult))
-    #callResult = tester.getSetClockReferenceSource(myPort1,"")
-    #print("tester.getSetClockReferenceSource result: [{}]".format(callResult))
-    #callResult = tester.getSetClockReferenceSource(myPort1,"RX")
-    #print("tester.getSetClockReferenceSource result: [{}]".format(callResult))
-    #callResult = tester.getSetRxBitrate(myPort1,"STM16")
-    #print("tester.getSetRxBitrate result: [{}]".format(callResult))
-    #callResult = tester.getSetTxBitrate(myPort1,"STM16")
-    #print("tester.getSetTxBitrate result: [{}]".format(callResult))
-    #callResult = tester.getSetRxMeasureChannel(myPort1,"1")
-    #print("tester.getSetRxMeasureChannel result: [{}]".format(callResult))
-    #callResult = tester.getSetRxChannelMappingSize(myPort1,"VC12")
-    #print("tester.getSetRxChannelMappingSize result: [{}]".format(callResult))
-    #callResult = tester.getSetRxLoMeasureChannel(myPort1,"4")
-    #print("tester.getSetRxLoMeasureChannel result: [{}]".format(callResult))
-    #callResult = tester.getSetAlarmInsertionType(myPort1,"LOF")
-    #print("tester.getSetAlarmInsertionType result: [{}]".format(callResult))
-    #callResult = tester.getSetAlarmedFramesNumber(myPort1,"222")
-    #print("tester.getSetAlarmedFramesNumber result: [{}]".format(callResult))
-    #callResult = tester.getSetNotAlarmedFramesNumber(myPort1,"444")
-    #print("tester.getSetNotAlarmedFramesNumber result: [{}]".format(callResult))
-    #callResult = tester.getSetAlarmActivation(myPort1,"")
-    #print("tester.getSetAlarmActivation result: [{}]".format(callResult))
-    #callResult = tester.getSetAlarmActivation(myPort1,"OFF")
-    #print("tester.getSetAlarmActivation result: [{}]".format(callResult))
-    #callResult = tester.getSetAlarmInsertionMode(myPort1,"BURST_CONT")
-    #print("tester.getSetAlarmInsertionMode result: [{}]".format(callResult))
-    #callResult = tester.getSetAlarmInsertionType(myPort1,"")
-    #print("tester.getSetAlarmInsertionType result: [{}]".format(callResult))
-    #callResult = tester.getSetNumAlarmedBurstFrames(myPort1,"7")
-    #print("tester.getSetNumAlarmedBurstFrames result: [{}]".format(callResult))
-    #callResult = tester.getSetNumNotAlarmedBurstFrames(myPort1,"")
-    #print("tester.getSetNumNotAlarmedBurstFrames result: [{}]".format(callResult))
-    #callResult = tester.getSetNumNotAlarmedBurstFrames(myPort1,"300")
-    #print("tester.getSetNumNotAlarmedBurstFrames result: [{}]".format(callResult))
-    #callResult = tester.getSetErrorActivation(myPort1,"ON")
-    #print("tester.getSetErrorActivation result: [{}]".format(callResult))
-    #callResult = tester.getSetErrorInsertionMode(myPort1,"ONCE")
-    #print("tester.getSetErrorInsertionMode result: [{}]".format(callResult))
-    #callResult = tester.getSetErrorInsertionType(myPort1,"FAS")
-    #print("tester.getSetErrorInsertionType result: [{}]".format(callResult))
-    #callResult = tester.getSetErrorInsertionType(myPort1,"RSBIP")
-    #print("tester.getSetErrorInsertionType result: [{}]".format(callResult))
-    #callResult = tester.getSetTxBitrate(myPort1,"STM16")
-    #print("tester.getSetTxBitrate result: [{}]".format(callResult))
-    #callResult = tester.getSetTxMeasureChannel(myPort1,"")
-    #print("tester.getSetTxMeasureChannel result: [{}]".format(callResult))
-    #callResult = tester.getSetTxMeasureChannel(myPort1,"7")
-    #print("tester.getSetTxMeasureChannel result: [{}]".format(callResult))
-    #callResult = tester.getSetRxChannelMappingSize(myPort1,"VC12")
-    #print("tester.getSetRxChannelMappingSize result: [{}]".format(callResult))
-    #callResult = tester.getSetTxChannelMappingSize(myPort1,"VC12")
-    #print("tester.getSetTxChannelMappingSize result: [{}]".format(callResult))
-
-
-    #print("\n\n\n\n\nTESTING SECTION START *************************************")
-    #input("press enter to continue...\n")
-
-    #callResult = tester.getSetRxLoMeasureChannel(myPort1,"4")
-    #print("tester.getSetRxLoMeasureChannel result: [{}]".format(callResult))
-    #input("press enter to continue...\n")
-    #callResult = tester.getSetTxLoMeasureChannel(myPort1,"5")
-    #print("tester.getSetTxLoMeasureChannel result: [{}]".format(callResult))
-    #input("press enter to continue...\n")
-
-
-
-    print("\n\n\n\n\nTESTING SECTION STOP *************************************")
-    #input("press enter to continue...")
-
-    callResult = tester.retrieveHOAlarms(myPort1)
-    print("tester.retrieveHOAlarms result: [{}]".format(callResult))
-    callResult = tester.retrieveLOAlarms(myPort1)
-    print("tester.retrieveLOAlarms result: [{}]".format(callResult))
-
-    callResult = tester.retrieveHOLOAlarms(myPort1)
-    print("tester.retrieveHOLOAlarms result: [{}]".format(callResult))
-
-
-
-    callResult = tester.unloadApp(myPort1, myApplication1)
-    print("tester.unloadApp result: [{}]".format(callResult))
-    callResult = tester.deselectPort(myPort1)    # uncomment to deselect the specified port
-    print("tester.deselectPort result: [{}]".format(callResult))
-    callResult = tester.deselectPort(myPort2)   # uncomment to deselect the specified port
-    print("tester.deselectPort result: [{}]".format(callResult))
-    callResult = tester.deselectPort(myPort3)   # uncomment to deselect the specified port
-    print("tester.deselectPort result: [{}]".format(callResult))
-
-    callResult = tester.deleteSession("SessionLore")
-    print("tester.deleteSession result: [{}]".format(callResult))
-
-    print(" ")
-    print("=============================")
-    print("ontXXXDriver 5xx -- END--")
-    print("=============================")
-    print(" ")
-
-    r.frame_close()
-
-    #sys.exit()
 
 
 

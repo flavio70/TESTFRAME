@@ -19,10 +19,10 @@ class SWP1850TSS():
     """
 
     def __init__(self):
-        self.__swp_rel  = None  # Release Identifier (string, as "V7.10.20")
-        self.__swp_id   = None  # SWP Identifier (string, as "V7.10.20-0491")
-        self.__flv      = None  # Reference FLV Label
-        self.__startapp = {}    # dictionary for StartApp strings
+        self.__swp_release  = None  # Release Identifier (string, as "V7.10.20")
+        self.__swp_id       = None  # SWP Identifier (string, as "V7.10.20-0491")
+        self.__flv          = None  # Reference FLV Label
+        self.__startapp     = {}    # dictionary for StartApp strings
 
 
     def init_manual(self, str_std=None, str_enh=None, str_sim=None):
@@ -98,7 +98,7 @@ class SWP1850TSS():
         """
         return self.__swp_id
 
-    def get_swp_ver(self):
+    def get_release(self):
         """
         Return the Release Identifier for current SWP
         """
@@ -126,7 +126,7 @@ if __name__ == '__main__':
     my_swp2.init_manual(str_enh=swpstr, str_std=None, str_sim=None)
 
     print(my_swp1.get_swp_label())
-    print(my_swp1.get_swp_ver())
+    print(my_swp1.get_release())
     print(my_swp1.get_swp_ref())
     print(my_swp1.get_startapp("ENH"))
 

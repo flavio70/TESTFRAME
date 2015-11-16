@@ -19,21 +19,22 @@ class Kunit:
     Unit Test Result - JUnit compliant
     """
 
-    def __init__(self, fileName):
+    def __init__(self, path_repo, test_file_name):
         """
-        fileName : test's file name
+        path_repo      : Base path for XML reporting
+        test_file_name : Test file name
         """
         self.__cnt  = 0     # counter of atomic test
         self.__st   = None  # test execution starting time
 
         # Base path of xml result area
-        self.__dir  = os.path.split(os.path.abspath(fileName))[0]
+        self.__dir  = path_repo
 
         # xml file name (path complete)
-        self.master_file_name   = '{:s}.XML'.format(os.path.splitext(fileName)[0])
+        self.master_file_name = '{:s}/{:s}.XML'.format(path_repo,
+                                                       os.path.splitext(test_file_name)[0])
 
         # basic name of test, i.e. without path and suffix
-        #self.__clnm = os.path.splitext(os.path.basename(master_file_name))[0]
         self.__clnm = { }
 
         # Lista dei file di report
