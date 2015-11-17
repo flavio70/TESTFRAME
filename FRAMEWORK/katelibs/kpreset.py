@@ -2,6 +2,13 @@
 """
 ###############################################################################
 # MODULE: kpreset.py
+#  Read and manage a Presettings file iin JSON format for a test script.
+#  A generic preset foreseens almost an entry, named by an Equipment Label.
+#  For each Equipment, using Label string it is possible to get:
+#  - the equipment ID on K@TE DB 'get_id()'          (mandatory element)
+#  - the equipment type from K@TE DB 'get_type()'    (mandatory element)
+#  - a generic attribute for the equipment 'get_elem()'
+#  - a generic attribute from a list for the equipment 'get_from_list()'
 #
 # AUTHOR: C.Ghelfi
 # DATE  : 13/11/2015
