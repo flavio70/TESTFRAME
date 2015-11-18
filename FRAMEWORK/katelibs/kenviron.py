@@ -45,7 +45,7 @@ class KEnvironment():
         self.__paths['LOGS'] = None     # Logs working area
 
         # Setup Working Area
-        self.__setup_workspace(basedir)
+        self.__setup_workspace(basedir, testfilename)
 
         # Test File Name
         self.__test_fn = os.path.basename(testfilename)
@@ -60,7 +60,7 @@ class KEnvironment():
         # ...
 
 
-    def __setup_workspace(self, basedir):
+    def __setup_workspace(self, basedir, testfilename):
         """
         Set or change current working area
         If called passing None, the working area could be:
@@ -75,9 +75,10 @@ class KEnvironment():
                 basedir = None
 
         if basedir is None:
-            # Get Path from HOME directory
-            home_dir = os.path.expanduser("~")
-            basedir = "{:s}/K_WORKSPACE".format(home_dir)
+            # Get Path from test file name
+            #home_dir = os.path.expanduser("~")
+            #basedir = "{:s}/K_WORKSPACE".format(home_dir)
+            basedir = os.path.dirname(os.path.abspath(testfilename))
 
         print("WORKSPACE FOR TEST: [{:s}]\n".format(basedir))
 
@@ -91,7 +92,7 @@ class KEnvironment():
                 return
 
         self.__paths['WSPC'] = basedir
-        self.__paths['TEST'] = "{:s}/suite".format(basedir)
+        self.__paths['TEST'] = basedir
         self.__paths['REPO'] = "{:s}/test-reports".format(basedir)
         self.__paths['LOGS'] = "{:s}/logs".format(basedir)
         self.__paths['TL1E'] = "{:s}/events".format(basedir)
