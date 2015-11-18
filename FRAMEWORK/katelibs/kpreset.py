@@ -41,6 +41,17 @@ class KPreset():
         print("-------------------------------------\n")
 
 
+    def get_all_ids(self):
+        """ Return a list of ID for current preset file
+        """
+        id_list = [ ]
+
+        for key in self.__presets:
+            id_list.append(self.get_id(key))
+
+        return id_list
+
+
     def get_id(self, equip_name):
         """
             Return the equipment Identifier (see K@TE DB, table T_EQUIPMENT)
@@ -89,6 +100,28 @@ class KPreset():
         return res
 
 
+
+class KPresetBuilder():
+    """ Define a new preset file
+    """
+
+    def __init__(self, test_area, test_file_name):
+        """ Create an empty preset file for specified test file
+            test_area      : base path for suite test area
+            test_file_name : the test file name
+        """
+        prs_file_name = "{:s}/{:s}.prs".format(os.path.expanduser(test_area), test_file_name)
+        print("Creating preset file [{:s}]".format(prs_file_name))
+
+    def get_presets_from_db(self):
+        pass
+
+    def generate_preset_file(self):
+        #preset_file = open(prs_file_name)
+        pass
+        
+
+
 if __name__ == '__main__':
     print("DEBUG KPreset")
 
@@ -112,3 +145,7 @@ if __name__ == '__main__':
     print("ONT1 P3    := " + str(kprs.get_from_list("ONT1", "PORTS", "P3")))
 
     print("ONT2 Port2 := " + str(kprs.get_from_list("ONT2", "PORTS", "Port2")))
+
+    print(kprs.get_all_ids())
+
+    newprs = KPresetBuilder(testarea, "new_test_file.py")
