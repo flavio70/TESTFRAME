@@ -252,11 +252,14 @@ class Plugin1850TL1():
     TL1_TIMEOUT = 1200   # defalt timeout for commands result
 
 
-    def __init__(self, IP, PORT=3083, krepo=None, eRef=None):
+    def __init__(self, IP, PORT=3083, krepo=None, eRef=None, collector=None):
         """
         Costructor for generic TL1 interface
-        IP   : equipment's IP Address
-        PORT : TL1 interface Port
+        IP        : equipment's IP Address
+        PORT      : TL1 interface Port
+        krepo     : reference to KUnit reporting instance
+        eRef      : reference to equipment (for label)
+        collector : file name for event collector
         """
 
         self.__the_ip      = IP
@@ -268,7 +271,10 @@ class Plugin1850TL1():
         self.__last_output = ""    # store the output of latest TL1 command
 
         # File for Event collector
-        collector_fn = "collector.log"   # temporaneo
+        if collector is None:
+            collector_fn = "collector.log"
+        else:
+            collector_fn = collector
         self.__f = open(collector_fn, "w")
         os.chmod(collector_fn, 0o644)
 

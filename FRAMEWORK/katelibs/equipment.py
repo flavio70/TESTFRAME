@@ -9,6 +9,7 @@
 ###############################################################################
 """
 
+
 class Equipment:
     """
     Generic Equipment descriptor. Implements basic operations
@@ -22,16 +23,19 @@ class Equipment:
         self.__id     = ID
         self.__type   = "unknown"
 
+
     def set_label(self, the_label):
         """ Initialize equipment name
             the_label : equipment name
         """
         self.__label = the_label
 
+
     def get_label(self):
         """ Get Equipment Name
         """
         return self.__label
+
 
     def set_type(self, the_type):
         """ Initialize equipment type
@@ -39,10 +43,12 @@ class Equipment:
         """
         self.__type = the_type
 
+
     def get_type(self):
         """ Get Equipment type
         """
         return self.__type
+
 
     def lock(self):
         """ Reserve current equipment
@@ -52,6 +58,7 @@ class Equipment:
         else:
             print("Equipment ", self.__id, " already locked.")
 
+
     def unlock(self):
         """ Unreserve current equipment
         """
@@ -60,10 +67,12 @@ class Equipment:
         else:
             print("Equipment ", self.__id, " already unlocked.")
 
+
     def get_status(self):
         """ Get reserved status of equipment
         """
         return self.__status
+
 
     def debug(self):
         """ Debug information

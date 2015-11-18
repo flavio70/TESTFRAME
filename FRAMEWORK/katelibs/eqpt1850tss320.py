@@ -9,15 +9,16 @@
 
 import os
 import time
-import string
-import socket
-from katelibs.equipment import Equipment
-from katelibs.facility1850 import IP, NetIF, SerIF
-from katelibs.access1850 import SER1850, SSH1850
-from katelibs.plugin_tl1 import TL1message, Plugin1850TL1
-from katelibs.plugin_cli import Plugin1850CLI
-from katelibs.kunit import Kunit
-from katelibs.database import *
+
+from katelibs.kenviron      import KEnvironment
+from katelibs.kpreset       import KPreset
+from katelibs.kunit         import Kunit
+from katelibs.equipment     import Equipment
+from katelibs.facility1850  import IP, NetIF, SerIF
+from katelibs.access1850    import SER1850, SSH1850
+from katelibs.plugin_tl1    import TL1message, Plugin1850TL1
+from katelibs.plugin_cli    import Plugin1850CLI
+from katelibs.database      import *
 
 
 
@@ -26,31 +27,38 @@ class Eqpt1850TSS320(Equipment):
     1850TSS320 Equipment descriptor. Implements specific operations
     """
 
-    def __init__(self, label, ID, krepo=None):
+    def __init__(self, label, kenv):
         """ label   : equipment name used on Report file
-            ID      : equipment ID (see T_EQUIPMENT table on K@TE DB)
-            krepo   : reference to kunit report instance
+            kenv    : instance of KEnvironment (initialized by K@TE FRAMEWORK)
         """
         # Public members:
-        self.tl1        = None      # main TL1 channel (used to send user command to equipment)
-        self.cli        = None      # CLI channel (used to send user command to equipment)
+        self.tl1        = None          # main TL1 channel (used to send user command to equipment)
+        self.cli        = None          # CLI channel (used to send user command to equipment)
         # Private members:
-        self.__krepo    = krepo     # result report (Kunit class instance)
-        self.__net_con  = None      # main 1850 IP Connection
-        self.__ser_con  = None      # main 1850 Serial Connection (i.e. FLC 1 console)
-        self.__net      = {}        # IP address informations (from DB)
-        self.__ser      = {}        # Serial(s) informations (from DB)
+        self.__kenv     = kenv          # Kate Environment
+        self.__krepo    = kenv.krepo    # result report (Kunit class instance)
+        self.__prs      = kenv.kprs     # Presets for running environment
+        self.__arch     = None          # Architecture of current Equipment ("STD"/"ENH"/"SIM")
+        self.__swp      = None          # SWP Descriptor
+        self.__net_con  = None          # main 1850 IP Connection
+        self.__ser_con  = None          # main 1850 Serial Connection (i.e. FLC 1 console)
+        self.__net      = {}            # IP address informations (from DB)
+        self.__ser      = {}            # Serial(s) informations (from DB)
 
-        super().__init__(label, ID)
+        super().__init__(label, self.__prs.get_id(label))
 
-        self.__get_eqpt_info_from_db(ID)
+        self.__get_eqpt_info_from_db(self.__prs.get_id(label))
 
         flc1ser = self.__ser.get_val(1)
         self.__ser_con = SER1850( (flc1ser[0], flc1ser[1]) )
 
         self.__net_con = SSH1850(self.__net.get_ip_str())
 
-        self.tl1 = Plugin1850TL1(self.__net.get_ip_str(), krepo=self.__krepo, eRef=self)
+        tl1_event = "{:s}/{:s}_tl1_event.log".format(kenv.path_collector(), label)
+        self.tl1 = Plugin1850TL1(self.__net.get_ip_str(),
+                                 krepo=self.__krepo,
+                                 eRef=self,
+                                 collector=tl1_event)
 
         self.cli = Plugin1850CLI(self.__net.get_ip_str(), krepo=self.__krepo, eRef=self)
 
@@ -273,13 +281,11 @@ class Eqpt1850TSS320(Equipment):
         return True
 
 
-    def flc_load_swp(self, swp_string):
+    def flc_load_swp(self, swp):
         """ Load the specified SWP. The equipment must be reachable by ip address
-            swp_string : the StartApp string
+            swp : an instance of SWP1850TSS class
         """
-        print("LOADING SWP ON '" + self.get_label() + "'")
-        print("SWP STRING: '" + swp_string + "'")
-
+        self.__swp = swp
         if self.__krepo:
             self.__krepo.start_time()
 
@@ -287,31 +293,52 @@ class Eqpt1850TSS320(Equipment):
             self.flc_ip_config()
 
         if self.flc_check_running_swp():
-            print("SWP ALREADY RUNNING")
+            print("SWP '{:s}' ALREADY RUNNING\n".format(self.__swp.get_swp_ref()))
             res = True
             self.__t_skipped("SWP LOAD", None, "SWP already running", "")
         else:
+            swp_string = self.__swp.get_startapp(self.__arch)
+
+            print("LOADING SWP ON '{:s}\nSWP STRING: '{:s}'".format(self.get_label(), swp_string))
+
             res = self.__net_con.send_cmd_and_check(swp_string, "EC_SetSwVersionActive status SUCCESS")
 
             if res == False:
-                print("SWP LOAD ERROR")
+                print("SWP LOAD ERROR\n")
                 self.__t_failure("SWP LOAD", None, "error in loading SWP", "")
             else:
-                print("SWP LOADING TERMINATE")
+                print("SWP LOADING TERMINATE\n")
                 self.__t_success("SWP LOAD", None, "SWP correctly load")
 
         return res
 
 
     def flc_check_running_swp(self):
-        """ Check current SWP
+        """ Check running SWP with expected one
         """
-        return True
+        if self.__swp is None:
+            print("SWP INFORMATION NOT PRESENT")
+            return True
 
-    def INSTALL(self, swp_string, do_format=False):
+        # Using 'bootcmd r' in order to detect running SWP
+        if self.__arch == "ENH":
+            # Enhanced Shelf
+            cmd = "bootcmd r | grep ACT:"
+            res = self.__ser_con.send_cmd_and_capture(cmd)
+            current_swp_id = res.split()[1]
+        else:
+            # Standard and Simulated shelves
+            cmd = "bootcmd r | grep ACTIVE"
+            res = self.__ser_con.send_cmd_and_capture(cmd)
+            current_swp_id = res.split()[0]
+
+        return (current_swp_id == self.__swp.get_swp_ref())
+
+
+    def INSTALL(self, swp, do_format=False):
         """ Start a complete node installation
-            swp_string   : the StartApp string
-            do_format    : before swp loading, a complete disk format will be performed (default: False)
+            swp       : an instance of SWP1850TSS class
+            do_format : before swp loading, a complete disk format will be performed (default: False)
         """
 
         if not self.flc_checl_dual():
@@ -326,7 +353,7 @@ class Eqpt1850TSS320(Equipment):
                 print("INSTALL ABORTED")
                 return False
 
-            if not self.flc_load_swp(swp_string):
+            if not self.flc_load_swp(swp):
                 print("INSTALL ABORTED")
                 return False
 
@@ -364,7 +391,7 @@ class Eqpt1850TSS320(Equipment):
 
         swp_id = ""     # sistemare
 
-        if not self.flc_check_running_swp(""):
+        if not self.flc_check_running_swp():
             print("INSTALL ABORTED")
             return False
 
@@ -410,10 +437,13 @@ class Eqpt1850TSS320(Equipment):
         e_ip,e_nm,e_gw  = self.__get_net_info(ID)
 
         if   e_type_id == 1  or  e_type_id == 3:
+            self.__arch = "STD"
             eth_adapter = "eth1"
         elif e_type_id == 4  or  e_type_id == 5:
+            self.__arch = "ENH"
             eth_adapter = "dbg"
         else:
+            self.__arch = "SIM"
             eth_adapter = "q"
 
         ip  = IP(e_ip)
@@ -438,6 +468,8 @@ class Eqpt1850TSS320(Equipment):
                 sIP = tabNet.objects.get(id_ip=r.t_net_id_ip.id_ip)
                 self.__ser.set_serial_to_slot(r.slot, IP(sIP.ip), r.port)
                 print("  Serial : {:2d} <--> {:s}:{:d}".format(r.slot, sIP.ip, r.port))
+
+        print("CONFIGURATION END\n")
 
 
     def __open_main_ssh_connection(self):
@@ -477,7 +509,10 @@ if __name__ == '__main__':
     #nodeA = Eqpt1850TSS320("nodeA", 1024)
     nodeB = Eqpt1850TSS320("nodeB", 1025, krepo=r)
 
-    #nodeB.INSTALL("StartApp DWL 1850TSS320M 1850TSS320M V7.10.10-J041 151.98.16.7 0 /users/TOOLS/SCRIPTS/pkgStore_04/pkgStoreArea4x/alc-tss/base00.24/int/LIV_ALC-TSS_DR4-24J_BASE00.24.01__VM_PKG058/target/MAIN_RELEASE_71/swp_gccpp/1850TSS320-7.10.10-J041 4gdwl 4gdwl2k12 true")
+    THE_SWP = SWP1850TSS()
+    THE_SWP.init_from_db(swp_flv="FLV_ALC-TSS__BASE00.25.FD0491__VM")
+
+    #nodeB.INSTALL(THE_SWP)
 
     nodeB.flc_ip_config()
     #nodeB.flc_reboot()

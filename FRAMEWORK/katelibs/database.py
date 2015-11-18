@@ -21,10 +21,3 @@ os.environ.setdefault("DJANGO_SETTINGS_MODULE", "katelibs.DB_API_CONF.settings")
 #models.py module must be placed in ./DB_API_LIB folder
 from katelibs.DB_API_LIB.models import *
 
-
-
-
-#global a
-#a=TTest
-#print(TTest.objects.all())
-#print(a)

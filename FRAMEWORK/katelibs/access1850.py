@@ -42,7 +42,7 @@ class SER1850:
 
         try:
             self.__tn = telnetlib.Telnet(self.__ip, self.__port)
-            self.expect(self.__klConnect, 2)    # da togliere ?
+            self.__expect(self.__klConnect, 2)    # da togliere ?
         except Exception as eee:
             print(str(eee))
 
@@ -56,7 +56,7 @@ class SER1850:
             self.__write("\n")
             retry = 1
             while retry == 1:
-                res = self.expect(self.__klLogin, 10)
+                res = self.__expect(self.__klLogin, 10)
                 if   res[0] == 0:
                     self.__write("root")
                 elif res[0] == 1:
@@ -78,6 +78,57 @@ class SER1850:
             return False
 
 
+    def send_cmd_and_capture(self, cmd):
+        """
+        Send a specified command to equipment on serial interface; the stdout result is returned to caller
+        cmd : a UNIX command
+        """
+        try:
+            self.__write("\n")
+            retry = 1
+            while retry == 1:
+                res = self.__expect(self.__klLogin, 10)
+                if   res[0] == 0:
+                    self.__write("root")
+                elif res[0] == 1:
+                    self.__write("root")
+                elif res[0] == 2:
+                    self.__write("root")
+                elif res[0] == 3:
+                    self.__write("alcatel")
+                elif res[0] == 4:
+                    retry = 0
+        except Exception as eee:
+            print("Error in serial connecting - " + str(eee))
+            return ""
+
+        try:
+            self.__read_all()
+            self.__write(cmd)
+        except Exception as eee:
+            print("Error sending command - " + str(eee))
+            return ""
+
+        captured_text = ""
+        discard_text = str.encode("{:s}\r\n".format(cmd))
+
+        while True:
+            res = self.__expect([discard_text, b"\r\n", b"root@.*#"])
+
+            if res[0] == 0:
+                # Command string detected - discard from output
+                continue
+            elif res[0] == 1:
+                # Output text to capture
+                tmp_text = str(res[2], 'utf-8')
+                captured_text = captured_text + tmp_text
+            elif res[0] == 2:
+                # Prompt detected - closing capture
+                break
+
+        return captured_text
+
+
     #pylint: disable=too-many-branches
     def send_cmd_and_check(self, cmd, check_ok, check_ko=None):
         """
@@ -91,7 +142,7 @@ class SER1850:
             self.__write("\n")
             retry = 1
             while retry == 1:
-                res = self.expect(self.__klLogin, 10)
+                res = self.__expect(self.__klLogin, 10)
                 if   res[0] == 0:
                     self.__write("root")
                 elif res[0] == 1:
@@ -116,7 +167,7 @@ class SER1850:
             key_list = [b"root@.*#",str.encode(check_ok)]
             retry = 1
             while retry == 1:
-                res = self.expect(key_list, 10)
+                res = self.__expect(key_list, 10)
                 if   res[0] == 0:
                     is_detected = False
                 elif res[0] == 1:
@@ -128,7 +179,7 @@ class SER1850:
             key_list = [b"root@.*#", str.encode(check_ok), str.encode(check_ko)]
             retry = 1
             while retry == 1:
-                res = self.expect(key_list, 10)
+                res = self.__expect(key_list, 10)
                 if   res[0] == 0:
                     is_detected = False
                 elif res[0] == 1:
@@ -145,7 +196,7 @@ class SER1850:
 
 
 
-    def expect(self, key_list, timeout=__DEFAULT_TIMEOUT):
+    def __expect(self, key_list, timeout=__DEFAULT_TIMEOUT):
         """ Wait on stream until an element of key_list will be detected
         """
         self.res  = self.__tn.expect(key_list, timeout=timeout)
@@ -160,6 +211,13 @@ class SER1850:
 
         return self.__tn.write(str.encode(msg))
 
+
+    def __read_all(self):
+        """ INTERNAL USAGE
+        """
+        while str(self.__tn.read_very_eager().strip(), 'utf-8') != "":
+            pass
+        return True
 
 
 
