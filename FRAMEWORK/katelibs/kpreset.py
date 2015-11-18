@@ -41,6 +41,17 @@ class KPreset():
         print("-------------------------------------\n")
 
 
+    def get_all_ids(self):
+        """ Return a list of ID for current preset file
+        """
+        id_list = [ ]
+
+        for key in self.__presets:
+            id_list.append(self.get_id(key))
+
+        return id_list
+
+
     def get_id(self, equip_name):
         """
             Return the equipment Identifier (see K@TE DB, table T_EQUIPMENT)
@@ -112,3 +123,5 @@ if __name__ == '__main__':
     print("ONT1 P3    := " + str(kprs.get_from_list("ONT1", "PORTS", "P3")))
 
     print("ONT2 Port2 := " + str(kprs.get_from_list("ONT2", "PORTS", "Port2")))
+
+    print(kprs.get_all_ids())
