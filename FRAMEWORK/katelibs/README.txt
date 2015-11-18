@@ -32,17 +32,16 @@ COMPONENTS
         klogger.py              management of logs              - tbd
         ktracer.py              management of trace             - tbd
 
-    DEMO
-        testcase.py
-        testcase.py.prs
+    TEST BASE
+        testcase.py             base class for Test script implementation
 
 
 
 GENERAL DESCRIPTION
 
-A Test script (testcase.py) foreseens a configuration file (testcase.py.prs) with current presets
-for a running session. The Presettings file is a JSON based text file, filled by K@TE Application
-or manually from expert user.
+A Test script (derived from testcase.py) foreseens a configuration file (testfile.py.prs) with
+current presets for a running session. The Presettings file is a JSON based text file,
+filled by K@TE Application or manually from expert user.
 
 The K@TE Application supplies a test script template for a specific Test Topology. On test script
 a preamble section declare all active items variables foreseens for the Topoloty and the correct
