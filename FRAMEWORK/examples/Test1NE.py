@@ -21,8 +21,12 @@ TestCase template for K@TE test developers
 
 '''
 
-from katelibs.testcase import TestCase
-from katelibs.eqpt1850tss320 import *
+from katelibs.testcase          import TestCase
+from katelibs.eqpt1850tss320    import Eqpt1850TSS320
+from katelibs.instrumentONT     import instrumentONT
+#from katelibs.instrumentIXIA     import InstrumentIXIA
+#from katelibs.instrumentSPIRENT  import InstrumentSPIRENT
+from katelibs.swp1850tss320     import SWP1850TSS
 
 
 class Test(TestCase):
@@ -46,22 +50,42 @@ class Test(TestCase):
         all runSections will be executed if run Test without input parameters
     '''
 
- 
+
     def dut_setup(self):
         '''
         DUT Setup section Implementation
         insert DUT SetUp code for your test below
         '''
-        #self.kenv.krepo.start_tps_block("EM", "1-2-3")
-        self.kenvironment.krepo.start_tps_block("EM", "1-2-3")
-        NE1.tl1.do("ACT-USER::admin:::Alcatel1;")
-        #self.report.add_success(None, "Test3 DUT SetUp", '0', "Test3 DUT SetUp Output")
+        THE_SWP = SWP1850TSS()
+        # temporaneo
+        THE_SWP.init_from_db(swp_flv="FLV_ALC-TSS__BASE00.25.FD0491__VM")
+
+        #NE1.flc_ip_config()
+
+        NE1.flc_load_swp(THE_SWP)
+
+        #NE1.flc_scratch_db()
+        #NE1.flc_reboot()
+        #NE1.flc_ip_config()
+        #NE1.flc_wait_in_service()
+
+
+        #NE1.tl1.do("ACT-USER::admin:::Root1850;")
+        #NE1.tl1.do("ED-PID::admin:::Root1850,Alcatel1,Alcatel1;")
+        #NE1.tl1.do("SET-PRMTR-NE::::::REGION=ETSI,PROVMODE=MANEQ-AUTOFC;")
+        #NE1.tl1.do("RTRV-PRMTR-NE;")
+        #NE1.tl1.do("SET-ATTR-SECUDFLT::::::MAXSESSION=6;")
+        #NE1.tl1.do("ENT-EQPT::SHELF-1-1::::PROVISIONEDTYPE=UNVRSL320,SHELFNUM=1,SHELFROLE=MAIN;")
+        #NE1.tl1.do("ENT-EQPT::SHELF-1-1::::PROVISIONEDTYPE=160H,SHELFNUM=1,SHELFROLE=MAIN;")
+
 
     def test_setup(self):
         '''
         test Setup Section implementation
         insert general SetUp code for your test below
         '''
+        self.kenvironment.krepo.start_tps_block("EM", "1-2-3")
+        NE1.tl1.do("ACT-USER::admin:::Alcatel1;")
 
 
     def test_body(self):
@@ -85,7 +109,6 @@ class Test(TestCase):
         '''
         print('@DUT CleanUP')
         NE1.clean_up()
-        #self.kenv.krepo.stop_tps_block("EM", "1-2-3")
         self.kenvironment.krepo.stop_tps_block("EM", "1-2-3")
 
 
@@ -93,15 +116,16 @@ class Test(TestCase):
 if __name__ == "__main__":
     #initializing the Test object instance, do not remove
     CTEST = Test(__file__)
+
     #initializing all local variable and constants used by Test object
-    #CPARS = CTEST.prs_values
-    #NE1 = Eqpt1850TSS320('NE1',int(CPARS['NE1']), krepo=CTEST.report )
     NE1 = Eqpt1850TSS320('NE1', CTEST.kenvironment)
+    #ONT1 = instrumentONT('ONT1', CTEST.kenvironment)
+    #ONT2 = instrumentONT('ONT2', CTEST.kenvironment)
 
     # Run Test main flow
     # Please don't touch this code
     CTEST.run()
 
+    #ONT2.clean_up()
+    #ONT1.clean_up()
     NE1.clean_up()
-    #inst1.clean_up() # esempio
-    #inst2.clean_up() # esempio

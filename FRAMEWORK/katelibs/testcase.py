@@ -6,48 +6,24 @@
 @Description: This module is used for general test case implementation.
     Provides test class definition and common functions
 """
-from katelibs.kenviron import KEnvironment
-#from katelibs.kunit import Kunit
-#import json
+
 import os
 import argparse
 
+from katelibs.kenviron import KEnvironment
+
 
 class TestCase(object):
-    
     '''
     TestCase General class definition
     '''
-    #__testdir = None  # py file Directory
-    #fn = None # py file name
-    #__xml_report = None # Py file XML Report File
-    #__prs_file = None # file containing the json preset for Test
-    prs_values = None # Structure containing the parsed json Test parameters
-    report = None # contains reference to the current kunit file report object
 
     def __init__(self, filename):
-        
-        #self.__testdir, self.fn = os.path.split(os.path.abspath(filename))
-        #self.__xml_report = self.__testdir + '/../test-reports/'+ os.path.splitext(self.fn)[0] + '._Main.py'
-        #self.__prs_file = open(os.path.abspath(filename)+ '.prs')
-        #self.prs_values = json.load(self.__prs_file)
-        #self.report = Kunit(self.__xml_report)
-
+        """ Costructor of TestCase. Initialize kenvironment variable
+            filename : the test file name
+        """
         self.kenvironment = KEnvironment(testfilename=filename)
 
-    def get_prs(self):
-        return self.prs_values
-
-    def print_prs(self):
-        '''
-        Print out the json parameters
-        '''
-        print('\ninput valid Keys for ', self.kenvironment.get_test_file_name(), ' : \n')
-        for key, values in self.prs_values.items():
-            print('Key: ' + key + ' with current value: ' + values)
-        #for key, values in self.prs_values.items():
-        #   print(key + '=' + values)
-        print('\n-- End of input valid keys -- \n')
 
     def skip_section(self, run_section):
         '''
@@ -56,22 +32,23 @@ class TestCase(object):
         print(run_section + ' Skipped\n')
         self.kenvironment.krepo.add_skipped(None, run_section, '0', run_section + " Skipped by User", run_section + " Skipped by User")
 
+
     def init(self):
         '''
         Main class constructor
         '''
         print('\nInitializing ', self.kenvironment.get_test_file_name(), ' environment ...')
-        #self.print_prs()
         print('DONE \n')
+
 
     def close(self):
         '''
         function used to finalize test execution
         '''
         print('\nFinalizing  ...')
-        #self.kenvironment.krepo.frame_close()
         self.kenvironment.clean_up()
         print('DONE \n')
+
 
     def dut_setup(self):
         '''
@@ -80,12 +57,14 @@ class TestCase(object):
         '''
         print('Running empty DUT SetUp...')
 
+
     def test_setup(self):
         '''
         Empty test setup common function
         should be overwritten by user implementation
         '''
         print('Running empty test Setup...')
+
 
     def test_body(self):
         '''
@@ -94,12 +73,14 @@ class TestCase(object):
         '''
         print('Running empty Main Test...')
 
+
     def test_cleanup(self):
         '''
         Empty test cleanup common function
         should be overwritten by user implementation
         '''
         print('Running empty Test cleanUp...')
+
 
     def dut_cleanup(self):
         '''
@@ -108,9 +89,10 @@ class TestCase(object):
         '''
         print('Running empty DUT cleanUp...')
 
+
     def run(self):
         '''
-        Main run etry point
+        Main run entry point
         test parameter parser and initializaton
         '''
         parser = argparse.ArgumentParser()
@@ -123,6 +105,7 @@ class TestCase(object):
         self.init()
         self.run_test(args)
         self.close()
+
 
     def run_test(self, args):
         '''
@@ -141,4 +124,3 @@ class TestCase(object):
         self.test_body() if args.testBody else self.skip_section('test Body')
         self.test_cleanup() if args.testClean else self.skip_section('test Clean Up')
         self.dut_cleanup() if args.DUTClean else self.skip_section('DUT Cleanup')
-
