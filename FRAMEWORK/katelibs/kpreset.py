@@ -99,9 +99,11 @@ class KPreset():
     def get_from_list(self, equip_name, a_list, elem):
         """
             Return a generic element value for specified equipment (list scenario)
+            OBSOLETE OBSOLETE
         """
         try:
-            res = self.__presets[equip_name][a_list][elem]
+            #res = self.__presets[equip_name][a_list][elem]
+            res = self.get_elem(equip_name, elem)
         except Exception:
             res = ""
 
