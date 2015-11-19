@@ -19,6 +19,9 @@
 import os
 import json
 
+from katelibs.database import *
+from django.db import connection
+
 
 
 class KPreset():
@@ -105,47 +108,112 @@ class KPresetBuilder():
     """ Define a new preset file
     """
 
-    def __init__(self, test_area, test_file_name):
+    def __init__(self, test_dir, id_suite, id_preset):
         """ Create an empty preset file for specified test file
-            test_area      : base path for suite test area
-            test_file_name : the test file name
+            test_dir  : base path for suite test area
+            id_suite  : DB ID for suite
+            id_preset : DB ID for presetting
         """
-        prs_file_name = "{:s}/{:s}.prs".format(os.path.expanduser(test_area), test_file_name)
-        print("Creating preset file [{:s}]".format(prs_file_name))
+        self.__test_dir  = test_dir
+        self.__id_suite  = id_suite
+        self.__id_preset = id_preset
+        self.__test_list = [ ]  # Dictionary as { 'test_name' : ( test_id, topology_id) }
 
-    def get_presets_from_db(self):
+        self.__get_test_list()
+
+        self.__generate_preset_file()
+
+
+    def __get_test_list(self):
+        cursor = connection.cursor()
+
+        query = ' '.join( ( "SELECT test_id, test_name, topology",
+                            "FROM   T_TEST",
+                            "  JOIN T_SUITES_BODY",
+                            "  JOIN T_TEST_REVS",
+                            "WHERE  T_SUITES_id_suite={:d}".format(self.__id_suite),
+                            "GROUP BY test_name" ) )
+
+        cursor.execute(query)
+
+        for row in cursor.fetchall():
+            test_ref = { }
+            test_ref[row[1]] = (row[0], int(row[2]))
+            self.__test_list.append(test_ref)
+
+
+    def __get_attr_value(self, id_entity):
+        print("id_entity := {:d}".format(id_entity))
         pass
 
-    def generate_preset_file(self):
-        #preset_file = open(prs_file_name)
-        pass
+
+    def __evaluate_entity(self, id_topo):
+        id_topo = 3 # solo per debug
+        tab_tpy_body = TTpyEntity
+
+        elem = { }
+
+        for r in tab_tpy_body.objects.all():
+            if r.t_topology_id_topology.id_topology == id_topo:
+                # creo un elemento di chiave r.entityname
+                if not r.entityname in elem:
+                    elem[r.entityname] = [ ]
+                # inserisco coppie <attr,val>
+                atval = { }
+                if r.entityname.find("#") != -1:
+                    # trovato tipo di equipaggiamento
+                    atval = ("TYPE", r.elemname.replace("#",""))
+                else:
+                    val = self.__get_attr_value(r.id_entity)
+                    atval = (r.elemname, val)
+                elem[r.entityname].append(atval)
+
+        print(elem)
+
+
+    def __test_presets(self, test_ref):
+        name = list(test_ref.keys())[0]
+        id_test = test_ref[name][0]
+        id_topo = test_ref[name][1]
+
+        print("{:s} / {:d} / {:d}".format(name, id_test, id_topo))
+
+        self.__evaluate_entity(id_topo)
+
+
+    def __generate_preset_file(self):
+        for test_ref in self.__test_list:
+            self.__test_presets(test_ref)
+            break
         
 
 
 if __name__ == '__main__':
     print("DEBUG KPreset")
 
-    testarea = "~/K_WORKSPACE/suite"
-    testfilename = "TestExample.py"
+    testarea = "~/TESTFRAME/FRAMEWORK/examples"
 
-    kprs = KPreset(testarea, testfilename)
+    if False:
+        testfilename = "Test1NE.py"
 
-    print("-" * 80)
+        kprs = KPreset(testarea, testfilename)
 
-    print("NE1 id   := " + str(kprs.get_id("NE1")))
-    print("NE1 type := " + kprs.get_type("NE1"))
+        print("-" * 80)
 
-    print("ONT1 id    := " + str(kprs.get_id("ONT1")))
-    print("ONT1 type  := " + kprs.get_type("ONT1"))
-    print("ONT1 USER  := " + str(kprs.get_elem("ONT1", "USER")))
-    print("ONT1 PWD   := " + str(kprs.get_elem("ONT1", "PWD")))
-    print("ONT1 APPL  := " + str(kprs.get_elem("ONT1", "APPL")))
-    print("ONT1 P1    := " + str(kprs.get_from_list("ONT1", "PORTS", "P1")))
-    print("ONT1 P2    := " + str(kprs.get_from_list("ONT1", "PORTS", "P2")))
-    print("ONT1 P3    := " + str(kprs.get_from_list("ONT1", "PORTS", "P3")))
+        print("NE1 id   := " + str(kprs.get_id("NE1")))
+        print("NE1 type := " + kprs.get_type("NE1"))
 
-    print("ONT2 Port2 := " + str(kprs.get_from_list("ONT2", "PORTS", "Port2")))
+        print("ONT1 id    := " + str(kprs.get_id("ONT1")))
+        print("ONT1 type  := " + kprs.get_type("ONT1"))
+        print("ONT1 USER  := " + str(kprs.get_elem("ONT1", "USER")))
+        print("ONT1 PWD   := " + str(kprs.get_elem("ONT1", "PWD")))
+        print("ONT1 APPL  := " + str(kprs.get_elem("ONT1", "APPL")))
+        print("ONT1 P1    := " + str(kprs.get_elem("ONT1", "P1")))
+        print("ONT1 P2    := " + str(kprs.get_elem("ONT1", "P2")))
+        print("ONT1 P3    := " + str(kprs.get_elem("ONT1", "P3")))
 
-    print(kprs.get_all_ids())
+        print("ONT2 Port2 := " + str(kprs.get_elem("ONT2", "Port2")))
 
-    newprs = KPresetBuilder(testarea, "new_test_file.py")
+        print(kprs.get_all_ids())
+    else:
+        newprs = KPresetBuilder(testarea, id_suite=65, id_preset=48)
