@@ -60,7 +60,7 @@ class KPreset():
             Return the equipment Identifier (see K@TE DB, table T_EQUIPMENT)
         """
         try:
-            res = self.__presets[equip_name]["ID"]
+            res = self.get_elem(equip_name, "ID")
         except Exception:
             res = ""
 
@@ -72,7 +72,7 @@ class KPreset():
             Return the equipment Type (see K@TE DB, table T_EQUIPMENT_TYPE)
         """
         try:
-            res = self.__presets[equip_name]["TYPE"]
+            res = self.get_elem(equip_name, "TYPE")
         except Exception:
             res = ""
 
@@ -83,8 +83,13 @@ class KPreset():
         """
             Return a generic element value for specified equipment
         """
+        res = ""
+
         try:
-            res = self.__presets[equip_name][elem]
+            for item in self.__presets[equip_name]:
+                if item[0] == elem:
+                    res = item[1]
+                    break
         except Exception:
             res = ""
 
@@ -138,37 +143,53 @@ class KPresetBuilder():
 
         for row in cursor.fetchall():
             test_ref = { }
-            test_ref[row[1]] = (row[0], int(row[2]))
+            name = os.path.basename(row[1])
+            test_ref[name] = (row[0], int(row[2]))
             self.__test_list.append(test_ref)
 
 
-    def __get_attr_value(self, id_entity):
-        print("id_entity := {:d}".format(id_entity))
-        pass
+    def __get_attr_value(self, id_tpy_ent):
+        tab_pst_entity = TPstEntity
+        for r in tab_pst_entity.objects.all():
+            if r.t_tpy_entity_id_entity.id_entity == id_tpy_ent:
+                return r.pstvalue
+        return None
+
+
+    def __get_eqpt_id_for_presetting(self, id_tpy_ent):
+        tab_pst_entity = TPstEntity
+        for r in tab_pst_entity.objects.all():
+            if r.t_tpy_entity_id_entity.id_entity == id_tpy_ent:
+                return r.t_equipment_id_equipment.id_equipment
+        return None
 
 
     def __evaluate_entity(self, id_topo):
-        id_topo = 3 # solo per debug
+        #id_topo = 3 # solo per debug
         tab_tpy_body = TTpyEntity
 
         elem = { }
 
         for r in tab_tpy_body.objects.all():
             if r.t_topology_id_topology.id_topology == id_topo:
-                # creo un elemento di chiave r.entityname
+                # New element for key r.entityname
                 if not r.entityname in elem:
                     elem[r.entityname] = [ ]
-                # inserisco coppie <attr,val>
+                # Adding tuple <attribute,value> (i.e. <'P1','1-1-2-3'>)
                 atval = { }
-                if r.entityname.find("#") != -1:
-                    # trovato tipo di equipaggiamento
+                if r.elemname.find("#") != -1:
+                    # Equipment Type managemtrovato tipo di equipaggiamento
                     atval = ("TYPE", r.elemname.replace("#",""))
+                    elem[r.entityname].append(atval)
+                    # Aggiungo l'ID di equipment
+                    atval = ("ID", self.__get_eqpt_id_for_presetting(r.id_entity))
+                    elem[r.entityname].append(atval)
                 else:
                     val = self.__get_attr_value(r.id_entity)
                     atval = (r.elemname, val)
-                elem[r.entityname].append(atval)
+                    elem[r.entityname].append(atval)
 
-        print(elem)
+        return elem
 
 
     def __test_presets(self, test_ref):
@@ -178,22 +199,29 @@ class KPresetBuilder():
 
         print("{:s} / {:d} / {:d}".format(name, id_test, id_topo))
 
-        self.__evaluate_entity(id_topo)
+        elem_list = self.__evaluate_entity(id_topo)
+
+        name_js = "{:s}/{:s}.prs".format(self.__test_dir, name)
+
+        fh = open(name_js, "w")
+
+        json.dump(elem_list, fh, ensure_ascii=False,indent=4,separators=(',',':'))
+
+        fh.close()
 
 
     def __generate_preset_file(self):
         for test_ref in self.__test_list:
             self.__test_presets(test_ref)
-            break
-        
+
 
 
 if __name__ == '__main__':
     print("DEBUG KPreset")
 
-    testarea = "~/TESTFRAME/FRAMEWORK/examples"
 
     if False:
+        testarea = "~/TESTFRAME/FRAMEWORK/examples"
         testfilename = "Test1NE.py"
 
         kprs = KPreset(testarea, testfilename)
@@ -216,4 +244,12 @@ if __name__ == '__main__':
 
         print(kprs.get_all_ids())
     else:
+        testarea = "."
         newprs = KPresetBuilder(testarea, id_suite=65, id_preset=48)
+        kprs = KPreset(testarea, "Test3.py")
+        print("NE1 id   := " + str(kprs.get_id("NE1")))
+        print("NE1 type := " + kprs.get_type("NE1"))
+        print("NE1 P1   := " + kprs.get_elem("NE1", "P1"))
+        print("NE2 id   := " + str(kprs.get_id("NE2")))
+        print("NE2 type := " + kprs.get_type("NE2"))
+        print("NE2 P1   := " + kprs.get_elem("NE2", "P1"))
