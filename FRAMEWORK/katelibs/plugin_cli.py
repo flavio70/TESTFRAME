@@ -175,6 +175,7 @@ class Plugin1850CLI():
 
         if condition and cmd_success:
             cmd_success = self.__verify_condition(condition)
+        print(cmd_success)
 
         if policy == "COMPLD":
             errmsg = "COMPLD policy -- {:s}".format(str(self.get_last_cmd_status()))
@@ -182,6 +183,7 @@ class Plugin1850CLI():
                 self.__t_success(cmd, None, self.get_last_outcome())
             else:
                 self.__t_failure(cmd, None, self.get_last_outcome(), errmsg)
+                self.__last_status = "FAILURE"
         else:
             errmsg = "DENY policy -- SUCCESS result"
             if cmd_success:
@@ -243,11 +245,7 @@ class Plugin1850CLI():
     def __verify_condition(self, condition):
         """ INTERNAL USAGE
         """
-        print(condition)
-        if condition in cli.get_last_outcome():
-        #outcome = cli.get_last_outcome().replace('\n', 'XXXXX').strip().split()
-            print("======================================================================")
-        return True
+        return condition in self.get_last_outcome()
 
 
     def __t_success(self, title, elapsed_time, out_text):
@@ -304,7 +302,7 @@ if __name__ == "__main__":
 
     cli = Plugin1850CLI("135.221.125.79")
 
-    cli.do("interface show", timeout=5, condition=".. message: not found interface")
+    cli.do("interface show", timeout=5, condition=".. message: not found interfacexx")
     if cli.get_last_cmd_status() == "SUCCESS":
         print("[+++\n" + cli.get_last_outcome() + "\n+++]")
     else:
