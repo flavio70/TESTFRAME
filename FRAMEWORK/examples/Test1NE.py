@@ -23,7 +23,7 @@ TestCase template for K@TE test developers
 
 from katelibs.testcase          import TestCase
 from katelibs.eqpt1850tss320    import Eqpt1850TSS320
-from katelibs.instrumentONT     import instrumentONT
+from katelibs.instrumentONT     import InstrumentONT
 #from katelibs.instrumentIXIA     import InstrumentIXIA
 #from katelibs.instrumentSPIRENT  import InstrumentSPIRENT
 from katelibs.swp1850tss320     import SWP1850TSS
