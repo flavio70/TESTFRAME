@@ -94,6 +94,12 @@ class Test(TestCase):
         insert Main body code for your test below
         '''
 
+        NE1.cli.do("interface show")
+        if NE1.cli.get_last_cmd_status() == "SUCCESS":
+            print("[+++\n" + NE1.cli.get_last_outcome() + "\n+++]")
+        else:
+            print("[+++" + NE1.cli.get_last_cmd_status() + "+++]")
+
     def test_cleanup(self):
         '''
         test Cleanup Section implementation
