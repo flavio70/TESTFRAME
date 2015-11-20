@@ -119,13 +119,13 @@ if __name__ == "__main__":
 
     #initializing all local variable and constants used by Test object
     NE1 = Eqpt1850TSS320('NE1', CTEST.kenvironment)
-    #ONT1 = instrumentONT('ONT1', CTEST.kenvironment)
-    #ONT2 = instrumentONT('ONT2', CTEST.kenvironment)
+    #ONT5xx = instrumentONT('ONT5xx', CTEST.kenvironment)
+    #ONT6xx = instrumentONT('ONT6xx', CTEST.kenvironment)
 
     # Run Test main flow
     # Please don't touch this code
     CTEST.run()
 
-    #ONT2.clean_up()
-    #ONT1.clean_up()
+    #ONT6xx.clean_up()
+    #ONT5xx.clean_up()
     NE1.clean_up()

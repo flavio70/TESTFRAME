@@ -252,7 +252,7 @@ class Plugin1850TL1():
     TL1_TIMEOUT = 1200   # defalt timeout for commands result
 
 
-    def __init__(self, IP, PORT=3083, krepo=None, eRef=None, collector=None):
+    def __init__(self, IP, PORT=3083, krepo=None, eRef=None, collector=None, ktrc=None):
         """
         Costructor for generic TL1 interface
         IP        : equipment's IP Address
@@ -266,6 +266,7 @@ class Plugin1850TL1():
         self.__the_port    = PORT
         self.__krepo       = krepo # result report (Kunit class instance)
         self.__eqpt_ref    = eRef  # equipment reference
+        self.__ktrc        = ktrc  # Tracer object
         self.__if_cmd      = None  # main TL1 interface (used for sending usr command)
         self.__if_eve      = None  # secondary TL1 interface (used for capturing events)
         self.__last_output = ""    # store the output of latest TL1 command
@@ -343,12 +344,12 @@ class Plugin1850TL1():
                     break
                 time.sleep(1)
             else:
-                print("TIMEOUT ON TL1::do()")
                 error_msg = "TIMEOUT ({:d}s) DETECTED ON SENDING '{:s}'".format(timeout, cmd)
+                self.__trc(error_msg)
                 result = False
                 break
 
-        print("DEBUG: result := {:s} - errmsg := [{:s}]\n".format(str(result), error_msg))
+        self.__trc("DEBUG: result := {:s} - errmsg := [{:s}]\n".format(str(result), error_msg))
 
         if result:
             self.__t_success(cmd, None, self.get_last_outcome())
@@ -377,7 +378,7 @@ class Plugin1850TL1():
 
         if policy == "COND":
             if condPST is None  and  condSST is None:
-                print("ATTENZIONE: ALMENO UNO TRA condPST e condSST deve essere valorizzato")
+                self.__trc("ATTENZIONE: ALMENO UNO TRA condPST e condSST deve essere valorizzato")
                 return False
 
         if timeout is None:
@@ -402,7 +403,7 @@ class Plugin1850TL1():
                 error_msg = "No AID found on TL1 response"
                 result = False
 
-        print("DEBUG: result := {:s} - errmsg := [{:s}]\n".format(str(result), error_msg))
+        self.__trc("DEBUG: result := {:s} - errmsg := [{:s}]\n".format(str(result), error_msg))
 
         if result:
             self.__t_success(cmd, None, self.get_last_outcome())
@@ -416,19 +417,19 @@ class Plugin1850TL1():
         """ INTERNAL USAGE
         """
         if channel == "CMD":
-            print("sending [{:s}]".format(cmd))
+            self.__trc("sending [{:s}]".format(cmd))
         else:
-            print("sending [{:s}] (EVENT INTERFACE)".format(cmd))
+            self.__trc("sending [{:s}] (EVENT INTERFACE)".format(cmd))
 
         verb_lower = cmd.replace(";", "").split(":")[0].lower().replace("\r", "").replace("\n", "")
 
         # Trash all trailing characters from stream
         if self.__read_all(channel) == False:
-            print("error [1] sending TL1 command [{:s}]".format(cmd))
+            self.__trc("error [1] sending TL1 command [{:s}]".format(cmd))
 
         # Sending command to interface
         if self.__write(channel, cmd) == False:
-            print("error [2] sending TL1 command [{:s}]".format(cmd))
+            self.__trc("error [2] sending TL1 command [{:s}]".format(cmd))
 
 
         if cmd.lower() == "canc-user;":
@@ -441,7 +442,7 @@ class Plugin1850TL1():
             while True:
                 res_list  = self.__expect(channel, [b"\n\>", b"\n\;"])
                 if res_list == ([], [], []):
-                    print("error [3] sending TL1 command [{:s}]".format(cmd))
+                    self.__trc("error [3] sending TL1 command [{:s}]".format(cmd))
 
                 match_idx = res_list[0]
                 msg_tmp   = str(res_list[2], 'utf-8')
@@ -549,21 +550,21 @@ class Plugin1850TL1():
         """ INTERNAL USAGE
         """
         if channel == "CMD":
-            print("(re)CONNECTING TL1...")
+            self.__trc("(re)CONNECTING TL1...")
             try:
                 self.__if_cmd = telnetlib.Telnet(self.__the_ip, self.__the_port, 5)
             except Exception as eee:
-                print("TL1: error connecting CMD channel - {:s}".format(str(eee)))
-            print("... TL1 INTERFACE for commands ready.")
+                self.__trc("TL1: error connecting CMD channel - {:s}".format(str(eee)))
+            self.__trc("... TL1 INTERFACE for commands ready.")
             return self.__if_cmd
 
         else:
-            print("(re)CONNECTING TL1 (Event channel)...")
+            self.__trc("(re)CONNECTING TL1 (Event channel)...")
             try:
                 self.__if_eve = telnetlib.Telnet(self.__the_ip, self.__the_port, 5)
             except Exception as eee:
-                print("TL1: error connecting EVE channel - {:s}".format(str(eee)))
-            print("... TL1 INTERFACE for events ready.")
+                self.__trc("TL1: error connecting EVE channel - {:s}".format(str(eee)))
+            self.__trc("... TL1 INTERFACE for events ready.")
             return self.__if_eve
 
 
@@ -574,7 +575,7 @@ class Plugin1850TL1():
             self.__do("EVE", "CANC-USER;", "COMPLD", None)
         except Exception as eee:
             msg = "Error in disconnection - {:s}".format(str(eee))
-            print(msg)
+            self.__trc(msg)
 
         self.__if_eve = None
 
@@ -582,7 +583,7 @@ class Plugin1850TL1():
             self.__do("CMD", "CANC-USER;", "COMPLD", None)
         except Exception as eee:
             msg = "Error in disconnection - {:s}".format(str(eee))
-            print(msg)
+            self.__trc(msg)
 
         self.__if_cmd = None
 
@@ -710,6 +711,13 @@ class Plugin1850TL1():
         """
         if self.__krepo:
             self.__krepo.add_skipped(self.__eqpt_ref, title, e_time, out_text, err_text, skip_text)
+
+
+    def __trc(self, msg):
+        """ INTERNAL USAGE
+        """
+        if self.__ktrc is not None:
+            self.__ktrc.trc(msg, item_ref=self)
 
 
 

@@ -58,7 +58,8 @@ class Eqpt1850TSS320(Equipment):
         self.tl1 = Plugin1850TL1(self.__net.get_ip_str(),
                                  krepo=self.__krepo,
                                  eRef=self,
-                                 collector=tl1_event)
+                                 collector=tl1_event,
+                                 ktrc=self.__kenv.ktrc)
 
         self.cli = Plugin1850CLI(self.__net.get_ip_str(), krepo=self.__krepo, eRef=self)
 
@@ -75,12 +76,12 @@ class Eqpt1850TSS320(Equipment):
             self.__krepo.start_time()
 
         if self.__is_reachable_by_ip():
-            print("Equipment '" + self.get_label() + "' reachable by IP " + self.__net.get_ip_str())
-            print("nothing to do.")
+            self.__trc("Equipment '{}' reachable by IP {}\nnothing to do.".format(\
+                                self.get_label(), self.__net.get_ip_str()))
             self.__t_skipped("CONFIGURE IP", None, "equipment already reachable", "")
             return True
         else:
-            print("Configuring IP address for equipment '" + self.get_label() + "'")
+            self.__trc("Configuring IP address for equipment '{}'".format(self.get_label()))
             dev     = self.__net.get_dev()
             cmd_ifdn = "ifconfig {:s} down".format(dev)
             cmd_ipad = "ifconfig {:s} {:s} netmask {:s} hw ether {:s}".format(\
@@ -94,7 +95,7 @@ class Eqpt1850TSS320(Equipment):
             max_iterations = 50
 
             for i in range(1, max_iterations+1):
-                print("trying to connect (#{:d}/{:d})".format(i, max_iterations))
+                self.__trc("trying to connect (#{:d}/{:d})".format(i, max_iterations))
                 self.__ser_con.send_cmd_simple(cmd_ifdn)
                 time.sleep(3)
                 self.__ser_con.send_cmd_simple(cmd_ipad)
@@ -105,22 +106,21 @@ class Eqpt1850TSS320(Equipment):
                 time.sleep(5)
 
                 if not self.__is_ongoing_to_address(self.__net.get_gw_str()):
-                    msg = "Error in IP Configuration. Retrying... [{:d}/{:d}]".format(i, max_iterations)
-                    print(msg)
+                    self.__trc("Error in IP Configuration. Retrying... [{:d}/{:d}]".format(i, max_iterations))
                 else:
-                    print("Equipment IP configuration OK. Waiting for external reachability")
+                    self.__trc("Equipment IP configuration OK. Waiting for external reachability")
                     break
 
             for i in range(1, max_iterations+1):
                 if not self.__is_reachable_by_ip():
-                    print("Equipment still not reachable. Retrying... [{:02d}/{:d}]".format(i, max_iterations))
+                    self.__trc("Equipment still not reachable. Retrying... [{:02d}/{:d}]".format(i, max_iterations))
                     time.sleep(15)
                 else:
                     self.__t_success("CONFIGURE IP", None, "Equipment reachable")
                     return True
 
 
-            print("Error in IP CONFIG")
+            self.__trc("Error in IP CONFIG")
             self.__t_failure("CONFIGURE IP", None, "error in configuring IP", "")
             return False
 
@@ -128,17 +128,17 @@ class Eqpt1850TSS320(Equipment):
     def flc_stop_dhcp(self):
         """ Shutdown DHCP daemon
         """
-        print("DHCP DOWN")
+        self.__trc("DHCP DOWN")
 
         if self.__krepo:
             self.__krepo.start_time()
 
         res = self.__net_con.send_cmd_and_check("/etc/rc.d/init.d/dhcp stop", "Stopping DHCP server: dhcpd")
         if res == False:
-            print("DHCP not stopped")
+            self.__trc("DHCP not stopped")
             self.__t_failure("DHCP SHUTDOWN", None, "error in DHCP shutdown", "")
         else:
-            print("DHCP stopped")
+            self.__trc("DHCP stopped")
             self.__t_success("DHCP SHUTDOWN", None, "DHCP shutted down")
         return res
 
@@ -146,7 +146,7 @@ class Eqpt1850TSS320(Equipment):
     def flc_reboot(self):
         """ Perform FLC reboot
         """
-        print("REBOOT FLC MAIN")
+        self.__trc("REBOOT FLC MAIN")
 
         if self.__krepo:
             self.__krepo.start_time()
@@ -156,11 +156,11 @@ class Eqpt1850TSS320(Equipment):
         klist = [b'Start BOOT image V', b'Restarting system']
         res = self.__ser_con.expect(klist)
         if res[0] == 0  or  res[0] == 1:
-            print("FLC RESTARTED")
+            self.__trc("FLC RESTARTED")
             self.__t_success("FLC REBOOT", None, "FLC restarted")
             return True
         else:
-            print("ERROR IN FLC REBOOT")
+            self.__trc("ERROR IN FLC REBOOT")
             self.__t_failure("FLC REBOOT", None, "error in FLC rebooting", "")
             return False
 
@@ -169,7 +169,7 @@ class Eqpt1850TSS320(Equipment):
         """ Perform specified SLC reboot
             slot : slc slot number
         """
-        print("REBOOT SLC " + str(slot))
+        self.__trc("REBOOT SLC " + str(slot))
         flc_ip = self.__net.get_ip_str()
         slc_ip = "100.0.1.{:s}".format(slot)
 
@@ -183,7 +183,7 @@ class Eqpt1850TSS320(Equipment):
             tmpsh.send_bm_command(slc_ip, "reboot")
             tmpsh.close_ssh()
         except Exception as eee:
-            print(str(eee))
+            self.__trc(str(eee))
             self.__t_failure("SLC "+ str(slot) + " REBOOT", None, "error in SLC rebooting", "")
             return False
 
@@ -195,7 +195,7 @@ class Eqpt1850TSS320(Equipment):
     def flc_scratch_db(self):
         """ Force a DB clean
         """
-        print("SCRATCH DB...")
+        self.__trc("SCRATCH DB...")
 
         if self.__krepo:
             self.__krepo.start_time()
@@ -204,10 +204,10 @@ class Eqpt1850TSS320(Equipment):
 
         res = self.__net_con.send_cmd_and_check("/bin/ls -l /pureNeApp/FLC/DB", "total 0")
         if res == False:
-            print("DB not scrtatched")
+            self.__trc("DB not scrtatched")
             self.__t_failure("SCRATCH DB", None, "error in scratching DB", "")
         else:
-            print("DB scratched")
+            self.__trc("DB scratched")
             self.__t_success("SCRATCH DB", None, "DB correctly scratched")
         return res
 
@@ -232,29 +232,29 @@ class Eqpt1850TSS320(Equipment):
         for i in range(1, max_iterations+1):
             out = self.__net_con.send_cmd_and_capture("pidof bin_1850TSS_TDM320_FLC.bin")
             if out[:-1] == "":
-                print("No running SWP yet. Retrying in 15s [{:d}/{:d}]".format(i, max_iterations))
+                self.__trc("No running SWP yet. Retrying in 15s [{:d}/{:d}]".format(i, max_iterations))
                 time.sleep(15)
             else:
                 res = True
                 break
         if not res:
             msg = "Not able to find a running SWP after {:d}s".format(15*max_iterations)
-            print(msg)
+            self.__trc(msg)
             self.__t_failure("FLC IN SERVICE", None, "timeout", msg)
 
         # Check for TL1 agent
         res = False
         for i in range(1, max_iterations+1):
             if not self.__net_con.send_cmd_and_check("netstat -anp | grep ':3083'", "0.0.0.0:3083"):
-                print("TL1 agent not ready. Retrying in 15s [{:d}/{:d}]".format(i, max_iterations))
+                self.__trc("TL1 agent not ready. Retrying in 15s [{:d}/{:d}]".format(i, max_iterations))
                 time.sleep(15)
             else:
-                print("TL1 agent ready in {:d}s".format(15*i))
+                self.__trc("TL1 agent ready in {:d}s".format(15*i))
                 res = True
                 break
         if not res:
             msg = "Not able to find TL1 Agent after {:d}s".format(15*max_iterations)
-            print(msg)
+            self.__trc(msg)
             self.__t_failure("FLC IN SERVICE", None, "timeout", msg)
 
         # Check for SNMP agent
@@ -263,18 +263,18 @@ class Eqpt1850TSS320(Equipment):
             for i in range(1, max_iterations+1):
                 cmd = "netstat -anp | grep '{:d}'".format(sub_agent)
                 if not self.__net_con.send_cmd_and_check(cmd, "bin_1850TSS_"):
-                    print("SNMP:{:s} sub-agent not ready. Retrying in 15s [{:d}/{:d}]".format(sub_agent, i, max_iterations))
+                    self.__trc("SNMP:{:s} sub-agent not ready. Retrying in 15s [{:d}/{:d}]".format(sub_agent, i, max_iterations))
                     time.sleep(15)
                 else:
-                    print("SNMP:{:d} sub-agent ready in {:d}s".format(sub_agent, 15*i))
+                    self.__trc("SNMP:{:d} sub-agent ready in {:d}s".format(sub_agent, 15*i))
                     res = True
                     break
             if not res:
                 msg = "Not able to find SNMP:{:d} sub-agent after {:d}s".format(sub_agent, 15*max_iterations)
-                print(msg)
+                self.__trc(msg)
                 self.__t_failure("FLC IN SERVICE", None, "timeout", msg)
 
-        print("FLC IN SERVICE")
+        self.__trc("FLC IN SERVICE")
 
         self.__t_success("FLC IN SERVICE", None, "FLC correctly in service")
 
@@ -293,21 +293,21 @@ class Eqpt1850TSS320(Equipment):
             self.flc_ip_config()
 
         if self.flc_check_running_swp():
-            print("SWP '{:s}' ALREADY RUNNING\n".format(self.__swp.get_swp_ref()))
+            self.__trc("SWP '{:s}' ALREADY RUNNING\n".format(self.__swp.get_swp_ref()))
             res = True
             self.__t_skipped("SWP LOAD", None, "SWP already running", "")
         else:
             swp_string = self.__swp.get_startapp(self.__arch)
 
-            print("LOADING SWP ON '{:s}\nSWP STRING: '{:s}'".format(self.get_label(), swp_string))
+            self.__trc("LOADING SWP ON '{:s}\nSWP STRING: '{:s}'".format(self.get_label(), swp_string))
 
             res = self.__net_con.send_cmd_and_check(swp_string, "EC_SetSwVersionActive status SUCCESS")
 
             if res == False:
-                print("SWP LOAD ERROR\n")
+                self.__trc("SWP LOAD ERROR\n")
                 self.__t_failure("SWP LOAD", None, "error in loading SWP", "")
             else:
-                print("SWP LOADING TERMINATE\n")
+                self.__trc("SWP LOADING TERMINATE\n")
                 self.__t_success("SWP LOAD", None, "SWP correctly load")
 
         return res
@@ -317,7 +317,7 @@ class Eqpt1850TSS320(Equipment):
         """ Check running SWP with expected one
         """
         if self.__swp is None:
-            print("SWP INFORMATION NOT PRESENT")
+            self.__trc("SWP INFORMATION NOT PRESENT")
             return True
 
         # Using 'bootcmd r' in order to detect running SWP
@@ -342,57 +342,57 @@ class Eqpt1850TSS320(Equipment):
         """
 
         if not self.flc_checl_dual():
-            print("INSTALL ABORTED")
+            self.__trc("INSTALL ABORTED")
             return False
 
         if do_format:
-            print("FORMAT DISK AND INSTALL NODE")
+            self.__trc("FORMAT DISK AND INSTALL NODE")
         else:
-            print("INSTALL NODE")
+            self.__trc("INSTALL NODE")
             if not self.flc_ip_config():
-                print("INSTALL ABORTED")
+                self.__trc("INSTALL ABORTED")
                 return False
 
             if not self.flc_load_swp(swp):
-                print("INSTALL ABORTED")
+                self.__trc("INSTALL ABORTED")
                 return False
 
             if not self.flc_stop_dhcp():
-                print("INSTALL ABORTED")
+                self.__trc("INSTALL ABORTED")
                 return False
 
             if not self.slc_reboot(10):
-                print("INSTALL ABORTED")
+                self.__trc("INSTALL ABORTED")
                 return False
 
             if not self.slc_reboot(11):
-                print("INSTALL ABORTED")
+                self.__trc("INSTALL ABORTED")
                 return False
 
             if not self.flc_scratch_db():
-                print("INSTALL ABORTED")
+                self.__trc("INSTALL ABORTED")
                 return False
 
             if not self.flc_reboot():
-                print("INSTALL ABORTED")
+                self.__trc("INSTALL ABORTED")
                 return False
 
         if not self.flc_checl_dual():
-            print("INSTALL ABORTED")
+            self.__trc("INSTALL ABORTED")
             return False
 
         if not self.flc_ip_config():
-            print("INSTALL ABORTED")
+            self.__trc("INSTALL ABORTED")
             return False
 
         if not self.flc_wait_in_service():
-            print("INSTALL ABORTED")
+            self.__trc("INSTALL ABORTED")
             return False
 
         swp_id = ""     # sistemare
 
         if not self.flc_check_running_swp():
-            print("INSTALL ABORTED")
+            self.__trc("INSTALL ABORTED")
             return False
 
         return True
@@ -403,7 +403,7 @@ class Eqpt1850TSS320(Equipment):
         cmd = "ping -c 4 {:s}".format(dest_ip)
         exp = "4 packets transmitted, 4 received, 0% packet loss,"
         res = self.__ser_con.send_cmd_and_check(cmd, exp)
-        print(res)
+        self.__trc(res)
         return res
 
 
@@ -427,7 +427,7 @@ class Eqpt1850TSS320(Equipment):
 
 
     def __get_eqpt_info_from_db(self, ID):
-        print("CONFIGURATION EQUIPMENT ID := {:d}".format(ID))
+        self.__trc("CONFIGURATION EQUIPMENT ID := {:d}".format(ID))
         tabEqpt  = TEquipment
 
         e_name    = tabEqpt.objects.get(id_equipment=ID).name
@@ -450,13 +450,13 @@ class Eqpt1850TSS320(Equipment):
         nm  = IP(e_nm)
         gw  = IP(e_gw)
 
-        print("  Name   : " + e_name)
-        print("  Type   : " + e_type)
-        print("  Net    : {:s} {:s} {:s} {:s} {:s}".format( eth_adapter,
-                                                            ip.get_val(),
-                                                            nm.get_val(),
-                                                            gw.get_val(),
-                                                            ip.evaluate_mac()))
+        self.__trc("  Name   : {:s}".format(e_name))
+        self.__trc("  Type   : {:s}".format(e_type))
+        self.__trc("  Net    : {:s} {:s} {:s} {:s} {:s}".format(eth_adapter,
+                                                                ip.get_val(),
+                                                                nm.get_val(),
+                                                                gw.get_val(),
+                                                                ip.evaluate_mac()))
 
         self.__net = NetIF(ip, nm, gw, ip.evaluate_mac(), eth_adapter)
         self.__ser = SerIF()
@@ -467,9 +467,9 @@ class Eqpt1850TSS320(Equipment):
             if r.t_equipment_id_equipment.id_equipment == ID:
                 sIP = tabNet.objects.get(id_ip=r.t_net_id_ip.id_ip)
                 self.__ser.set_serial_to_slot(r.slot, IP(sIP.ip), r.port)
-                print("  Serial : {:2d} <--> {:s}:{:d}".format(r.slot, sIP.ip, r.port))
+                self.__trc("  Serial : {:2d} <--> {:s}:{:d}".format(r.slot, sIP.ip, r.port))
 
-        print("CONFIGURATION END\n")
+        self.__trc("CONFIGURATION END\n")
 
 
     def __open_main_ssh_connection(self):
@@ -500,6 +500,12 @@ class Eqpt1850TSS320(Equipment):
         """
         if self.__krepo:
             self.__krepo.add_skipped(self, title, e_time, out_text, err_text, skip_text)
+
+
+    def __trc(self, msg):
+        """ INTERNAL USAGE
+        """
+        self.__kenv.ktrc.trc(msg, item_ref=self)
 
 
 
