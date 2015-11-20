@@ -23,7 +23,7 @@ TestCase template for K@TE test developers
 
 from katelibs.testcase          import TestCase
 from katelibs.eqpt1850tss320    import Eqpt1850TSS320
-from katelibs.instrumentONT     import instrumentONT
+#from katelibs.instrumentONT     import InstrumentONT
 #from katelibs.instrumentIXIA     import InstrumentIXIA
 #from katelibs.instrumentSPIRENT  import InstrumentSPIRENT
 from katelibs.swp1850tss320     import SWP1850TSS
@@ -93,6 +93,12 @@ class Test(TestCase):
         test Body Section implementation
         insert Main body code for your test below
         '''
+
+        NE1.cli.do("interface show", condition=".. message: not found interfacexx")
+        if NE1.cli.get_last_cmd_status() == "SUCCESS":
+            print("[+++\n" + NE1.cli.get_last_outcome() + "\n+++]")
+        else:
+            print("[+++" + NE1.cli.get_last_cmd_status() + "+++]")
 
     def test_cleanup(self):
         '''

@@ -10,11 +10,8 @@
 """
 
 import telnetlib
-import re
 import threading
 import time
-import os
-import sys
 import socket
 
 
@@ -39,7 +36,7 @@ class Plugin1850CLI():
         self.__connected = False          # flag indicating connection performed
         self.__curr_timeout = 10          # current timeout
         self.__timeout = 0                # init timeout
-        self.__ending_time  = 0           # ending time for timeout evaluation
+        self.__ending_time = 0            # ending time for timeout evaluation
         self.__timer = None
         self.__user = "admin"
         self.__password = "Alcatel1"
@@ -73,7 +70,7 @@ class Plugin1850CLI():
         if self.__connected:       # already connected
             return True
 
-        print ("CONNECTING CLI...")
+        print("CONNECTING CLI...")
         try:
             # Creates telnet instance and opens connection
             self.__if_cmd = telnetlib.Telnet()
@@ -84,7 +81,7 @@ class Plugin1850CLI():
             self.__if_cmd.read_until(b"Password: ", timeout=self.__timeout)
             self.__if_cmd.write(self.__password.encode() + b"\r\n")
             # Wait for cli prompt
-            buf = self.__if_cmd.read_until(self.__prompt.encode(), timeout=self.__timeout)
+            self.__if_cmd.read_until(self.__prompt.encode(), timeout=self.__timeout)
         except socket.timeout as eee:
             msg = "Timeout connecting {:s}/{:s} - Timeout: {:s} sec.".format(str(self.__the_ip), str(self.__the_port), str(self.__timeout))
             print(msg)
@@ -109,7 +106,7 @@ class Plugin1850CLI():
             self.disconnect()
             return False
 
-        print ("... CLI INTERFACE for commands ready.")
+        print("... CLI INTERFACE for commands ready.")
         return True
 
 
@@ -128,7 +125,7 @@ class Plugin1850CLI():
 
 
     def __keep_alive(self):
-        """ INTERNAL USAGE        
+        """ INTERNAL USAGE
             Set and start a Timer in order to keep the cli dialog alive
         """
         self.__timer = threading.Timer(5, self.__keep_alive)
@@ -162,7 +159,7 @@ class Plugin1850CLI():
             print(msg)
             self.__last_status = "FAILURE"
             return
-            
+
         if timeout is not None:
             self.__curr_timeout = timeout
 
@@ -174,22 +171,26 @@ class Plugin1850CLI():
             self.__krepo.start_time()
 
         # Send command and retrieve result
-        self.__do(cmd)
+        cmd_success = self.__do(cmd)
+
+        if condition and cmd_success:
+            cmd_success = self.__verify_condition(condition)
+        print(cmd_success)
 
         if policy == "COMPLD":
-            errmsg = "COMPLD policy -- FAILURE result"
-            if self.get_last_cmd_status() == "SUCCESS":
+            errmsg = "COMPLD policy -- {:s}".format(str(self.get_last_cmd_status()))
+            if cmd_success:
                 self.__t_success(cmd, None, self.get_last_outcome())
             else:
                 self.__t_failure(cmd, None, self.get_last_outcome(), errmsg)
                 self.__last_status = "FAILURE"
         else:
             errmsg = "DENY policy -- SUCCESS result"
-            if self.get_last_cmd_status() == "SUCCESS":
+            if cmd_success:
                 self.__t_failure(cmd, None, self.get_last_outcome(), errmsg)
                 self.__last_status = "FAILURE"
             else:
-                 self.__t_success(cmd, None, self.get_last_outcome())
+                self.__t_success(cmd, None, self.get_last_outcome())
         return
 
 
@@ -225,7 +226,7 @@ class Plugin1850CLI():
 
         if cmd != "logout":
             try:
-                buf = self.__if_cmd.read_until(self.__prompt.encode(), timeout=self.__timeout) 
+                buf = self.__if_cmd.read_until(self.__prompt.encode(), timeout=self.__timeout)
             except socket.timeout as eee:
                 msg = "Timeout in waiting for commad execution"
                 print(msg)
@@ -239,6 +240,12 @@ class Plugin1850CLI():
             self.__last_output = buf.decode()
 
         return True
+
+
+    def __verify_condition(self, condition):
+        """ INTERNAL USAGE
+        """
+        return condition in self.get_last_outcome()
 
 
     def __t_success(self, title, elapsed_time, out_text):
@@ -295,7 +302,7 @@ if __name__ == "__main__":
 
     cli = Plugin1850CLI("135.221.125.79")
 
-    cli.do("interface show", timeout=1)
+    cli.do("interface show", timeout=5, condition=".. message: not found interfacexx")
     if cli.get_last_cmd_status() == "SUCCESS":
         print("[+++\n" + cli.get_last_outcome() + "\n+++]")
     else:
