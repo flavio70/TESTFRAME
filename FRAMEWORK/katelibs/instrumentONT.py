@@ -40,28 +40,19 @@ class InstrumentONT(Equipment):
     #        ID      : equipment ID (see T_EQUIPMENT table on K@TE DB)
     #        krepo   : reference to kunit report instance
     #    """
-    #       self.super().__init__(label, ID)
-    #       self.__init_from_db(ID) # inizializza i dati di IP, tipo di ONT..
-
 
     def __init__(self, label, kenv):
         """ label   : equipment name used on Report file
             kenv    : instance of KEnvironment (initialized by K@TE FRAMEWORK)
         """
-
-        # def __init__(self, sessionUser=None, sessionPassword=None, sessionIpAddress="135.221.123.144", telnetPort=5001, krepo=None):  # Ont506 Flavio
-        # def __init__(self, sessionUser=None, sessionPassword=None, sessionIpAddress="151.98.176.6", telnetPort=5001): # Ont506 ghelfi
-        """ sessionUser      : Ont session authentication user
-            sessionPassword  : Ont session user's password
-            sessionIpAddress : OntXXX IP address
-            telnetPort       : Telnet port for remote Ont command sessions (default 5001)
-        """
+ 
         # Enviroment
         self.__kenv                 = kenv             # Kate Environment
         self.__krepo                = kenv.krepo       # result report (Kunit class instance)
         self.__prs                  = kenv.kprs        # Presets for running environment
         # Session
-        self.__ontType              = None #  NotInitialized (default) for 5xx Ont50,506,512  6xx for Ont 601
+        self.__ontType              = None             #  Specify 5xx for Ont50,506,512  6xx for Ont 601
+        self.__sessionName          = "Session5xxLore"    #  To be changed: meaningfuls only for  5xx 
         # Connection
         self.__ontUser              = None             #  Ont session authentication user
         self.__ontPassword          = None             #  Ont session user's password
@@ -90,6 +81,12 @@ class InstrumentONT(Equipment):
         self.__ontUser        = self.__prs.get_elem(self.get_label(), 'USER')
         self.__ontPassword    = self.__prs.get_elem(self.get_label(), 'PWD')
         self.__ontApplication = self.__prs.get_elem(self.get_label(), 'APPL')
+
+
+    def clean_up(self):
+        """ INTERNAL USAGE
+        """
+        print("clean_up called [{}]".format(self.__ontType))
 
     #     
     # Krepo-related     
@@ -162,17 +159,18 @@ class InstrumentONT(Equipment):
  
 
 
-    def init_instrument(self, localUser, localPwd, localOntIpAddress, portId):
+    #def init_instrument(self, localUser, localPwd, localOntIpAddress, portId):
+    def init_instrument(self, portId):
         """
             INITALIZES THE ONT INSTRUMENT TO GET READY TO ACCEPT USER (Library) COMMANDS
             after this inizialization the user can start to send commands to 
             the ONT (5xx/6xx) instrument
+            portId user's naming convention: P1, P2,...
         """
-        # portId = self.__prs.get_elem(self.get_label(), portId)   GHELFI
-        portId = self.__prs.get_from_list(self.get_label(), 'PORTS', portId)
+        # portId = self.__prs.get_elem(self.get_label(), portId)
         if self.__ontType  == "6xx":   # ONT-6xx Init
-            localUser="Automation"
-            localPwd="Automation"
+            localUser = self.__ontUser  
+            localPwd = self.__ontPassword 
             localOntIpAddress = self.__ontIpAddress
             myApplication="New-Application"
 
@@ -234,8 +232,9 @@ class InstrumentONT(Equipment):
             DEINITALIZES THE ONT INSTRUMENT TO FREE IT 
             after this deinizialization another user can use this Instrument
             the ONT (5xx/6xx) instrument
+            portId user's naming convention: P1, P2,...
         """
-        portId = self.__prs.get_from_list(self.get_label(), 'PORTS', portId)
+        #portId = self.__prs.get_elem(self.get_label(), portId)
         if self.__ontType  == "6xx":   
             # Unload Application to clean wrong situations...
             myApplication="New-Application"
@@ -285,9 +284,11 @@ class InstrumentONT(Equipment):
 
     def __lc_msg(self,messageForDebugPurposes):
         # Print debug messages: verbose mode in test only
-        if __name__ == "__main__":
-            print ("{:s}".format(messageForDebugPurposes))
-        pass
+        #if __name__ == "__main__":
+        #    print ("{:s}".format(messageForDebugPurposes))
+        #else:
+        #   insert HERE the new logging method (still in progress...)   
+        print ("{:s}".format(messageForDebugPurposes))
 
 
 
@@ -299,8 +300,12 @@ class InstrumentONT(Equipment):
         # methodName = inspect.stack()[0][3]  # <-- current method name: __lc_current_method_name)
         #
         methodName = inspect.stack()[1][3]   # <-- daddy method name  : who calls __lc_current_method_name
-        if __name__ == "__main__":
-            print ("\n[[[ @@@@ [{}] Method Call ... Krepo[{}]   @@@ ]]] ".format(methodName,embedKrepoInit))
+        #if __name__ == "__main__":
+        #    print ("\n[[[ @@@@ [{}] Method Call ... Krepo[{}]   @@@ ]]] ".format(methodName,embedKrepoInit))
+        #else:
+        #   insert HERE the new logging method (still in progress...)   
+        print ("\n[[[ @@@@ [{}] Method Call ... Krepo[{}]   @@@ ]]] ".format(methodName,embedKrepoInit))
+
         if self.__krepo and embedKrepoInit == True:
             self.__krepo.start_time()
         return methodName 
@@ -447,7 +452,7 @@ class InstrumentONT(Equipment):
 
     def __authenticate_user_on_6xx_port(self, portId):  # On ONT6xx the authentication is at port level
         """ Recognizes user as valid user and try to authenticate him """
-        portId = self.__prs.get_from_list(self.get_label(), 'PORTS', portId)
+        #portId = self.__prs.get_elem(self.get_label(), portId)
         self.init_ont_type()
         if self.__ontType  == "6xx":   # ONT-6xx Authentication
             # login user
@@ -651,6 +656,7 @@ class InstrumentONT(Equipment):
         # port availability check
         callResult = self.get_selected_ports("")
         localMessage = "Available ports found:[{}]".format(callResult)
+        self.__lc_msg(localMessage)
         portAvailableFound = self.__get_result_TF(callResult)
         if not portAvailableFound:
             localMessage = "No available port found"
@@ -727,7 +733,7 @@ class InstrumentONT(Equipment):
             False, < cause of fail (eg: port already selected... >  """
         # basic check input parameter
         methodLocalName = self.__lc_current_method_name(True)
-        portId = self.__prs.get_from_list(self.get_label(), 'PORTS', portId)
+        portId = self.__prs.get_elem(self.get_label(), portId)
         if portId == "":
             localMessage = "port:[{}] not specified: empty parameter".format(portId)
             self.__lc_msg(localMessage)
@@ -773,7 +779,7 @@ class InstrumentONT(Equipment):
             False, < cause of fail (eg: port already selected... >  """
         # basic check input parameter
         methodLocalName = self.__lc_current_method_name(True)
-        portId = self.__prs.get_from_list(self.get_label(), 'PORTS', portId)
+        portId = self.__prs.get_elem(self.get_label(), portId)
         if portId == "":
             localMessage = "port:[{}] not specified: empty parameter".format(portId)
             self.__lc_msg(localMessage)
@@ -820,7 +826,8 @@ class InstrumentONT(Equipment):
                   /rack/slotNo/portNo, /rack/slot/portNo,...
             False, <empty list> if there is no suitable port """
         methodLocalName = self.__lc_current_method_name()
-        portId = self.__prs.get_from_list(self.get_label(), 'PORTS', portId)
+        portId = self.__prs.get_elem(self.get_label(), portId)
+        print("@@@ PORT ID := [{:s}] @@@".format(portId))
         localCommand=":PRTM:SEL? {}".format(portId)
         rawCallResult = self.__send_cmd(localCommand)
         callResult = self.__remove_dust(rawCallResult[1])
@@ -850,7 +857,7 @@ class InstrumentONT(Equipment):
                     /rack/slotNo/portNo
             False, <empty list> if there is no suitable port """
         methodLocalName = self.__lc_current_method_name()
-        portId = self.__prs.get_from_list(self.get_label(), 'PORTS', portId)
+        portId = self.__prs.get_elem(self.get_label(), portId)
         if portId == "":  # reboot rack
             rackSlotId=""
             localMessage="Reboot Instrument NOW (rackSlotId:[{}])".format(rackSlotId)
@@ -963,14 +970,14 @@ class InstrumentONT(Equipment):
     #   APPLICATION CONTROL: APPLICATION HANDLING
     #
     def __send_port_cmd(self, portId, command):    ### krepo not added ###
-        portId = self.__prs.get_from_list(self.get_label(), 'PORTS', portId)
+        ### GHELFI ##portId = self.__prs.get_elem(self.get_label(), portId)
         # send a command to an instrument port specified by its portId ( /rack/slotNo/portNo ) port
         if command == "":
             localMessage = "__send_port_cmd error: command string [{}] empty".format(command)
             self.__lc_msg(localMessage)
             return False, localMessage
         if portId == "":
-            localMessage = "__send_port_cmd error: portId  [{}] not valid (empty..._".format(portId)
+            localMessage = "__send_port_cmd error: portId  [{}] not valid (empty...)".format(portId)
             self.__lc_msg(localMessage)
             return False, localMessage
         localTelnetConnection=self.__portConnection[portId]
@@ -994,7 +1001,7 @@ class InstrumentONT(Equipment):
 
     def __create_port_connection(self,portId):    ### krepo not added ###
         # create a telnet connection with the portId custom TCP port of the ONT for Application cmd issue ( /rack/slotNo/portNo ) port
-        portId = self.__prs.get_from_list(self.get_label(), 'PORTS', portId)
+        #portId = self.__prs.get_elem(self.get_label(), portId)
         tcpPortNumber = self.__portToSocketMap[portId]
         localMessage="Port [{}] bound to TCP Socket [{}][{}]".format(portId,self.__ontIpAddress, tcpPortNumber)
         self.__lc_msg(localMessage)
@@ -1025,7 +1032,7 @@ class InstrumentONT(Equipment):
 
     def open_port_channel(self, portId):    ### krepo not added ###
         # open a TCP channel to Port specified by portId( /rack/slotNo/portNo )
-        portId = self.__prs.get_from_list(self.get_label(), 'PORTS', portId)
+        portId = self.__prs.get_elem(self.get_label(), portId)
         if portId == "":
             localMessage = "open_port_channel error: portId  [{}] not valid (empty value)".format(portId)
             self.__lc_msg(localMessage)
@@ -1040,7 +1047,7 @@ class InstrumentONT(Equipment):
             True,  < application currently loaded (e.g. SdhBert)>
             False, < empty string >  """
         methodLocalName = self.__lc_current_method_name()
-        portId = self.__prs.get_from_list(self.get_label(), 'PORTS', portId)
+        portId = self.__prs.get_elem(self.get_label(), portId)
         localCommand=":INST:CAT?"
         rawCallResult = self.__send_port_cmd(portId, localCommand)
         #callResult = self.__remove_dust(rawCallResult[1]).replace(">","")
@@ -1061,7 +1068,7 @@ class InstrumentONT(Equipment):
             True,  < application currently loaded (e.g. SdhBert)>
             False, < empty string >  """
         methodLocalName = self.__lc_current_method_name(True)
-        portId = self.__prs.get_from_list(self.get_label(), 'PORTS', portId)
+        portId = self.__prs.get_elem(self.get_label(), portId)
         localCommand=":INST:CAT?"
         rawCallResult = self.__send_port_cmd(portId, localCommand)
         #callResult = self.__remove_dust(rawCallResult[1]).replace(">","")
@@ -1086,7 +1093,7 @@ class InstrumentONT(Equipment):
             True.... application loaded
             False... application load failed   """
         methodLocalName = self.__lc_current_method_name(True)
-        portId = self.__prs.get_from_list(self.get_label(), 'PORTS', portId)
+        portId = self.__prs.get_elem(self.get_label(), portId)
         if portId == "":
             localMessage = "load_app error: portId  [{}] not valid (empty value)".format(portId)
             self.__lc_msg(localMessage)
@@ -1152,7 +1159,7 @@ class InstrumentONT(Equipment):
             True.... application unloaded
             False... application unload failed   """
         methodLocalName = self.__lc_current_method_name(True)
-        portId = self.__prs.get_from_list(self.get_label(), 'PORTS', portId)
+        portId = self.__prs.get_elem(self.get_label(), portId)
         if portId == "":
             localMessage = "unload_app error: portId  [{}] not valid (empty value)".format(portId)
             self.__lc_msg(localMessage)
@@ -1220,7 +1227,7 @@ class InstrumentONT(Equipment):
             It opens edit session for new application configuration.
             The edit session is then closed by the next apply_edit_session()   command   """
         methodLocalName = self.__lc_current_method_name()
-        portId = self.__prs.get_from_list(self.get_label(), 'PORTS', portId)
+        portId = self.__prs.get_elem(self.get_label(), portId)
         if self.__ontType  == "6xx":
             pass
         else:
@@ -1254,7 +1261,7 @@ class InstrumentONT(Equipment):
         """ UNDER TESTING: ONT-6XX only
             It applies settings of the edit session and closes the edit session. """
         methodLocalName = self.__lc_current_method_name()
-        portId = self.__prs.get_from_list(self.get_label(), 'PORTS', portId)
+        portId = self.__prs.get_elem(self.get_label(), portId)
         if self.__ontType  == "6xx":
             pass
         else:
@@ -1354,7 +1361,7 @@ class InstrumentONT(Equipment):
             PHYS_SONW_PCS_MAC                    10GigE WAN-SONET L2 L3 Traffic
             """
         methodLocalName = self.__lc_current_method_name(True)
-        portId = self.__prs.get_from_list(self.get_label(), 'PORTS', portId)
+        portId = self.__prs.get_elem(self.get_label(), portId)
         if self.__ontType  == "6xx":
             pass
         else:
@@ -1403,7 +1410,7 @@ class InstrumentONT(Equipment):
         """ ONT-5XX only
             Starts a measurement.. """
         methodLocalName = self.__lc_current_method_name(True)
-        portId = self.__prs.get_from_list(self.get_label(), 'PORTS', portId)
+        portId = self.__prs.get_elem(self.get_label(), portId)
         if self.__ontType  == "5xx":
             pass
         else:
@@ -1431,7 +1438,7 @@ class InstrumentONT(Equipment):
     def halt_measurement(self, portId):   # ONT-5xx  Only    ### krepo added ###       
         """ Halts a running measurement. """
         methodLocalName = self.__lc_current_method_name(True)
-        portId = self.__prs.get_from_list(self.get_label(), 'PORTS', portId)
+        portId = self.__prs.get_elem(self.get_label(), portId)
         if self.__ontType  == "5xx":
             pass
         else:
@@ -1454,8 +1461,21 @@ class InstrumentONT(Equipment):
         return True, callResult
 
 
+        
+    def cli_user_debug_command(self,commandString, portId):   # To give the user the possibility to check commands       
+        """ To give the user the possibility to check commands """
+        methodLocalName = self.__lc_current_method_name(True)
+        portId = self.__prs.get_elem(self.get_label(), portId)
+        localCommand = commandString 
+        rawCallResult = self.__send_port_cmd(portId, localCommand)
+        callResult = self.__remove_dust(rawCallResult[1])
+        localMessage="Cmd:[{}] Result:[{}]".format(localCommand, callResult)
+        self.__lc_msg(localMessage)
+        self.__t_success(methodLocalName, None, localMessage)
+        return True, callResult
 
-    def get_set_measurement_time(self, portId, gatingTime):   # ONT-5xx  Only   ### krepo added ###    
+
+    def get_set_measurement_time(self, portId, gatingTime=""):   # ONT-5xx  Only   ### krepo added ###    
         """ Sets and  gets the measurement gating time.
             gatingTime values :
             0 or ""    ...provides the current time
@@ -1464,7 +1484,7 @@ class InstrumentONT(Equipment):
                    and may be shorter than 99 days.
                    Setting the maximal possible gating time is equivalent to 'Continuous'. """
         methodLocalName = self.__lc_current_method_name(True)
-        portId = self.__prs.get_from_list(self.get_label(), 'PORTS', portId)
+        portId = self.__prs.get_elem(self.get_label(), portId)
         if self.__ontType  == "5xx":
             pass
         else:
@@ -1510,7 +1530,7 @@ class InstrumentONT(Equipment):
             False: command execution failed, error string for debug purposes
         """
         methodLocalName = self.__lc_current_method_name(True)
-        portId = self.__prs.get_from_list(self.get_label(), 'PORTS', portId)
+        portId = self.__prs.get_elem(self.get_label(), portId)
         retList = []
         if self.__ontType  == "5xx":
             ONTCmdString=":HST:RX:OPT"
@@ -1533,6 +1553,7 @@ class InstrumentONT(Equipment):
         alarmCodes = resultItemsArray[1]
         if self.__ontType  == "5xx":
             localMessage="[5xx] Optical alarms retcode: [{}]".format(str(alarmCodes))
+            alarmCodes=int(float(alarmCodes))
             if alarmCodes & 2:
                 retList += ["LOS"]
             if alarmCodes & 4:
@@ -1577,7 +1598,7 @@ class InstrumentONT(Equipment):
             False: command execution failed, error string for debug purposes
         """
         methodLocalName = self.__lc_current_method_name(True)
-        portId = self.__prs.get_from_list(self.get_label(), 'PORTS', portId)
+        portId = self.__prs.get_elem(self.get_label(), portId)
         retList = []
         if self.__ontType  == "5xx":
             pass
@@ -1601,6 +1622,7 @@ class InstrumentONT(Equipment):
             self.__t_failure(methodLocalName, None, "", localMessage)
             return False, localMessage
         alarmCodes = resultItemsArray[1]
+        alarmCodes=int(float(alarmCodes))
         if alarmCodes & 4:
              retList += ["OOF"]
         if alarmCodes & 8:
@@ -1647,7 +1669,7 @@ class InstrumentONT(Equipment):
             False: command execution failed, error string for debug purposes
         """
         methodLocalName = self.__lc_current_method_name(True)
-        portId = self.__prs.get_from_list(self.get_label(), 'PORTS', portId)
+        portId = self.__prs.get_elem(self.get_label(), portId)
         retList = []
         if self.__ontType  == "5xx":
             pass
@@ -1671,6 +1693,7 @@ class InstrumentONT(Equipment):
             self.__t_failure(methodLocalName, None, "", localMessage)
             return False, localMessage
         alarmCodes = resultItemsArray[1]
+        alarmCodes=int(float(alarmCodes))
         if alarmCodes & 1:
              retList += ["TU-AIS"]
         if alarmCodes & 2:
@@ -1728,7 +1751,7 @@ class InstrumentONT(Equipment):
             False: command execution failed, error string for debug purposes
         """
         methodLocalName = self.__lc_current_method_name(True)
-        portId = self.__prs.get_from_list(self.get_label(), 'PORTS', portId)
+        portId = self.__prs.get_elem(self.get_label(), portId)
         retList = []
         if self.__ontType  == "6xx":
             pass
@@ -1791,7 +1814,7 @@ class InstrumentONT(Equipment):
 
 
 
-    def get_set_laser_status(self, portId, laserStatus):   # ONT-5xx and ONT-6xx    ### krepo added ###       
+    def get_set_laser_status(self, portId, laserStatus=""):   # ONT-5xx and ONT-6xx    ### krepo added ###       
         """ ONT-5XX and ONT-6xx
             Set or Retrieve the laser status
             laserStatus ON | OFF | "" (get status)
@@ -1804,7 +1827,7 @@ class InstrumentONT(Equipment):
         localCommand="{}?".format(ONTCmdString)
         """
         methodLocalName = self.__lc_current_method_name(True)
-        portId = self.__prs.get_from_list(self.get_label(), 'PORTS', portId)
+        portId = self.__prs.get_elem(self.get_label(), portId)
         retList = []
         if self.__ontType  == "5xx":
             ONTCmdString=":OUTP:TEL:LINE:OPT:STAT"
@@ -1842,7 +1865,7 @@ class InstrumentONT(Equipment):
 
 
 
-    def get_set_wavelenght(self, portId, waveLenght):   # ONT-5xx and ONT-6xx    ### krepo added ###       
+    def get_set_wavelenght(self, portId, waveLenght=""):   # ONT-5xx and ONT-6xx    ### krepo added ###       
         """ ONT-5XX only
             Get or Set the laser wavelenght between
                 W1310 (Generator wavelength is 1310 nm)
@@ -1858,7 +1881,7 @@ class InstrumentONT(Equipment):
 
         """
         methodLocalName = self.__lc_current_method_name(True)
-        portId = self.__prs.get_from_list(self.get_label(), 'PORTS', portId)
+        portId = self.__prs.get_elem(self.get_label(), portId)
         #retList = []
         if portId == "":
             localMessage = "ERROR get_set_wavelenght: portId  [{}] not specified".format(portId)
@@ -1910,7 +1933,7 @@ class InstrumentONT(Equipment):
 
 
 
-    def __get_set_rx_bit_rate(self, portId, bitRate):   # ONT-5xx  ONT-6xx    ### krepo not added ###
+    def __get_set_rx_bit_rate(self, portId, bitRate=""):   # ONT-5xx  ONT-6xx    ### krepo not added ###
         """ ONT-5XX only
             Get or Set the current bitRate from:
                 STM0  Bit rate is 55.84 Mbit/s.
@@ -1923,7 +1946,7 @@ class InstrumentONT(Equipment):
                 False: error in command execution, details in error list string
         """
         methodLocalName = self.__lc_current_method_name()
-        portId = self.__prs.get_from_list(self.get_label(), 'PORTS', portId)
+        portId = self.__prs.get_elem(self.get_label(), portId)
         if self.__ontType  == "5xx":
             ONTCmdString=":SENS:DATA:TEL:OPT:RATE"
         else:
@@ -1970,7 +1993,7 @@ class InstrumentONT(Equipment):
 
 
 
-    def get_set_rx_bit_rate(self, portId, bitRate):   # ONT-5xx  ONT-6xx    ### krepo added ###       
+    def get_set_rx_bit_rate(self, portId, bitRate=""):   # ONT-5xx  ONT-6xx    ### krepo added ###       
         """ ONT-5XX only
             Get or Set the current bitRate from:
                 STM0  Bit rate is 55.84 Mbit/s.
@@ -1983,7 +2006,7 @@ class InstrumentONT(Equipment):
                 False: error in command execution, details in error list string
         """
         methodLocalName = self.__lc_current_method_name(True)
-        portId = self.__prs.get_from_list(self.get_label(), 'PORTS', portId)
+        portId = self.__prs.get_elem(self.get_label(), portId)
         if self.__ontType  == "5xx":
             ONTCmdString=":SENS:DATA:TEL:OPT:RATE"
         else:
@@ -2033,7 +2056,7 @@ class InstrumentONT(Equipment):
 
 
 
-    def get_set_clock_reference_source(self, portId, clockMode):   # ONT-5xx and ONT-6xx    ### krepo added ###       
+    def get_set_clock_reference_source(self, portId, clockMode=""):   # ONT-5xx and ONT-6xx    ### krepo added ###       
         """ ONT-5XX and ONT-6XX
             Get or Set the source of the reference clock:
                 CM(5xx)/LOCAL(6xx) Controlled via internal Clock Module
@@ -2043,7 +2066,7 @@ class InstrumentONT(Equipment):
                 False: error in command execution, details in error list string
         """
         methodLocalName = self.__lc_current_method_name(True)
-        portId = self.__prs.get_from_list(self.get_label(), 'PORTS', portId)
+        portId = self.__prs.get_elem(self.get_label(), portId)
         if self.__ontType  == "5xx":
             ONTCmdString=":SENS:DATA:TEL:RCL:TX:CLOC:SEL"
             ontSpecificLocalClockParam="CM"     # Local mode string "CM"
@@ -2082,7 +2105,7 @@ class InstrumentONT(Equipment):
 
 
 
-    def get_set_rx_measure_channel(self, portId, rxChannel):   # ONT-5xx  Only    ### krepo added ###       
+    def get_set_rx_measure_channel(self, portId, rxChannel=""):   # ONT-5xx  Only    ### krepo added ###       
         """ ONT-5XX only
             Get or Set measurement channel on RX side:
                 1...48  (up to STM-16)
@@ -2092,7 +2115,7 @@ class InstrumentONT(Equipment):
                 False: error in command execution, details in error list string
         """
         methodLocalName = self.__lc_current_method_name(True)
-        portId = self.__prs.get_from_list(self.get_label(), 'PORTS', portId)
+        portId = self.__prs.get_elem(self.get_label(), portId)
         if self.__ontType  == "5xx":
             pass
         else:
@@ -2137,7 +2160,7 @@ class InstrumentONT(Equipment):
 
 
 
-    def get_set_rx_channel_mapping_size(self, portId, channelMapping):   # ONT-5xx and ONT-6xx     ### krepo added ###       
+    def get_set_rx_channel_mapping_size(self, portId, channelMapping=""):   # ONT-5xx and ONT-6xx     ### krepo added ###       
         """ ONT-5XX only
             Get or Set RX mapping size used for the measurement channel:
                 VC11     Mapping is VC-11.
@@ -2153,7 +2176,7 @@ class InstrumentONT(Equipment):
                 False: error in command execution, details in error list string
         """
         methodLocalName = self.__lc_current_method_name(True)
-        portId = self.__prs.get_from_list(self.get_label(), 'PORTS', portId)
+        portId = self.__prs.get_elem(self.get_label(), portId)
 
         if portId == "":
             localMessage = "ERROR get_set_rx_channel_mapping_size: portId  [{}] not specified".format(portId)
@@ -2322,7 +2345,7 @@ class InstrumentONT(Equipment):
 
 
 
-    def get_set_alarmed_frames_number(self, portId, alarmedFramesNumber):   # ONT-5xx  and ONT-6xx    ### krepo added ###       
+    def get_set_alarmed_frames_number(self, portId, alarmedFramesNumber=""):   # ONT-5xx  and ONT-6xx    ### krepo added ###       
         """ ONT-5XX / ONT-6xx
             Get or Set the number of frames, in which alarm insertion is active.:
                 1...65536
@@ -2331,7 +2354,7 @@ class InstrumentONT(Equipment):
                 False: error in command execution, details in error list string
         """
         methodLocalName = self.__lc_current_method_name(True)
-        portId = self.__prs.get_from_list(self.get_label(), 'PORTS', portId)
+        portId = self.__prs.get_elem(self.get_label(), portId)
         if self.__ontType  == "5xx":
             ONTCmdString=":SOUR:DATA:TEL:ALAR:BURS:ACTI"
         else:
@@ -2372,7 +2395,7 @@ class InstrumentONT(Equipment):
 
 
 
-    def get_set_not_alarmed_frames_number(self, portId, notAlarmedFramesNumber):   # ONT-5xx  and ONT-6xx    ### krepo added ###      
+    def get_set_not_alarmed_frames_number(self, portId, notAlarmedFramesNumber=""):   # ONT-5xx  and ONT-6xx    ### krepo added ###      
         """ ONT-5XX only / ONT-6xx
             Get or Set the number of frames, in which alarm insertion is inactive.:
                 0...65536
@@ -2384,7 +2407,7 @@ class InstrumentONT(Equipment):
         localCommand="{}?".format(ONTCmdString)
         """
         methodLocalName = self.__lc_current_method_name(True)
-        portId = self.__prs.get_from_list(self.get_label(), 'PORTS', portId)
+        portId = self.__prs.get_elem(self.get_label(), portId)
         if self.__ontType  == "5xx":
             ONTCmdString=":SOUR:DATA:TEL:ALAR:BURS:INAC"
         else:
@@ -2424,7 +2447,7 @@ class InstrumentONT(Equipment):
 
 
 
-    def get_set_alarm_activation(self, portId, alarmActivation):   # ONT-5xx  ONT-6xx    ### krepo added ###       
+    def get_set_alarm_activation(self, portId, alarmActivation=""):   # ONT-5xx  ONT-6xx    ### krepo added ###       
         """ ONT-5XX  / ONT-6xx
             Get or Set the alarm insertion status:
                 ON   Enable Alarms
@@ -2434,7 +2457,7 @@ class InstrumentONT(Equipment):
                 False: error in command execution, details in error list string
         """
         methodLocalName = self.__lc_current_method_name(True)
-        portId = self.__prs.get_from_list(self.get_label(), 'PORTS', portId)
+        portId = self.__prs.get_elem(self.get_label(), portId)
         if self.__ontType  == "5xx":
             ONTCmdString=":SOUR:DATA:TEL:ALAR:INS"
         else:
@@ -2476,7 +2499,7 @@ class InstrumentONT(Equipment):
 
 
 
-    def get_set_alarm_insertion_mode(self, portId, alarmInsertionMode):   # ONT-5xx  ONT-6xx    ### krepo added ###       
+    def get_set_alarm_insertion_mode(self, portId, alarmInsertionMode=""):   # ONT-5xx  ONT-6xx    ### krepo added ###       
         """ ONT-5XX ONT-6xx
             Get or Set the alarm insertion mode from:
                 NONE No alarm insertion.
@@ -2494,7 +2517,7 @@ class InstrumentONT(Equipment):
                 False: error in command execution, details in error list string
         """
         methodLocalName = self.__lc_current_method_name(True)
-        portId = self.__prs.get_from_list(self.get_label(), 'PORTS', portId)
+        portId = self.__prs.get_elem(self.get_label(), portId)
         if self.__ontType  == "5xx":
             ONTCmdString=":SOUR:DATA:TEL:ALAR:MODE"
         else:
@@ -2536,7 +2559,7 @@ class InstrumentONT(Equipment):
 
 
 
-    def get_set_alarm_insertion_type(self, portId, alarmInsertionType):   # ONT-5xx  ONT-6xx   ### krepo added ###      
+    def get_set_alarm_insertion_type(self, portId, alarmInsertionType=""):   # ONT-5xx  ONT-6xx   ### krepo added ###      
         """ ONT-5XX   ONT-6xx
             Get or Set the alarm insertion type from:
                 LOS     Loss of Signal.
@@ -2563,7 +2586,7 @@ class InstrumentONT(Equipment):
                 False: error in command execution, details in error list string
         """
         methodLocalName = self.__lc_current_method_name(True)
-        portId = self.__prs.get_from_list(self.get_label(), 'PORTS', portId)
+        portId = self.__prs.get_elem(self.get_label(), portId)
         if portId == "":
             localMessage = "ERROR get_set_alarm_insertion_type: portId  [{}] not specified".format(portId)
             self.__lc_msg(localMessage)
@@ -2640,7 +2663,7 @@ class InstrumentONT(Equipment):
 
 
 
-    def get_set_num_alarmed_burst_frames(self, portId, burstAlarmedFramesNumber):   # ONT-5xx  ONT-6xx   ### krepo added ###      
+    def get_set_num_alarmed_burst_frames(self, portId, burstAlarmedFramesNumber=""):   # ONT-5xx  ONT-6xx   ### krepo added ###      
         """ ONT-5xx  ONT-6xx
             Get or Set number of frames, in which error insertion is active:
             is the duration of error insertion is burstAlarmedFramesNumber frames.
@@ -2650,7 +2673,7 @@ class InstrumentONT(Equipment):
                 False: error in command execution, details in error list string
         """
         methodLocalName = self.__lc_current_method_name(True)
-        portId = self.__prs.get_from_list(self.get_label(), 'PORTS', portId)
+        portId = self.__prs.get_elem(self.get_label(), portId)
         if self.__ontType  == "5xx":
             ONTCmdString=":SOUR:DATA:TEL:ERR:BURS:ACTI"
         else:
@@ -2691,7 +2714,7 @@ class InstrumentONT(Equipment):
 
 
 
-    def get_set_num_not_alarmed_burst_frames(self, portId, burstNotAlarmedFramesNumber):   # ONT-5xx  ONT-6xx   ### krepo added ###       
+    def get_set_num_not_alarmed_burst_frames(self, portId, burstNotAlarmedFramesNumber=""):   # ONT-5xx  ONT-6xx   ### krepo added ###       
         """ ONT-5xx  ONT-6xx
             Get or Set number of frames, in which error insertion is inactive:
             is the duration of inactive error insertion is burstNotAlarmedFramesNumber frames.
@@ -2701,7 +2724,7 @@ class InstrumentONT(Equipment):
                 False: error in command execution, details in error list string
         """
         methodLocalName = self.__lc_current_method_name(True)
-        portId = self.__prs.get_from_list(self.get_label(), 'PORTS', portId)
+        portId = self.__prs.get_elem(self.get_label(), portId)
         if self.__ontType  == "5xx":
             ONTCmdString=":SOUR:DATA:TEL:ERR:BURS:INAC"
         else:
@@ -2742,7 +2765,7 @@ class InstrumentONT(Equipment):
 
 
 
-    def get_set_error_activation(self, portId, errorActivation):   # ONT-5xx  ONT-6xx   ### krepo added ###       
+    def get_set_error_activation(self, portId, errorActivation=""):   # ONT-5xx  ONT-6xx   ### krepo added ###       
         """ ONT-5xx  ONT-6xx
             Get or Set the error insertion status:
                 ON   Activate Error Insertion
@@ -2752,7 +2775,7 @@ class InstrumentONT(Equipment):
                 False: error in command execution, details in error list string
         """
         methodLocalName = self.__lc_current_method_name(True)
-        portId = self.__prs.get_from_list(self.get_label(), 'PORTS', portId)
+        portId = self.__prs.get_elem(self.get_label(), portId)
         if self.__ontType  == "5xx":
             ONTCmdString=":SOUR:DATA:TEL:ERR:INS"  # ONT original command string put here
         else:
@@ -2793,7 +2816,7 @@ class InstrumentONT(Equipment):
 
 
 
-    def get_set_error_insertion_mode(self, portId, errorInsertionMode):   # ONT-5xx  ONT-6xx    ### krepo added ###       
+    def get_set_error_insertion_mode(self, portId, errorInsertionMode=""):   # ONT-5xx  ONT-6xx    ### krepo added ###       
         """ ONT-5XX ONT-6xx
             Get or Set the error insertion mode from:
                 NONE            No error insertion..
@@ -2821,7 +2844,7 @@ class InstrumentONT(Equipment):
                 False: error in command execution, details in error list string
        """
         methodLocalName = self.__lc_current_method_name(True)
-        portId = self.__prs.get_from_list(self.get_label(), 'PORTS', portId)
+        portId = self.__prs.get_elem(self.get_label(), portId)
         if self.__ontType  == "5xx":
             ONTCmdString=":SOUR:DATA:TEL:ERR:MODE"
         else:
@@ -2867,7 +2890,7 @@ class InstrumentONT(Equipment):
 
 
 
-    def get_set_error_rate(self, portId, errorRate):   # ONT-5xx  ONT-6xx    ### krepo added ###       
+    def get_set_error_rate(self, portId, errorRate=""):   # ONT-5xx  ONT-6xx    ### krepo added ###       
         """ ONT-5XX ONT-6xx
             Get or Set number of frames, in which error insertion is active:
             is the duration of error insertion is errorRate frames.
@@ -2877,7 +2900,7 @@ class InstrumentONT(Equipment):
                 False: error in command execution, details in error list string
         """
         methodLocalName = self.__lc_current_method_name(True)
-        portId = self.__prs.get_from_list(self.get_label(), 'PORTS', portId)
+        portId = self.__prs.get_elem(self.get_label(), portId)
         if self.__ontType  == "5xx":
             ONTCmdString=":SOUR:DATA:TEL:ERR:RATE"
         else:
@@ -2920,7 +2943,7 @@ class InstrumentONT(Equipment):
 
 
 
-    def get_set_error_insertion_type(self, portId, errorInsertionType):   # ONT-5xx ONT-6xx    ### krepo added ###      
+    def get_set_error_insertion_type(self, portId, errorInsertionType=""):   # ONT-5xx ONT-6xx    ### krepo added ###      
         """ ONT-5XX  ONT-6xx
             Get or Set the error insertion type from:
                 LOGIC  Pattern Bit Error.
@@ -2938,7 +2961,7 @@ class InstrumentONT(Equipment):
                 False: error in command execution, details in error list string
         """
         methodLocalName = self.__lc_current_method_name(True)
-        portId = self.__prs.get_from_list(self.get_label(), 'PORTS', portId)
+        portId = self.__prs.get_elem(self.get_label(), portId)
         if portId == "":
             localMessage = "ERROR get_set_error_insertion_type: portId  [{}] not specified".format(portId)
             self.__lc_msg(localMessage)
@@ -3000,7 +3023,7 @@ class InstrumentONT(Equipment):
 
 
 
-    def get_set_tx_bit_rate(self, portId, bitRate):   # ONT-5XX and ONT-6XX    ### krepo added ###    
+    def get_set_tx_bit_rate(self, portId, bitRate=""):   # ONT-5XX and ONT-6XX    ### krepo added ###    
         """ ONT-5XX and ONT-6XX
             Get or Set the current TX bitRate from:
                 STM0  Bit rate is 55.84 Mbit/s.
@@ -3013,7 +3036,7 @@ class InstrumentONT(Equipment):
                 False: error in command execution, details in error list string
         """
         methodLocalName = self.__lc_current_method_name(True)
-        portId = self.__prs.get_from_list(self.get_label(), 'PORTS', portId)
+        portId = self.__prs.get_elem(self.get_label(), portId)
         if self.__ontType  == "5xx":
             ONTCmdString=":SOUR:DATA:TEL:OPT:RATE"
         else:
@@ -3063,7 +3086,7 @@ class InstrumentONT(Equipment):
 
 
 
-    def get_set_tx_measure_channel(self, portId, txChannel):   # ONT-5xx  Only    ### krepo added ###       
+    def get_set_tx_measure_channel(self, portId, txChannel=""):   # ONT-5xx  Only    ### krepo added ###       
         """ ONT-5XX only
             Get or Set measurement channel on TX side:
                 1...48  (up to STM-16)
@@ -3073,7 +3096,7 @@ class InstrumentONT(Equipment):
                 False: error in command execution, details in error list string
         """
         methodLocalName = self.__lc_current_method_name(True)
-        portId = self.__prs.get_from_list(self.get_label(), 'PORTS', portId)
+        portId = self.__prs.get_elem(self.get_label(), portId)
         ONTCmdString=":SOUR:DATA:TEL:SDH:PATH1:CHAN"  # ONT original command string put here
         if self.__ontType  == "5xx":
             pass
@@ -3118,7 +3141,7 @@ class InstrumentONT(Equipment):
 
 
 
-    def get_set_tx_channel_mapping_size(self, portId, channelMapping):     # ONT-5XX and ONT-6XX    ### krepo added ###    
+    def get_set_tx_channel_mapping_size(self, portId, channelMapping=""):     # ONT-5XX and ONT-6XX    ### krepo added ###    
         """ ONT-5XX only
             Get or Set TX mapping size used for the measurement channel:
                 VC11     Mapping is VC-11.
@@ -3134,7 +3157,7 @@ class InstrumentONT(Equipment):
                 False: error in command execution, details in error list string
         """
         methodLocalName = self.__lc_current_method_name(True)
-        portId = self.__prs.get_from_list(self.get_label(), 'PORTS', portId)
+        portId = self.__prs.get_elem(self.get_label(), portId)
         if portId == "":
             localMessage = "ERROR get_set_tx_channel_mapping_size: portId  [{}] not specified".format(portId)
             self.__lc_msg(localMessage)
@@ -3192,7 +3215,7 @@ class InstrumentONT(Equipment):
 
 
 
-    def get_set_tx_lo_measure_channel(self, portId, txLoChannel):   # ONT-5xx  ONT-6xx    ### krepo added ###      
+    def get_set_tx_lo_measure_channel(self, portId, txLoChannel=""):   # ONT-5xx  ONT-6xx    ### krepo added ###      
         """ ONT-5XX  ONT-6xx
 
             !!! BE CARE: parameter format mismatch 5xx vs 6xx  !!!
@@ -3204,7 +3227,7 @@ class InstrumentONT(Equipment):
                 False: error in command execution, details in error list string
         """
         methodLocalName = self.__lc_current_method_name(True)
-        portId = self.__prs.get_from_list(self.get_label(), 'PORTS', portId)
+        portId = self.__prs.get_elem(self.get_label(), portId)
         if self.__ontType  == "5xx":
             ONTCmdString=":SOUR:DATA:TEL:SDH:TRIB:PATH1:CHAN"
         else:
@@ -3253,7 +3276,7 @@ class InstrumentONT(Equipment):
 
 
 
-    def get_set_rx_lo_measure_channel(self, portId, rxLoChannel):   # ONT-5xx  ONT-6xx    ### krepo added ###    
+    def get_set_rx_lo_measure_channel(self, portId, rxLoChannel=""):   # ONT-5xx  ONT-6xx    ### krepo added ###    
         """ ONT-5XX ONT-6xx
 
             !!! BE CARE: parameter format mismatch 5xx vs 6xx  !!!
@@ -3266,7 +3289,7 @@ class InstrumentONT(Equipment):
                 False: error in command execution, details in error list string
         """
         methodLocalName = self.__lc_current_method_name(True)
-        portId = self.__prs.get_from_list(self.get_label(), 'PORTS', portId)
+        portId = self.__prs.get_elem(self.get_label(), portId)
         if self.__ontType  == "5xx":
             ONTCmdString=":SENS:DATA:TEL:SDH:TRIB:PATH1:CHAN"
         else:
@@ -3313,7 +3336,7 @@ class InstrumentONT(Equipment):
 
 
 
-    def get_set_background_channels_fill_mode(self, portId, backgroundMode):   # ONT-6xx only    ### krepo added ###      
+    def get_set_background_channels_fill_mode(self, portId, backgroundMode=""):   # ONT-6xx only    ### krepo added ###      
         """ ONT-6xx only
             Get or Set the alarm insertion status:
                 COPY   Mapping size of background is equivalent to foreground chhannel
@@ -3323,7 +3346,7 @@ class InstrumentONT(Equipment):
                 False: error in command execution, details in error list string
         """
         methodLocalName = self.__lc_current_method_name(True)
-        portId = self.__prs.get_from_list(self.get_label(), 'PORTS', portId)
+        portId = self.__prs.get_elem(self.get_label(), portId)
         if self.__ontType  == "6xx":
             ONTCmdString=":SOUR:DATA:TEL:SDH:BCH:MODE"
         else:
@@ -3368,7 +3391,7 @@ class InstrumentONT(Equipment):
 
 
 
-    def get_set_tx_au_path_J1_trace_mode(self, portId, sequenceInJ1Byte):   # ONT-6xx only    ### krepo added ###       
+    def get_set_tx_au_path_J1_trace_mode(self, portId, sequenceInJ1Byte=""):   # ONT-6xx only    ### krepo added ###       
         """ ONT-6xx only
             Get or Set the Tx Au Path Trace Mode of the background channel il J1 byte:
                 OFF    No sequence sent in J1
@@ -3379,7 +3402,7 @@ class InstrumentONT(Equipment):
                 False: error in command execution, details in error list string
         """
         methodLocalName = self.__lc_current_method_name(True)
-        portId = self.__prs.get_from_list(self.get_label(), 'PORTS', portId)
+        portId = self.__prs.get_elem(self.get_label(), portId)
         if self.__ontType  == "6xx":
             ONTCmdString=":SOUR:DATA:TEL:SDH:BCH:PATH:J1TR:MODE"
         else:
@@ -3424,7 +3447,7 @@ class InstrumentONT(Equipment):
 
 
 
-    def get_set_au_path_trace_rx_channel(self, portId, auPathTraceMode):   # ONT-6xx only    ### krepo added ###       
+    def get_set_au_path_trace_rx_channel(self, portId, auPathTraceMode=""):   # ONT-6xx only    ### krepo added ###       
         """ ONT-6xx only
             Get or Set the Au Path Trace Mode of the selected RX channel in J1 byte:
                 OFF     No sequence expected in J1
@@ -3437,7 +3460,7 @@ class InstrumentONT(Equipment):
                 False: error in command execution, details in error list string
         """
         methodLocalName = self.__lc_current_method_name(True)
-        portId = self.__prs.get_from_list(self.get_label(), 'PORTS', portId)
+        portId = self.__prs.get_elem(self.get_label(), portId)
         if self.__ontType  == "6xx":
             ONTCmdString=":SENS:DATA:TEL:SDH:PATH:SEL:J1TR:MODE"
         else:
@@ -3485,7 +3508,7 @@ class InstrumentONT(Equipment):
 
 
 
-    def get_set_au_path_trace_tx_channel(self, portId, auPathTraceMode):   # ONT-6xx only    ### krepo added ###      
+    def get_set_au_path_trace_tx_channel(self, portId, auPathTraceMode=""):   # ONT-6xx only    ### krepo added ###      
         """ ONT-6xx only
             Get or Set the Au Path Trace Mode of the selected TX channel in J1 byte:
                 OFF     No sequence sent in J1
@@ -3498,7 +3521,7 @@ class InstrumentONT(Equipment):
                 False: error in command execution, details in error list string
         """
         methodLocalName = self.__lc_current_method_name(True)
-        portId = self.__prs.get_from_list(self.get_label(), 'PORTS', portId)
+        portId = self.__prs.get_elem(self.get_label(), portId)
         if self.__ontType  == "6xx":
             ONTCmdString=":SOUR:DATA:TEL:SDH:PATH:SEL:J1TR:MODE"
         else:
@@ -3546,7 +3569,7 @@ class InstrumentONT(Equipment):
 
 
 
-    def get_set_au_path_trace_rx_TR16_string(self, portId, expectedString):   # ONT-6xx only    ### krepo added ###      
+    def get_set_au_path_trace_rx_TR16_string(self, portId, expectedString=""):   # ONT-6xx only    ### krepo added ###      
         """ ONT-6xx only
             Get or Set the 15-char string in J1 byte for RX channel:
                 expectedString: "string"|empty string to read current value
@@ -3555,7 +3578,7 @@ class InstrumentONT(Equipment):
                 False: error in command execution, details in error list string
         """
         methodLocalName = self.__lc_current_method_name(True)
-        portId = self.__prs.get_from_list(self.get_label(), 'PORTS', portId)
+        portId = self.__prs.get_elem(self.get_label(), portId)
         if portId == "":
             localMessage = "ERROR get_set_au_path_trace_rx_TR16_string: portId  [{}] not specified".format(portId)
             self.__lc_msg(localMessage)
@@ -3595,7 +3618,7 @@ class InstrumentONT(Equipment):
 
 
 
-    def get_set_au_path_trace_tx_TR16_string(self, portId, tr16String):   # ONT-6xx only  ### krepo added ###  
+    def get_set_au_path_trace_tx_TR16_string(self, portId, tr16String=""):   # ONT-6xx only  ### krepo added ###  
         """ ONT-6xx only
             Get or Set the 15-char string in J1 byte for TX channel:
                 tr16String: "string"|empty string to read current value
@@ -3604,7 +3627,7 @@ class InstrumentONT(Equipment):
                 False: error in command execution, details in error list string
         """
         methodLocalName = self.__lc_current_method_name(True)
-        portId = self.__prs.get_from_list(self.get_label(), 'PORTS', portId)
+        portId = self.__prs.get_elem(self.get_label(), portId)
         if portId == "":
             localMessage = "ERROR get_set_au_path_trace_tx_TR16_string: portId  [{}] not specified".format(portId)
             self.__lc_msg(localMessage)
@@ -3733,8 +3756,8 @@ if __name__ == "__main__":   #now use this part
   
     tester_5xx = InstrumentONT("tester_5xx", ID=20, krepo=r)
     tester_6xx = InstrumentONT("tester_6xx", ID=21, krepo=r)
-    tester_5xx.init_instrument(localUser_5xx, localPwd_5xx, myApplication1_5xx, portId_5xx)
-    tester_6xx.init_instrument(localUser_6xx, localPwd_6xx, myApplication1_6xx, portId_6xx)
+    tester_5xx.init_instrument(portId_5xx)
+    tester_6xx.init_instrument(portId_6xx)
 
 
 
