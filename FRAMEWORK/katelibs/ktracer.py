@@ -2,6 +2,11 @@
 """
 ###############################################################################
 # MODULE: ktracer.py
+#         Collect and log trace messages for K@TE framework
+#         A message log will be collect on .../logs/SUITE_trace.log file and
+#         print on STDOUT if required
+#         Only on file, a Time Stamp and an environment information will be
+#         add on message text
 #
 # AUTHOR: C.Ghelfi
 # DATE  : 20/11/2015
@@ -42,14 +47,24 @@ class KTracer():
         self.__main_fh.close()
 
 
-    def trc(self, msg, item_ref=None):
+    def k_tracer_function(self, msg):
+        """ Perform a message trace. The supplied message will be logged with a time stamp
+            and module, row and function/method
+        """
         ts = datetime.datetime.now().isoformat(' ')
 
         try:
-            insp = inspect.stack()[2]
-            context_mod = os.path.basename(insp[1])
-            context_row = insp[2]
-            context_fun = insp[3]
+            insp = inspect.stack()
+            for i in range(len(insp)):
+                # Searching on current stack frame for this function calling
+                if insp[i][4][0].find("k_tracer_function(") != -1:
+                    # The caller contect to trace is the next one on call stack
+                    stack_elem = insp[i+1]
+                    context_mod = os.path.basename(stack_elem[1])
+                    context_row = stack_elem[2]
+                    context_fun = stack_elem[3]
+                    break
+
             label = "{}:{}({})".format(context_mod, context_row, context_fun)
         except:
             label = "FRAMEWORK"

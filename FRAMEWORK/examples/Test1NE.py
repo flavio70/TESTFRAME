@@ -23,7 +23,7 @@ TestCase template for K@TE test developers
 
 from katelibs.testcase          import TestCase
 from katelibs.eqpt1850tss320    import Eqpt1850TSS320
-from katelibs.instrumentONT     import instrumentONT
+from katelibs.instrumentONT     import InstrumentONT
 #from katelibs.instrumentIXIA     import InstrumentIXIA
 #from katelibs.instrumentSPIRENT  import InstrumentSPIRENT
 from katelibs.swp1850tss320     import SWP1850TSS
@@ -118,8 +118,8 @@ if __name__ == "__main__":
 
     #initializing all local variable and constants used by Test object
     NE1 = Eqpt1850TSS320('NE1', CTEST.kenvironment)
-    #ONT5xx = instrumentONT('ONT5xx', CTEST.kenvironment)
-    #ONT6xx = instrumentONT('ONT6xx', CTEST.kenvironment)
+    #ONT5xx = InstrumentONT('ONT5xx', CTEST.kenvironment)
+    #ONT6xx = InstrumentONT('ONT6xx', CTEST.kenvironment)
 
     # Run Test main flow
     # Please don't touch this code

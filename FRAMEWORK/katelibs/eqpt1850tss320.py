@@ -16,7 +16,8 @@ from katelibs.kunit         import Kunit
 from katelibs.equipment     import Equipment
 from katelibs.facility1850  import IP, NetIF, SerIF
 from katelibs.access1850    import SER1850, SSH1850
-from katelibs.plugin_tl1    import TL1message, Plugin1850TL1
+from katelibs.tl1_facility  import TL1message
+from katelibs.plugin_tl1    import Plugin1850TL1
 from katelibs.plugin_cli    import Plugin1850CLI
 from katelibs.database      import *
 
@@ -505,7 +506,7 @@ class Eqpt1850TSS320(Equipment):
     def __trc(self, msg):
         """ INTERNAL USAGE
         """
-        self.__kenv.ktrc.trc(msg, item_ref=self)
+        self.__kenv.ktrc.k_tracer_function(msg)
 
 
 
