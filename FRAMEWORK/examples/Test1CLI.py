@@ -23,7 +23,7 @@ TestCase template for K@TE test developers
 
 from katelibs.testcase          import TestCase
 from katelibs.eqpt1850tss320    import Eqpt1850TSS320
-from katelibs.instrumentONT     import instrumentONT
+#from katelibs.instrumentONT     import InstrumentONT
 #from katelibs.instrumentIXIA     import InstrumentIXIA
 #from katelibs.instrumentSPIRENT  import InstrumentSPIRENT
 from katelibs.swp1850tss320     import SWP1850TSS
@@ -94,6 +94,12 @@ class Test(TestCase):
         insert Main body code for your test below
         '''
 
+        NE1.cli.do("interface show", condition=".. message: not found interfacexx")
+        if NE1.cli.get_last_cmd_status() == "SUCCESS":
+            print("[+++\n" + NE1.cli.get_last_outcome() + "\n+++]")
+        else:
+            print("[+++" + NE1.cli.get_last_cmd_status() + "+++]")
+
     def test_cleanup(self):
         '''
         test Cleanup Section implementation
@@ -118,13 +124,13 @@ if __name__ == "__main__":
 
     #initializing all local variable and constants used by Test object
     NE1 = Eqpt1850TSS320('NE1', CTEST.kenvironment)
-    #ONT5xx = instrumentONT('ONT5xx', CTEST.kenvironment)
-    #ONT6xx = instrumentONT('ONT6xx', CTEST.kenvironment)
+    #ONT1 = instrumentONT('ONT1', CTEST.kenvironment)
+    #ONT2 = instrumentONT('ONT2', CTEST.kenvironment)
 
     # Run Test main flow
     # Please don't touch this code
     CTEST.run()
 
-    #ONT6xx.clean_up()
-    #ONT5xx.clean_up()
+    #ONT2.clean_up()
+    #ONT1.clean_up()
     NE1.clean_up()
