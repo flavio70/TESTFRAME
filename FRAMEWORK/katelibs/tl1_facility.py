@@ -9,15 +9,93 @@
 ###############################################################################
 """
 
-import re
-import time
-import os
 import sys
 import json
 
 
+
+class TL1check():
+    """ TL1 Message Scanner
+    """
+
+    def __init__(self):
+        """ Constructor for a TL1 Scanner
+        """
+        self.__aids     = []    # List of AID (could be conains Regular Expression)
+        self.__filters  = {}    # Dictionary of <ATTR,VALUE> couple to search on a TL1 Message
+        self.__conds    = {}    # Dictionary of <PST,SST> conditions to search on a TL1 Message
+
+
+    def add_filter(self, attr, value):
+        """ Insert a new <ATTR,VALUE> filter. It is possible to add more than one VALUE for
+            an ATTR calling this method with different VALUE
+        """
+        try:
+            self.__filters[attr].append(value)
+        except KeyError:
+            self.__filters[attr] = [value]
+
+
+    def res_filter(self, attr=None, value=None):
+        """ Remove a <ATTR,VALUE> filter.
+            A None for VALUE remove all filters for specified ATTR
+            If used without parameters, the filter list will be cleared
+        """
+        if attr is None:
+            self.__filters = {}
+        else:
+            if value is not None:
+                self.__filters[attr] = [x for x in self.__filters[attr] if x != value]
+            else:
+                self.__filters.pop(attr)
+
+
+    def evaluate_aid(self, aid):
+        if len(self.__aids) == 0:
+            return True
+        pass
+
+
+    def evaluate_attr_val(self, attr_val):
+        the_attr = attr_val.split('=')[0]
+        the_val  = attr_val.split('=')[1]
+
+        for attr, values in self.__filters.items():
+            if attr == the_attr:
+                for val in values:
+                    if val == the_val:
+                        return True, "{:s}={:s}".format(attr, val)
+
+        return False, ""
+
+
+    def evaluate_msg(self, msg):
+        result = False
+
+        res_list = []
+
+        # TL1 complete command scenario
+        if msg.get_cmd_status() == (True, 'COMPLD'):
+            for aid in msg.get_cmd_aid_list():
+                if self.evaluate_aid(aid):
+                    for attr_val in msg.get_cmd_attr_values(aid):
+                        res = self.evaluate_attr_val(attr_val)
+                        if res[0]:
+                            result = True
+                            res_list.append("{:s}:{:s}".format(aid, res[1]))
+            return result,res_list
+
+        print("UNMANAGED SCENARIO")
+        return False,res_list
+
+
+    def debug(self):
+        print("filters    : {}".format(self.__filters))
+        print("conditions : {}".format(self.__conds))
+
+
 class TL1message():
-    """ Collection of TL1 facilities
+    """ TL1 Message decomposer
     """
 
     def __init__(self, tl1_msg):
@@ -227,6 +305,19 @@ class TL1message():
         return None
 
 
+    def get_cmd_attr_values(self, aid):
+        """ Return the <attr,value> list for specified AID
+            None if wrong parameters are supplied
+        """
+        if self.__m_event:
+            return None
+
+        if self.get_cmd_status() != (True, "COMPLD"):
+            return None
+
+        return self.__m_coded['R_BODY_OK'].get(aid)['VALUES'].split(',')
+
+
     def get_cmd_error_frame(self):
         """ Return a tuple (result, str1, str2) for a DENY response message
             'result' is False if the message isn't a command response
@@ -247,172 +338,203 @@ class TL1message():
 if __name__ == "__main__":
     print("DEBUG")
 
-    msg1 = "\n\
-   PLEASE-SET-SID-C8A00 15-10-04 17:01:56\n\
-*  243 REPT ALM EQPT\n\
-   \"MDL-1-1-18:MN,ABNORMAL,NSA,10-04,17-01-56,NEND\"\n\
-;\n\
-"
+    msg1 = """
 
-    msg2 = "\n\
-\n\
-\n\
-   PLEASE-SET-SID-C8A00 15-10-04 18:35:10\n\
-M  379 COMPLD\n\
-   \"EC320-1-1-1::PROVISIONEDTYPE=EC320,ACTUALTYPE=EC320,AINSMODE=NOWAIT,ALMPROF=LBL-ASAPEQPT-SYSDFLT,REGION=ETSI,PROVMODE=MANEQ-AUTOFC:OOS-AU,WRK&FLT\"\n\
-   /* RTRV-EQPT::MDL-1-1-1 [379] (536871116) */\n\
-;\n\
-"
+   PLEASE-SET-SID-C8A00 15-10-04 17:01:56
+*  243 REPT ALM EQPT
+   "MDL-1-1-18:MN,ABNORMAL,NSA,10-04,17-01-56,NEND"
+;
+"""
 
-    msg3 = "\n\
-\n\
-\n\
-   PLEASE-SET-SID-C8A00 15-10-04 20:31:15\n\
-M  165 COMPLD\n\
-   \"EC320-1-1-1::PROVISIONEDTYPE=EC320,ACTUALTYPE=EC320,AINSMODE=NOWAIT,ALMPROF=LBL-ASAPEQPT-SYSDFLT,REGION=ETSI,PROVMODE=MANEQ-AUTOFC:OOS-AU,WRK&FLT\"\n\
-   \"MDL-1-1-18::ACTUALTYPE=PP1GE,AUTOPROV=OFF:OOS-MA,UAS\"\n\
-   /* RTRV-EQPT::MDL-1-1-1&-18 [165] (536871116) */\n\
-;\n\
-"
+    msg2 = """
 
-    msg4 = "\n\
-\n\
-\n\
-   PLEASE-SET-SID-C8A00 15-10-05 17:25:40\n\
-M  792 DENY\n\
-   IEAE\n\
-   /* Input, Entity Already Exists */\n\
-   /* Equipment is already Provisioned */\n\
-   /* ENT-EQPT::PP1GE-1-1-18::::PROVISIONEDTYPE=PP1GE:IS [792] (536871116) */\n\
-;\n\
-"
+   PLEASE-SET-SID-C8A00 15-10-04 18:35:10
+M  379 COMPLD
+   "EC320-1-1-1::PROVISIONEDTYPE=EC320,ACTUALTYPE=EC320,AINSMODE=NOWAIT,ALMPROF=LBL-ASAPEQPT-SYSDFLT,REGION=ETSI,PROVMODE=MANEQ-AUTOFC:OOS-AU,WRK&FLT"
+   /* RTRV-EQPT::MDL-1-1-1 [379] (536871116) */
+;
+"""
 
-    msg5 = "\n\
-   \"nodeA - .TDM.EM_TEST.RtrvEqptALL\" 15-10-15 21:47:33\n\
-M  963 COMPLD\n\
-   \"SHELF-1-1::PROVISIONEDTYPE=UNVRSL320,ACTUALTYPE=UNVRSL320,AINSMODE=NOWAIT,SHELFNUM=1,SHELFROLE=MAIN,ALMPROF=LBL-ASAPEQPT-SYSDFLT,REGION=ETSI,PROVMODE=MANEQ-AUTOFC:IS\"\n\
-   \"EC320-1-1-1::PROVISIONEDTYPE=EC320,ACTUALTYPE=UNKNOWN,AINSMODE=NOWAIT,ALMPROF=LBL-ASAPEQPT-SYSDFLT,REGION=ETSI,PROVMODE=MANEQ-AUTOFC:OOS-AU,WRK&FLT\"\n\
-   \"MDL-1-1-2::AUTOPROV=OFF:OOS-AUMA,UAS&UEQ\"\n\
-   \"MDL-1-1-3::AUTOPROV=OFF:OOS-AUMA,UAS&UEQ\"\n\
-   \"MDL-1-1-4::AUTOPROV=OFF:OOS-AUMA,UAS&UEQ\"\n\
-   \"MDL-1-1-5::AUTOPROV=OFF:OOS-AUMA,UAS&UEQ\"\n\
-   \"MDL-1-1-6::AUTOPROV=OFF:OOS-AUMA,UAS&UEQ\"\n\
-   \"MDL-1-1-7::AUTOPROV=OFF:OOS-AUMA,UAS&UEQ\"\n\
-   \"MDL-1-1-8::AUTOPROV=OFF:OOS-AUMA,UAS&UEQ\"\n\
-   \"MDL-1-1-9::AUTOPROV=OFF:OOS-AUMA,UAS&UEQ\"\n\
-   \"MT320-1-1-10::PROVISIONEDTYPE=MT320,ACTUALTYPE=UNKNOWN,AINSMODE=NOWAIT,ALMPROF=LBL-ASAPEQPT-SYSDFLT,REGION=ETSI,PROVMODE=MANEQ-AUTOFC:OOS-AU,WRK&UEQ\"\n\
-   \"MT320-1-1-11::PROVISIONEDTYPE=MT320,ACTUALTYPE=UNKNOWN,AINSMODE=NOWAIT,ALMPROF=LBL-ASAPEQPT-SYSDFLT,REGION=ETSI,PROVMODE=MANEQ-AUTOFC:OOS-AU,STBYH&UEQ\"\n\
-   \"MDL-1-1-12::AUTOPROV=OFF:OOS-AUMA,UAS&UEQ\"\n\
-   \"MDL-1-1-13::AUTOPROV=OFF:OOS-AUMA,UAS&UEQ\"\n\
-   \"MDL-1-1-14::AUTOPROV=OFF:OOS-AUMA,UAS&UEQ\"\n\
-   \"MDL-1-1-15::AUTOPROV=OFF:OOS-AUMA,UAS&UEQ\"\n\
-   \"MDL-1-1-16::AUTOPROV=OFF:OOS-AUMA,UAS&UEQ\"\n\
-   \"MDL-1-1-17::AUTOPROV=OFF:OOS-AUMA,UAS&UEQ\"\n\
-   \"PP1GE-1-1-18::PROVISIONEDTYPE=PP1GE,ACTUALTYPE=UNKNOWN,AINSMODE=NOWAIT,ALMPROF=LBL-ASAPEQPT-SYSDFLT,REGION=ETSI,PROVMODE=MANEQ-AUTOFC:OOS-AU,FLT\"\n\
-   \"MDL-1-1-18-1::AUTOPROV=OFF:OOS-AUMA,UAS&UEQ\"\n\
-   \"MDL-1-1-18-2::AUTOPROV=OFF:OOS-AUMA,UAS&UEQ\"\n\
-   \"MDL-1-1-18-3::AUTOPROV=OFF:OOS-AUMA,UAS&UEQ\"\n\
-   \"MDL-1-1-18-4::AUTOPROV=OFF:OOS-AUMA,UAS&UEQ\"\n\
-   \"MDL-1-1-18-5::AUTOPROV=OFF:OOS-AUMA,UAS&UEQ\"\n\
-   \"MDL-1-1-18-6::AUTOPROV=OFF:OOS-AUMA,UAS&UEQ\"\n\
-   \"MDL-1-1-18-7::AUTOPROV=OFF:OOS-AUMA,UAS&UEQ\"\n\
-   \"MDL-1-1-18-8::AUTOPROV=OFF:OOS-AUMA,UAS&UEQ\"\n\
-   \"MDL-1-1-18-9::AUTOPROV=OFF:OOS-AUMA,UAS&UEQ\"\n\
-   \"MDL-1-1-18-10::AUTOPROV=OFF:OOS-AUMA,UAS&UEQ\"\n\
-   \"MDL-1-1-19::AUTOPROV=OFF:OOS-AUMA,UAS&UEQ\"\n\
-   \"MDL-1-1-20::AUTOPROV=OFF:OOS-AUMA,UAS&UEQ\"\n\
-   \"MDL-1-1-21::AUTOPROV=OFF:OOS-AUMA,UAS&UEQ\"\n\
-   \"MDL-1-1-22::AUTOPROV=OFF:OOS-AUMA,UAS&UEQ\"\n\
-   \"MDL-1-1-23::AUTOPROV=OFF:OOS-AUMA,UAS&UEQ\"\n\
-   \"MDL-1-1-24::AUTOPROV=OFF:OOS-AUMA,UAS&UEQ\"\n\
-   \"MDL-1-1-25::AUTOPROV=OFF:OOS-AUMA,UAS&UEQ\"\n\
-   \"MDL-1-1-26::AUTOPROV=OFF:OOS-AUMA,UAS&UEQ\"\n\
-   \"MDL-1-1-27::AUTOPROV=OFF:OOS-AUMA,UAS&UEQ\"\n\
-   \"MDL-1-1-28::AUTOPROV=OFF:OOS-AUMA,UAS&UEQ\"\n\
-   \"MDL-1-1-29::AUTOPROV=OFF:OOS-AUMA,UAS&UEQ\"\n\
-   \"MDL-1-1-30::AUTOPROV=OFF:OOS-AUMA,UAS&UEQ\"\n\
-   \"MDL-1-1-31::AUTOPROV=OFF:OOS-AUMA,UAS&UEQ\"\n\
-   \"MDL-1-1-32::AUTOPROV=OFF:OOS-AUMA,UAS&UEQ\"\n\
-   \"MDL-1-1-33::AUTOPROV=OFF:OOS-AUMA,UAS&UEQ\"\n\
-   \"MDL-1-1-34::AUTOPROV=OFF:OOS-AUMA,UAS&UEQ\"\n\
-   \"MDL-1-1-35::AUTOPROV=OFF:OOS-AUMA,UAS&UEQ\"\n\
-   \"MDL-1-1-36::AUTOPROV=OFF:OOS-AUMA,UAS&UEQ\"\n\
-   \"POW320-1-1-37::PROVISIONEDTYPE=PSF320,ACTUALTYPE=UNKNOWN,AINSMODE=NOWAIT,ALMPROF=LBL-ASAPEQPT-SYSDFLT,REGION=ETSI,PROVMODE=MANEQ-AUTOFC:OOS-AU,MEA\"\n\
-   \"MDL-1-1-38::AUTOPROV=OFF:OOS-AUMA,UAS&UEQ\"\n\
-   \"POW320-1-1-39::PROVISIONEDTYPE=PSF320,ACTUALTYPE=UNKNOWN,AINSMODE=NOWAIT,ALMPROF=LBL-ASAPEQPT-SYSDFLT,REGION=ETSI,PROVMODE=MANEQ-AUTOFC:OOS-AU,MEA\"\n\
-   \"FAN320-1-1-40::PROVISIONEDTYPE=FAN320,ACTUALTYPE=UNKNOWN,AINSMODE=NOWAIT,ALMPROF=LBL-ASAPEQPT-SYSDFLT,REGION=ETSI,PROVMODE=MANEQ-AUTOFC:OOS-AU,FLT\"\n\
-   \"FAN320-1-1-41::PROVISIONEDTYPE=FAN320,ACTUALTYPE=UNKNOWN,AINSMODE=NOWAIT,ALMPROF=LBL-ASAPEQPT-SYSDFLT,REGION=ETSI,PROVMODE=MANEQ-AUTOFC:OOS-AU,FLT\"\n\
-   \"TBUS-1-1-42::PROVISIONEDTYPE=TBUS320,ACTUALTYPE=UNKNOWN,AINSMODE=NOWAIT,ALMPROF=LBL-ASAPEQPT-SYSDFLT,REGION=ETSI,PROVMODE=MANEQ-AUTOFC:IS\"\n\
-   \"TBUS-1-1-43::PROVISIONEDTYPE=TBUS320,ACTUALTYPE=UNKNOWN,AINSMODE=NOWAIT,ALMPROF=LBL-ASAPEQPT-SYSDFLT,REGION=ETSI,PROVMODE=MANEQ-AUTOFC:IS\"\n\
-   /* RTRV-EQPT::ALL [963] (536871273) */\n\
-;\n\
-"
+    msg3 = """
 
-    if True:
-        #print("[{:s}]\n{:s}".format(msg1, "-" * 80))
-        mm = TL1message(msg3)
-        print(mm.decode("JSON"))
-        sys.exit(0)
+   PLEASE-SET-SID-C8A00 15-10-04 20:31:15
+M  165 COMPLD
+   "EC320-1-1-1::PROVISIONEDTYPE=EC320,ACTUALTYPE=EC320,AINSMODE=NOWAIT,ALMPROF=LBL-ASAPEQPT-SYSDFLT,REGION=ETSI,PROVMODE=MANEQ-AUTOFC:OOS-AU,WRK&FLT"
+   "MDL-1-1-18::ACTUALTYPE=PP1GE,AUTOPROV=OFF:OOS-MA,UAS"
+   /* RTRV-EQPT::MDL-1-1-1&-18 [165] (536871116) */
+;
+"""
 
-        print("#" * 80)
+    msg4 = """
 
-        print("[{:s}]\n{:s}".format(msg3, "-" * 80))
-        mm = TL1message(msg3)
-        print(mm)
-        print("@@@")
-        lista = mm.get_cmd_aid_list()
-        #print(lista[0] + " " + mm.get_cmd_status_value(lista[0])[0])
-        #print(lista[0] + " " + mm.get_cmd_status_value(lista[0])[1])
-        #print(lista[1] + " " + mm.get_cmd_status_value(lista[1])[0])
-        #print(lista[1] + " " + mm.get_cmd_status_value(lista[1])[1])
-        print(mm.get_cmd_attr_value("EC320-1-1-1", "REGION"))
-        print(mm.get_cmd_attr_value("EC320-1-1-1", "PIPPO"))
-        print(mm.get_cmd_attr_value("MDL-1-1-18", "AUTOPROV"))
-        print("@@@")
+   PLEASE-SET-SID-C8A00 15-10-05 17:25:40
+M  792 DENY
+   IEAE
+   /* Input, Entity Already Exists */
+   /* Equipment is already Provisioned */
+   /* ENT-EQPT::PP1GE-1-1-18::::PROVISIONEDTYPE=PP1GE:IS [792] (536871116) */
+;
+"""
 
-        print("#" * 80)
+    msg5 = """
 
-        print("[{:s}]\n{:s}".format(msg4, "-" * 80))
-        mm = TL1message(msg4)
-        print(mm)
-        if False:
-            v1,v2,v3 = mm.get_cmd_error_frame()
-            if v1:
-                print("ERRORE: " + v2)
-                print(v3[0])
-                print(v3[1])
+   "nodeA - .TDM.EM_TEST.RtrvEqptALL" 15-10-15 21:47:33
+M  963 COMPLD
+   "SHELF-1-1::PROVISIONEDTYPE=UNVRSL320,ACTUALTYPE=UNVRSL320,AINSMODE=NOWAIT,SHELFNUM=1,SHELFROLE=MAIN,ALMPROF=LBL-ASAPEQPT-SYSDFLT,REGION=ETSI,PROVMODE=MANEQ-AUTOFC:IS"
+   "EC320-1-1-1::PROVISIONEDTYPE=EC320,ACTUALTYPE=UNKNOWN,AINSMODE=NOWAIT,ALMPROF=LBL-ASAPEQPT-SYSDFLT,REGION=ETSI,PROVMODE=MANEQ-AUTOFC:OOS-AU,WRK&FLT"
+   "MDL-1-1-2::AUTOPROV=OFF:OOS-AUMA,UAS&UEQ"
+   "MDL-1-1-3::AUTOPROV=OFF:OOS-AUMA,UAS&UEQ"
+   "MDL-1-1-4::AUTOPROV=OFF:OOS-AUMA,UAS&UEQ"
+   "MDL-1-1-5::AUTOPROV=OFF:OOS-AUMA,UAS&UEQ"
+   "MDL-1-1-6::AUTOPROV=OFF:OOS-AUMA,UAS&UEQ"
+   "MDL-1-1-7::AUTOPROV=OFF:OOS-AUMA,UAS&UEQ"
+   "MDL-1-1-8::AUTOPROV=OFF:OOS-AUMA,UAS&UEQ"
+   "MDL-1-1-9::AUTOPROV=OFF:OOS-AUMA,UAS&UEQ"
+   "MT320-1-1-10::PROVISIONEDTYPE=MT320,ACTUALTYPE=UNKNOWN,AINSMODE=NOWAIT,ALMPROF=LBL-ASAPEQPT-SYSDFLT,REGION=ETSI,PROVMODE=MANEQ-AUTOFC:OOS-AU,WRK&UEQ"
+   "MT320-1-1-11::PROVISIONEDTYPE=MT320,ACTUALTYPE=UNKNOWN,AINSMODE=NOWAIT,ALMPROF=LBL-ASAPEQPT-SYSDFLT,REGION=ETSI,PROVMODE=MANEQ-AUTOFC:OOS-AU,STBYH&UEQ"
+   "MDL-1-1-12::AUTOPROV=OFF:OOS-AUMA,UAS&UEQ"
+   "MDL-1-1-13::AUTOPROV=OFF:OOS-AUMA,UAS&UEQ"
+   "MDL-1-1-14::AUTOPROV=OFF:OOS-AUMA,UAS&UEQ"
+   "MDL-1-1-15::AUTOPROV=OFF:OOS-AUMA,UAS&UEQ"
+   "MDL-1-1-16::AUTOPROV=OFF:OOS-AUMA,UAS&UEQ"
+   "MDL-1-1-17::AUTOPROV=OFF:OOS-AUMA,UAS&UEQ"
+   "PP1GE-1-1-18::PROVISIONEDTYPE=PP1GE,ACTUALTYPE=UNKNOWN,AINSMODE=NOWAIT,ALMPROF=LBL-ASAPEQPT-SYSDFLT,REGION=ETSI,PROVMODE=MANEQ-AUTOFC:OOS-AU,FLT"
+   "MDL-1-1-18-1::AUTOPROV=OFF:OOS-AUMA,UAS&UEQ"
+   "MDL-1-1-18-2::AUTOPROV=OFF:OOS-AUMA,UAS&UEQ"
+   "MDL-1-1-18-3::AUTOPROV=OFF:OOS-AUMA,UAS&UEQ"
+   "MDL-1-1-18-4::AUTOPROV=OFF:OOS-AUMA,UAS&UEQ"
+   "MDL-1-1-18-5::AUTOPROV=OFF:OOS-AUMA,UAS&UEQ"
+   "MDL-1-1-18-6::AUTOPROV=OFF:OOS-AUMA,UAS&UEQ"
+   "MDL-1-1-18-7::AUTOPROV=OFF:OOS-AUMA,UAS&UEQ"
+   "MDL-1-1-18-8::AUTOPROV=OFF:OOS-AUMA,UAS&UEQ"
+   "MDL-1-1-18-9::AUTOPROV=OFF:OOS-AUMA,UAS&UEQ"
+   "MDL-1-1-18-10::AUTOPROV=OFF:OOS-AUMA,UAS&UEQ"
+   "MDL-1-1-19::AUTOPROV=OFF:OOS-AUMA,UAS&UEQ"
+   "MDL-1-1-20::AUTOPROV=OFF:OOS-AUMA,UAS&UEQ"
+   "MDL-1-1-21::AUTOPROV=OFF:OOS-AUMA,UAS&UEQ"
+   "MDL-1-1-22::AUTOPROV=OFF:OOS-AUMA,UAS&UEQ"
+   "MDL-1-1-23::AUTOPROV=OFF:OOS-AUMA,UAS&UEQ"
+   "MDL-1-1-24::AUTOPROV=OFF:OOS-AUMA,UAS&UEQ"
+   "MDL-1-1-25::AUTOPROV=OFF:OOS-AUMA,UAS&UEQ"
+   "MDL-1-1-26::AUTOPROV=OFF:OOS-AUMA,UAS&UEQ"
+   "MDL-1-1-27::AUTOPROV=OFF:OOS-AUMA,UAS&UEQ"
+   "MDL-1-1-28::AUTOPROV=OFF:OOS-AUMA,UAS&UEQ"
+   "MDL-1-1-29::AUTOPROV=OFF:OOS-AUMA,UAS&UEQ"
+   "MDL-1-1-30::AUTOPROV=OFF:OOS-AUMA,UAS&UEQ"
+   "MDL-1-1-31::AUTOPROV=OFF:OOS-AUMA,UAS&UEQ"
+   "MDL-1-1-32::AUTOPROV=OFF:OOS-AUMA,UAS&UEQ"
+   "MDL-1-1-33::AUTOPROV=OFF:OOS-AUMA,UAS&UEQ"
+   "MDL-1-1-34::AUTOPROV=OFF:OOS-AUMA,UAS&UEQ"
+   "MDL-1-1-35::AUTOPROV=OFF:OOS-AUMA,UAS&UEQ"
+   "MDL-1-1-36::AUTOPROV=OFF:OOS-AUMA,UAS&UEQ"
+   "POW320-1-1-37::PROVISIONEDTYPE=PSF320,ACTUALTYPE=UNKNOWN,AINSMODE=NOWAIT,ALMPROF=LBL-ASAPEQPT-SYSDFLT,REGION=ETSI,PROVMODE=MANEQ-AUTOFC:OOS-AU,MEA"
+   "MDL-1-1-38::AUTOPROV=OFF:OOS-AUMA,UAS&UEQ"
+   "POW320-1-1-39::PROVISIONEDTYPE=PSF320,ACTUALTYPE=UNKNOWN,AINSMODE=NOWAIT,ALMPROF=LBL-ASAPEQPT-SYSDFLT,REGION=ETSI,PROVMODE=MANEQ-AUTOFC:OOS-AU,MEA"
+   "FAN320-1-1-40::PROVISIONEDTYPE=FAN320,ACTUALTYPE=UNKNOWN,AINSMODE=NOWAIT,ALMPROF=LBL-ASAPEQPT-SYSDFLT,REGION=ETSI,PROVMODE=MANEQ-AUTOFC:OOS-AU,FLT"
+   "FAN320-1-1-41::PROVISIONEDTYPE=FAN320,ACTUALTYPE=UNKNOWN,AINSMODE=NOWAIT,ALMPROF=LBL-ASAPEQPT-SYSDFLT,REGION=ETSI,PROVMODE=MANEQ-AUTOFC:OOS-AU,FLT"
+   "TBUS-1-1-42::PROVISIONEDTYPE=TBUS320,ACTUALTYPE=UNKNOWN,AINSMODE=NOWAIT,ALMPROF=LBL-ASAPEQPT-SYSDFLT,REGION=ETSI,PROVMODE=MANEQ-AUTOFC:IS"
+   "TBUS-1-1-43::PROVISIONEDTYPE=TBUS320,ACTUALTYPE=UNKNOWN,AINSMODE=NOWAIT,ALMPROF=LBL-ASAPEQPT-SYSDFLT,REGION=ETSI,PROVMODE=MANEQ-AUTOFC:IS"
+   /* RTRV-EQPT::ALL [963] (536871273) */
+;
+"""
 
-            print("-" * 80)
-        #mm.encode("ASCII")
+    msg6="""
 
-        sys.exit(0)
+   PLEASE-SET-SID-63880 15-09-18 05:11:48
+M  480 COMPLD
+   "ASAPEQPT-0,EQPT::DFLT=N,USERLABEL=LBL-ASAPEQPT-None"
+   "::ABNORMAL,NR,NSA,NEND"
+   "::AIRTEMP,NR,NSA,NEND"
+   "::BPERROR,NR,SA,NEND"
+   "::CONTBUS,NR,SA,NEND"
+   "::CONTBUS,NR,NSA,NEND"
+   "::CONTCOM,NR,SA,NEND"
+   "::DBF,NR,NSA,NEND"
+   "::FA,NR,SA,NEND"
+   "::FA,NR,NSA,NEND"
+   "::HWFAIL,NR,SA,NEND"
+   "::HWFAIL,NR,NSA,NEND"
+   "::IMPROPRMVL,NR,SA,NEND"
+   "::IMPROPRMVL,NR,NSA,NEND"
+   "::LANFAIL,NR,SA,NEND"
+   "::MAN,NR,SA,NEND"
+   "::MAN,NR,NSA,NEND"
+   "::MISC-1,NR,NSA,NEND"
+   "::MTXLNKFAIL,NR,SA,NEND"
+   "::MTXLNKFAIL,NR,NSA,NEND"
+   "::NTPOOSYNC,NR,NSA,NEND"
+   "::PRCDRERR,NR,SA,NEND"
+   "::PRCDRERR,NR,NSA,NEND"
+   "::PWR,NR,SA,NEND"
+   "::PWR,NR,NSA,NEND"
+   "::RAIDSYNC,NR,NSA,NEND"
+   "::SYNCEQPT,NR,SA,NEND"
+   "::SYNCEQPT,NR,NSA,NEND"
+   "::CLKADJ,NR,NSA,NEND"
+   "::IR-EOLSPAN,NR,NSA,NEND"
+   "::IR-N1,NR,NSA,NEND"
+   "::IR-VOA,NR,NSA,NEND"
+   "::IR-IT,NR,NSA,NEND"
+   "::IR-OP1,NR,NSA,NEND"
+   "::IR-OP2,NR,NSA,NEND"
+   "::DBPROB,NR,SA,NEND"
+   "::DBCKFAIL,NR,SA,NEND"
+   "::SWCKFAIL,NR,SA,NEND"
+   "::SWCKFAIL,NR,SA,NEND"
+   "::MNGIFPLGIN,NR,NSA,NEND"
+   "::DISKFULL,NR,NSA,NEND"
+   "::DSCFGALIGN,NR,NSA,NEND"
+   "::PWROFF,NR,SA,NEND"
+   "::PWROFF,NR,NSA,NEND"
+   /* RTRV-ASAP-PROF::ASAPEQPT-0 [480] (536871198) */
+;
+"""
 
-    tl1 = Plugin1850TL1("135.221.125.79")
+    #print("[{:s}]\n{:s}".format(msg1, "-" * 80))
+    mm = TL1message(msg3)
+    print(mm.decode("JSON"))
 
+    filt = TL1check()
+    filt.add_filter("AINSMODE", "NOWAIT")
+    filt.add_filter("AINSMODE", "NONESISTE")
+    filt.add_filter("REGION", "ETSI")
+    filt.add_filter("PIPPO", "123")
+    filt.debug()
+    print(filt.evaluate_msg(mm))
+
+
+    sys.exit(0)
+
+    print("#" * 80)
+
+    print("[{:s}]\n{:s}".format(msg3, "-" * 80))
+    mm = TL1message(msg3)
+    print(mm)
+    print("@@@")
+    lista = mm.get_cmd_aid_list()
+    #print(lista[0] + " " + mm.get_cmd_status_value(lista[0])[0])
+    #print(lista[0] + " " + mm.get_cmd_status_value(lista[0])[1])
+    #print(lista[1] + " " + mm.get_cmd_status_value(lista[1])[0])
+    #print(lista[1] + " " + mm.get_cmd_status_value(lista[1])[1])
+    print(mm.get_cmd_attr_value("EC320-1-1-1", "REGION"))
+    print(mm.get_cmd_attr_value("EC320-1-1-1", "PIPPO"))
+    print(mm.get_cmd_attr_value("MDL-1-1-18", "AUTOPROV"))
+    print("@@@")
+
+    print("#" * 80)
+
+    print("[{:s}]\n{:s}".format(msg4, "-" * 80))
+    mm = TL1message(msg4)
+    print(mm)
     if False:
-        # DB PULITO
-        tl1.do("ACT-USER::admin:MYTAG::Root1850;")
-        tl1.do("ED-PID::admin:::Root1850,Alcatel1,Alcatel1;")
-        #
-        tl1.do("SET-PRMTR-NE::::::REGION=ETSI,PROVMODE=MANEQ-AUTOFC;")
-        tl1.do("RTRV-PRMTR-NE;")
-        tl1.do("SET-ATTR-SECUDFLT::::::MAXSESSION=6;")
-        tl1.do("ENT-EQPT::SHELF-1-1::::PROVISIONEDTYPE=UNVRSL320,SHELFNUM=1,SHELFROLE=MAIN;")
-    else:
-        # DB Inizializzato
-        tl1.do("ACT-USER::admin:MYTAG::Alcatel1;")
-        tl1.event_collection_start()
-        time.sleep(2)
-        tl1.do("ENT-EQPT::PP1GE-1-1-18::::PROVISIONEDTYPE=PP1GE:IS;", policy="COND", condPST="IS")
-        time.sleep(30)
-        tl1.do("RTRV-EQPT::MDL-1-1-18;")
-        res = tl1.get_last_outcome()
-        print(res)
-        tl1.do("RMV-EQPT::PP1GE-1-1-18;")
-        tl1.do("DLT-EQPT::PP1GE-1-1-18;")
+        v1,v2,v3 = mm.get_cmd_error_frame()
+        if v1:
+            print("ERRORE: " + v2)
+            print(v3[0])
+            print(v3[1])
 
-    time.sleep(1)
+        print("-" * 80)
+    #mm.encode("ASCII")
 
-    tl1.thr_event_terminate()
 
     print("FINE")

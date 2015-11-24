@@ -93,6 +93,8 @@ class Test(TestCase):
         test Body Section implementation
         insert Main body code for your test below
         '''
+        NE1.tl1.do("RTRV-ASAP-PROF::ASAPEQPT-0;")
+        print(NE1.tl1.get_last_outcome())
 
     def test_cleanup(self):
         '''
