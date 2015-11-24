@@ -84,7 +84,7 @@ class Test(TestCase):
         test Setup Section implementation
         insert general SetUp code for your test below
         '''
-        self.kenvironment.krepo.start_tps_block("EM", "1-2-3")
+        self.start_tps_block("EM", "1-2-3")
         NE1.tl1.do("ACT-USER::admin:::Alcatel1;")
 
 
@@ -94,7 +94,7 @@ class Test(TestCase):
         insert Main body code for your test below
         '''
         NE1.tl1.do("RTRV-ASAP-PROF::ASAPEQPT-0;")
-        print(NE1.tl1.get_last_outcome())
+        self.trc_inf(NE1.tl1.get_last_outcome())
 
     def test_cleanup(self):
         '''
@@ -108,9 +108,10 @@ class Test(TestCase):
         DUT CleanUp Section implementation
         insert DUT CleanUp code for your test below
         '''
-        print('@DUT CleanUP')
+        self.trc_inf('@DUT CleanUP')
+
         NE1.clean_up()
-        self.kenvironment.krepo.stop_tps_block("EM", "1-2-3")
+        self.stop_tps_block("EM", "1-2-3")
 
 
 #Please don't change the code below#
