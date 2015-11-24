@@ -54,7 +54,7 @@ class KEnvironment():
         self.__test_fn = os.path.basename(testfilename)
 
         # Trace Management
-        self.ktrc = KTracer(self.__paths['LOGS'], send_stdout=True)
+        self.ktrc = KTracer(self.__paths['LOGS'], level="ERROR", trunk=True)
 
         # Presets Management
         self.kprs = KPreset(self.__paths['TEST'], self.__test_fn)
