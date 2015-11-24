@@ -13,6 +13,7 @@ import os
 
 from katelibs.kunit     import Kunit
 from katelibs.kpreset   import KPreset
+from katelibs.ktracer   import KTracer
 
 
 
@@ -31,8 +32,10 @@ class KEnvironment():
         testfilename : (only for debug) A test file name
         """
         # Public members:
-        self.kprs      = None   # Presettings for test execution
-        self.krepo     = None   # XML Reporting
+        self.kprs   = None  # Presettings for test execution
+        self.krepo  = None  # XML Reporting
+        self.ktrc   = None  # Tracer
+
         # Private members:
         self.__test_fn = None   # Test File Name
         self.__paths   = { }    # Environment Paths (see below)
@@ -49,6 +52,9 @@ class KEnvironment():
 
         # Test File Name
         self.__test_fn = os.path.basename(testfilename)
+
+        # Trace Management
+        self.ktrc = KTracer(self.__paths['LOGS'], send_stdout=True)
 
         # Presets Management
         self.kprs = KPreset(self.__paths['TEST'], self.__test_fn)
