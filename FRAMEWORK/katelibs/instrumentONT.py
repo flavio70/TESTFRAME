@@ -26,6 +26,7 @@ import string
 import getpass
 import inspect
 import telnetlib
+import datetime
 
 from katelibs.equipment import Equipment
 from katelibs.kenviron import KEnvironment
@@ -52,7 +53,7 @@ class InstrumentONT(Equipment):
         self.__prs                  = kenv.kprs        # Presets for running environment
         # Session
         self.__ontType              = None             #  Specify 5xx for Ont50,506,512  6xx for Ont 601
-        self.__sessionName          = "Session5xxLore"    #  To be changed: meaningfuls only for  5xx 
+        self.__sessionName          = "Session5xx_KATE"    #  To be changed: meaningfuls only for  5xx 
         # Connection
         self.__ontUser              = None             #  Ont session authentication user
         self.__ontPassword          = None             #  Ont session user's password
@@ -62,14 +63,13 @@ class InstrumentONT(Equipment):
         self.__pingRetryNumber      = 1                #  Retry number for -c ping option
         self.__telnetExpectedPrompt = [b'> ']          #  it must be specified as keys LIST...
         self.__telnetTimeout        = 2
-        # Session
-        self.__sessionName          = None
         # Ont command execution
         self.__ontSleepTimeForRetry = 0.5              # one retry every 0.5 second
         self.__ontCmdMaxRetry       = 120              # max 120 retries
         # Application Port Socket
         self.__portToSocketMap      = dict()           # OntXXX port telnet socket
         self.__portConnection       = dict()           # OntXXX port telnet socket ID (used to send messages to port)
+        self.__labelToPortId        = dict()           # used to get back /x/y/z port from user portId)
         self.StmToOc={"STM0":"OC1", "STM1":"OC3","STM4":"OC12","STM16":"OC48","STM64":"OC192"}
         self.OcToStm={"OC1":"STM0", "OC3":"STM1","OC12":"STM4","OC48":"STM16","OC192":"STM64"}
         self.VcToAu={"VC11":"AU4_C11", "VC12":"AU4_C12", "VC2":"NOTSUPPORTED", "VC3":"AU3_C3", "VC4":"AU4_C4", "VC4_4C":"AU4_4C", "VC4_16C":"AU4_16C", "VC4_64C":"AU4_64C"}
@@ -81,6 +81,9 @@ class InstrumentONT(Equipment):
         self.__ontUser        = self.__prs.get_elem(self.get_label(), 'USER')
         self.__ontPassword    = self.__prs.get_elem(self.get_label(), 'PWD')
         self.__ontApplication = self.__prs.get_elem(self.get_label(), 'APPL')
+        # Unique 5xx sessionName generation bound to start date&time (UTC)  Comment next row if a single static name needed
+        self.__sessionName          = "Session__" + datetime.datetime.utcnow().strftime("%d%b_%H%M%S") + "__UTC"
+
 
 
     def clean_up(self):
@@ -167,7 +170,11 @@ class InstrumentONT(Equipment):
             the ONT (5xx/6xx) instrument
             portId user's naming convention: P1, P2,...
         """
-        # portId = self.__prs.get_elem(self.get_label(), portId)
+        # portId = self.__recover_port_to_use(portId)
+
+        localPortId = self.__prs.get_elem(self.get_label(), portId)
+        self.__labelToPortId[portId]=localPortId
+
         if self.__ontType  == "6xx":   # ONT-6xx Init
             localUser = self.__ontUser  
             localPwd = self.__ontPassword 
@@ -196,12 +203,13 @@ class InstrumentONT(Equipment):
             #callResult = self.get_currently_loaded_app(portId)
             callResult = self.load_app(portId, myApplication)
             time.sleep(20)
+            callResult = self.set_current_signal_structure(portId,"PHYS_SDH")  
         else:                         # ONT-5xx Init
             # 5xx init
             myApplication="SdhBert"
             #tester = InstrumentONT(localUser,localPwd, krepo=r)
             callResult = self.connect()
-            callResult = self.create_session("SessionLore")
+            callResult = self.create_session(self.__sessionName)
             callResult = self.select_port(portId)
             callResult = self.get_selected_ports("")
 
@@ -225,6 +233,31 @@ class InstrumentONT(Equipment):
         self.__lc_msg(localMessage)
         return True, localMessage
 
+
+
+
+
+
+    def __recover_port_to_use(self, portId):
+        """ Smart port translator (5xx/6xx):
+            if portId=/rack/slot/portNo  --> return      /rack/slot/portNo  
+            if portId=Px                 --> return its  /rack/slot/portNo format """
+        #if self.__ontType  != "6xx":   # ONT-5xx, or ontType not yet initialize: do nothing
+        #    return portId
+
+        try: # port specified as P1,P2, ...
+            originalPortId = self.__labelToPortId[portId]
+        except Exception:
+            originalPortId = portId
+        localMessage = "Port fixed: [{}]-->[{}]".format(portId, originalPortId )
+        self.__lc_msg(localMessage)
+        return originalPortId  
+
+
+
+
+
+
  
 
     def deinit_instrument(self, portId):
@@ -234,7 +267,7 @@ class InstrumentONT(Equipment):
             the ONT (5xx/6xx) instrument
             portId user's naming convention: P1, P2,...
         """
-        #portId = self.__prs.get_elem(self.get_label(), portId)
+        #portId = self.__recover_port_to_use(portId)
         if self.__ontType  == "6xx":   
             # Unload Application to clean wrong situations...
             myApplication="New-Application"
@@ -246,7 +279,7 @@ class InstrumentONT(Equipment):
             callResult = self.unload_app(portId, myApplication)
             time.sleep(5)
             callResult = self.deselect_port(portId)    # uncomment to deselect the specified port
-            callResult = self.delete_session("SessionLore")
+            callResult = self.delete_session(self.__sessionName)
 
         localMessage="[{}]: deinit_instrument: instrument correctly initialized".format(self.__ontType)
         self.__lc_msg(localMessage)
@@ -452,7 +485,7 @@ class InstrumentONT(Equipment):
 
     def __authenticate_user_on_6xx_port(self, portId):  # On ONT6xx the authentication is at port level
         """ Recognizes user as valid user and try to authenticate him """
-        #portId = self.__prs.get_elem(self.get_label(), portId)
+        #portId = self.__recover_port_to_use(portId)
         self.init_ont_type()
         if self.__ontType  == "6xx":   # ONT-6xx Authentication
             # login user
@@ -733,7 +766,7 @@ class InstrumentONT(Equipment):
             False, < cause of fail (eg: port already selected... >  """
         # basic check input parameter
         methodLocalName = self.__lc_current_method_name(True)
-        portId = self.__prs.get_elem(self.get_label(), portId)
+        portId = self.__recover_port_to_use(portId)
         if portId == "":
             localMessage = "port:[{}] not specified: empty parameter".format(portId)
             self.__lc_msg(localMessage)
@@ -779,7 +812,7 @@ class InstrumentONT(Equipment):
             False, < cause of fail (eg: port already selected... >  """
         # basic check input parameter
         methodLocalName = self.__lc_current_method_name(True)
-        portId = self.__prs.get_elem(self.get_label(), portId)
+        portId = self.__recover_port_to_use(portId)
         if portId == "":
             localMessage = "port:[{}] not specified: empty parameter".format(portId)
             self.__lc_msg(localMessage)
@@ -826,7 +859,7 @@ class InstrumentONT(Equipment):
                   /rack/slotNo/portNo, /rack/slot/portNo,...
             False, <empty list> if there is no suitable port """
         methodLocalName = self.__lc_current_method_name()
-        portId = self.__prs.get_elem(self.get_label(), portId)
+        portId = self.__recover_port_to_use(portId)
         print("@@@ PORT ID := [{:s}] @@@".format(portId))
         localCommand=":PRTM:SEL? {}".format(portId)
         rawCallResult = self.__send_cmd(localCommand)
@@ -857,7 +890,7 @@ class InstrumentONT(Equipment):
                     /rack/slotNo/portNo
             False, <empty list> if there is no suitable port """
         methodLocalName = self.__lc_current_method_name()
-        portId = self.__prs.get_elem(self.get_label(), portId)
+        portId = self.__recover_port_to_use(portId)
         if portId == "":  # reboot rack
             rackSlotId=""
             localMessage="Reboot Instrument NOW (rackSlotId:[{}])".format(rackSlotId)
@@ -970,7 +1003,7 @@ class InstrumentONT(Equipment):
     #   APPLICATION CONTROL: APPLICATION HANDLING
     #
     def __send_port_cmd(self, portId, command):    ### krepo not added ###
-        ### GHELFI ##portId = self.__prs.get_elem(self.get_label(), portId)
+        ### GHELFI ##portId = self.__recover_port_to_use(portId)
         # send a command to an instrument port specified by its portId ( /rack/slotNo/portNo ) port
         if command == "":
             localMessage = "__send_port_cmd error: command string [{}] empty".format(command)
@@ -1001,7 +1034,7 @@ class InstrumentONT(Equipment):
 
     def __create_port_connection(self,portId):    ### krepo not added ###
         # create a telnet connection with the portId custom TCP port of the ONT for Application cmd issue ( /rack/slotNo/portNo ) port
-        #portId = self.__prs.get_elem(self.get_label(), portId)
+        portId = self.__recover_port_to_use(portId)
         tcpPortNumber = self.__portToSocketMap[portId]
         localMessage="Port [{}] bound to TCP Socket [{}][{}]".format(portId,self.__ontIpAddress, tcpPortNumber)
         self.__lc_msg(localMessage)
@@ -1032,7 +1065,7 @@ class InstrumentONT(Equipment):
 
     def open_port_channel(self, portId):    ### krepo not added ###
         # open a TCP channel to Port specified by portId( /rack/slotNo/portNo )
-        portId = self.__prs.get_elem(self.get_label(), portId)
+        portId = self.__recover_port_to_use(portId)
         if portId == "":
             localMessage = "open_port_channel error: portId  [{}] not valid (empty value)".format(portId)
             self.__lc_msg(localMessage)
@@ -1047,7 +1080,7 @@ class InstrumentONT(Equipment):
             True,  < application currently loaded (e.g. SdhBert)>
             False, < empty string >  """
         methodLocalName = self.__lc_current_method_name()
-        portId = self.__prs.get_elem(self.get_label(), portId)
+        portId = self.__recover_port_to_use(portId)
         localCommand=":INST:CAT?"
         rawCallResult = self.__send_port_cmd(portId, localCommand)
         #callResult = self.__remove_dust(rawCallResult[1]).replace(">","")
@@ -1068,7 +1101,7 @@ class InstrumentONT(Equipment):
             True,  < application currently loaded (e.g. SdhBert)>
             False, < empty string >  """
         methodLocalName = self.__lc_current_method_name(True)
-        portId = self.__prs.get_elem(self.get_label(), portId)
+        portId = self.__recover_port_to_use(portId)
         localCommand=":INST:CAT?"
         rawCallResult = self.__send_port_cmd(portId, localCommand)
         #callResult = self.__remove_dust(rawCallResult[1]).replace(">","")
@@ -1093,7 +1126,7 @@ class InstrumentONT(Equipment):
             True.... application loaded
             False... application load failed   """
         methodLocalName = self.__lc_current_method_name(True)
-        portId = self.__prs.get_elem(self.get_label(), portId)
+        portId = self.__recover_port_to_use(portId)
         if portId == "":
             localMessage = "load_app error: portId  [{}] not valid (empty value)".format(portId)
             self.__lc_msg(localMessage)
@@ -1159,7 +1192,7 @@ class InstrumentONT(Equipment):
             True.... application unloaded
             False... application unload failed   """
         methodLocalName = self.__lc_current_method_name(True)
-        portId = self.__prs.get_elem(self.get_label(), portId)
+        portId = self.__recover_port_to_use(portId)
         if portId == "":
             localMessage = "unload_app error: portId  [{}] not valid (empty value)".format(portId)
             self.__lc_msg(localMessage)
@@ -1227,7 +1260,7 @@ class InstrumentONT(Equipment):
             It opens edit session for new application configuration.
             The edit session is then closed by the next apply_edit_session()   command   """
         methodLocalName = self.__lc_current_method_name()
-        portId = self.__prs.get_elem(self.get_label(), portId)
+        portId = self.__recover_port_to_use(portId)
         if self.__ontType  == "6xx":
             pass
         else:
@@ -1261,7 +1294,7 @@ class InstrumentONT(Equipment):
         """ UNDER TESTING: ONT-6XX only
             It applies settings of the edit session and closes the edit session. """
         methodLocalName = self.__lc_current_method_name()
-        portId = self.__prs.get_elem(self.get_label(), portId)
+        portId = self.__recover_port_to_use(portId)
         if self.__ontType  == "6xx":
             pass
         else:
@@ -1361,7 +1394,7 @@ class InstrumentONT(Equipment):
             PHYS_SONW_PCS_MAC                    10GigE WAN-SONET L2 L3 Traffic
             """
         methodLocalName = self.__lc_current_method_name(True)
-        portId = self.__prs.get_elem(self.get_label(), portId)
+        portId = self.__recover_port_to_use(portId)
         if self.__ontType  == "6xx":
             pass
         else:
@@ -1399,7 +1432,7 @@ class InstrumentONT(Equipment):
         time.sleep(30)
         self.__lc_msg(localMessage)
         self.__t_success(methodLocalName, None, localMessage)
-        return True, callResult
+        return True, localMessage
 
 
 
@@ -1410,7 +1443,7 @@ class InstrumentONT(Equipment):
         """ ONT-5XX only
             Starts a measurement.. """
         methodLocalName = self.__lc_current_method_name(True)
-        portId = self.__prs.get_elem(self.get_label(), portId)
+        portId = self.__recover_port_to_use(portId)
         if self.__ontType  == "5xx":
             pass
         else:
@@ -1438,7 +1471,7 @@ class InstrumentONT(Equipment):
     def halt_measurement(self, portId):   # ONT-5xx  Only    ### krepo added ###       
         """ Halts a running measurement. """
         methodLocalName = self.__lc_current_method_name(True)
-        portId = self.__prs.get_elem(self.get_label(), portId)
+        portId = self.__recover_port_to_use(portId)
         if self.__ontType  == "5xx":
             pass
         else:
@@ -1465,7 +1498,7 @@ class InstrumentONT(Equipment):
     def cli_user_debug_command(self,commandString, portId):   # To give the user the possibility to check commands       
         """ To give the user the possibility to check commands """
         methodLocalName = self.__lc_current_method_name(True)
-        portId = self.__prs.get_elem(self.get_label(), portId)
+        portId = self.__recover_port_to_use(portId)
         localCommand = commandString 
         rawCallResult = self.__send_port_cmd(portId, localCommand)
         callResult = self.__remove_dust(rawCallResult[1])
@@ -1484,7 +1517,7 @@ class InstrumentONT(Equipment):
                    and may be shorter than 99 days.
                    Setting the maximal possible gating time is equivalent to 'Continuous'. """
         methodLocalName = self.__lc_current_method_name(True)
-        portId = self.__prs.get_elem(self.get_label(), portId)
+        portId = self.__recover_port_to_use(portId)
         if self.__ontType  == "5xx":
             pass
         else:
@@ -1530,7 +1563,7 @@ class InstrumentONT(Equipment):
             False: command execution failed, error string for debug purposes
         """
         methodLocalName = self.__lc_current_method_name(True)
-        portId = self.__prs.get_elem(self.get_label(), portId)
+        portId = self.__recover_port_to_use(portId)
         retList = []
         if self.__ontType  == "5xx":
             ONTCmdString=":HST:RX:OPT"
@@ -1579,6 +1612,168 @@ class InstrumentONT(Equipment):
 
 
 
+    def retrieve_sdh_alarms(self, portId):   # ONT-5xx  and ONT-6xx    ### krepo added ###       
+        """ ONT-5XX  and ONT-6xx 
+            Retrieve SDH Alarms in both instruments types, without no HO/LO distinction.
+            Use this method to ease the alarms retrieving for all JDSU/ Ont5xx/6xx instruments
+            ONT-5XX / Higher Order SDH Alarms:  
+              OOF
+              LOF
+              MS-AIS
+              MS-RDI
+              AU-AIS
+              AU-LOP
+              HP-UNEQ
+              RS-TIM
+              HP-TIM
+              HP-PLM
+            ONT-5XX / Lower Order SDH Alarms
+              TU-AIS
+              LP-RDI
+              TU-LOP
+              LP-UNEQ
+              TU-LOM
+              LP-RFI
+              LP-TIM
+              LP-PLM
+              ONT-6XX only both HO and LO alarms SDH Alarms
+              LOPL
+              LOF
+              OOF
+              RS-TIM
+              MS-AIS
+              MS-RDI
+              AU-AIS
+              AU-LOP
+              AU-NDF
+              HP-TIM
+              HP-UNEQ
+              HP-PLM
+              HP-RDI
+              HP-RDI-C
+              HP-RDI-S
+              HP-RDI-P
+              LOM
+              TU-AIS
+              TU-LOP
+              LP-TIM
+              LP-UNEQ
+              LP-PLM
+              LP-RDI
+              LP-RFI
+              LSS
+            Return tuple:
+            ( "True|False" , "<return string / error list>)
+            True : command execution ok, the return string contains the alarm list (empty if no alarm)
+            False: command execution failed, error string for debug purposes
+        """
+        methodLocalName = self.__lc_current_method_name(True)
+        portId = self.__recover_port_to_use(portId)
+        if portId == "":
+            localMessage = "[{}] ERROR retrieve_ho_alarms: portId  [{}] not specified".format(methodLocalName,portId)
+            self.__lc_msg(localMessage)
+            self.__t_failure(methodLocalName, None, "", localMessage)
+            return False, localMessage
+        retList = []
+        if self.__ontType  == "6xx":  # ONT 6xx management
+            localCommand="SDH:SEL:CST:ALAR?"
+            rawCallResult = self.__send_port_cmd(portId, localCommand)
+            sdhAnswer = self.__remove_dust(rawCallResult[1])
+            resultItemsArray=sdhAnswer.split(",")
+            if resultItemsArray[0] == "-1":  # SDH command error
+                localMessage = "ERROR: retrieve_ho_lo_alarms ({}) answers :[{}] ".format(localCommand,resultItemsArray[0])
+                self.__lc_msg(localMessage)
+                self.__t_failure(methodLocalName, None, "", localMessage)
+                return False, localMessage
+            alarmCodes = resultItemsArray[1]
+            localMessage="[6xx] Optical alarms retcode: [{}]".format(str(alarmCodes))
+            self.__lc_msg(str(localMessage))
+            alarmCodes=int(float(alarmCodes))
+            if alarmCodes & 1 :           retList += ["LOPL"]
+            if alarmCodes & 2 :           retList += ["LOF"]
+            if alarmCodes & 4 :           retList += ["OOF"]
+            if alarmCodes & 8 :           retList += ["RS-TIM"]
+            if alarmCodes & 16 :          retList += ["MS-AIS"]
+            if alarmCodes & 32 :          retList += ["MS-RDI"]
+            if alarmCodes & 64 :          retList += ["AU-AIS"]
+            if alarmCodes & 128 :         retList += ["AU-LOP"]
+            if alarmCodes & 256 :         retList += ["AU-NDF"]
+            if alarmCodes & 512 :         retList += ["HP-TIM"]
+            if alarmCodes & 1024 :        retList += ["HP-UNEQ"]
+            if alarmCodes & 2048 :        retList += ["HP-PLM"]
+            if alarmCodes & 8192 :        retList += ["HP-RDI"]
+            if alarmCodes & 16384 :       retList += ["HP-RDI-C"]
+            if alarmCodes & 32768 :       retList += ["HP-RDI-S"]
+            if alarmCodes & 65536 :       retList += ["HP-RDI-P"]
+            if alarmCodes & 131072 :      retList += ["LOM"]
+            if alarmCodes & 262144 :      retList += ["TU-AIS"]
+            if alarmCodes & 524288 :      retList += ["TU-LOP"]
+            if alarmCodes & 2097152 :     retList += ["LP-TIM"]
+            if alarmCodes & 4194304 :     retList += ["LP-UNEQ"]
+            if alarmCodes & 8388608 :     retList += ["LP-PLM"]
+            if alarmCodes & 33554432 :    retList += ["LP-RDI"]
+            if alarmCodes & 536870912 :   retList += ["LP-RFI"]
+            if alarmCodes & 1073741824 :  retList += ["LSS"]
+            localMessage="High Order and Lower Order Found Alarms: [{}]".format(retList)
+            self.__lc_msg(localMessage)
+            self.__t_success(methodLocalName, None, localMessage)
+            return True, retList
+        elif self.__ontType  == "5xx":  # ONT 5xx management :
+            localCommand=":HST:RX:SDH?"
+            rawCallResult = self.__send_port_cmd(portId, localCommand)
+            sdhAnswer = self.__remove_dust(rawCallResult[1])
+            resultItemsArray=sdhAnswer.split(",")
+            if resultItemsArray[0] == "-1":  # SDH command error
+                localMessage = "ERROR: retrieve_ho_alarms ({}) answers :[{}] ".format(localCommand,resultItemsArray[0])
+                self.__lc_msg(localMessage)
+                self.__t_failure(methodLocalName, None, "", localMessage)
+                return False, localMessage
+            alarmCodes = resultItemsArray[1]
+            alarmCodes=int(float(alarmCodes))
+            if alarmCodes & 4:            retList += ["OOF"]
+            if alarmCodes & 8:            retList += ["LOF"]
+            if alarmCodes & 16:           retList += ["MS-AIS"]
+            if alarmCodes & 32:           retList += ["MS-RDI"]
+            if alarmCodes & 128:          retList += ["AU-AIS"]
+            if alarmCodes & 256:          retList += ["HP-RDI"]
+            if alarmCodes & 4096:         retList += ["AU-LOP"]
+            if alarmCodes & 8192:         retList += ["HP-UNEQ"]
+            if alarmCodes & 16384:        retList += ["RS-TIM"]
+            if alarmCodes & 32768:        retList += ["HP-TIM"]
+            if alarmCodes & 65536:        retList += ["HP-PLM"] #if alarmCodes & 65535:
+             
+            localCommand=":HST:RX:SDH:TRIB?"
+            rawCallResult = self.__send_port_cmd(portId, localCommand)
+            sdhAnswer = self.__remove_dust(rawCallResult[1])
+            resultItemsArray=sdhAnswer.split(",")
+            if resultItemsArray[0] == "-1":  # SDH command error
+                localMessage = "ERROR: retrieve_lo_alarms ({}) answers :[{}] ".format(localCommand,resultItemsArray[0])
+                self.__lc_msg(localMessage)
+                self.__t_failure(methodLocalName, None, "", localMessage)
+                return False, localMessage
+            alarmCodes = resultItemsArray[1]
+            alarmCodes=int(float(alarmCodes))
+            if alarmCodes & 1:            retList += ["TU-AIS"]
+            if alarmCodes & 2:            retList += ["LP-RDI"]
+            if alarmCodes & 4:            retList += ["TU-LOP"]
+            if alarmCodes & 8:            retList += ["LP-UNEQ"]
+            if alarmCodes & 16:           retList += ["TU-LOM"]
+            if alarmCodes & 32:           retList += ["LP-RFI"]
+            if alarmCodes & 128:          retList += ["LP-TIM"]
+            if alarmCodes & 256:          retList += ["LP-PLM"]
+            localMessage="Found Alarms: [{}]".format(retList)
+            self.__lc_msg(localMessage)
+            self.__t_success(methodLocalName, None, localMessage)
+            return True, retList
+
+        else :  # "Instrument not supported" case management :
+            localMessage="Instrument [{}] not supported".format(retList)
+            self.__lc_msg(localMessage)
+            self.__t_failure(methodLocalName, None, "", localMessage)
+            return False, retList
+
+
+
     def retrieve_ho_alarms(self, portId):   # ONT-5xx  Only    ### krepo added ###       
         """ ONT-5XX only
             Retrieve the following Higher Order SDH Alarms
@@ -1598,7 +1793,7 @@ class InstrumentONT(Equipment):
             False: command execution failed, error string for debug purposes
         """
         methodLocalName = self.__lc_current_method_name(True)
-        portId = self.__prs.get_elem(self.get_label(), portId)
+        portId = self.__recover_port_to_use(portId)
         retList = []
         if self.__ontType  == "5xx":
             pass
@@ -1669,7 +1864,7 @@ class InstrumentONT(Equipment):
             False: command execution failed, error string for debug purposes
         """
         methodLocalName = self.__lc_current_method_name(True)
-        portId = self.__prs.get_elem(self.get_label(), portId)
+        portId = self.__recover_port_to_use(portId)
         retList = []
         if self.__ontType  == "5xx":
             pass
@@ -1751,7 +1946,7 @@ class InstrumentONT(Equipment):
             False: command execution failed, error string for debug purposes
         """
         methodLocalName = self.__lc_current_method_name(True)
-        portId = self.__prs.get_elem(self.get_label(), portId)
+        portId = self.__recover_port_to_use(portId)
         retList = []
         if self.__ontType  == "6xx":
             pass
@@ -1827,7 +2022,7 @@ class InstrumentONT(Equipment):
         localCommand="{}?".format(ONTCmdString)
         """
         methodLocalName = self.__lc_current_method_name(True)
-        portId = self.__prs.get_elem(self.get_label(), portId)
+        portId = self.__recover_port_to_use(portId)
         retList = []
         if self.__ontType  == "5xx":
             ONTCmdString=":OUTP:TEL:LINE:OPT:STAT"
@@ -1881,7 +2076,7 @@ class InstrumentONT(Equipment):
 
         """
         methodLocalName = self.__lc_current_method_name(True)
-        portId = self.__prs.get_elem(self.get_label(), portId)
+        portId = self.__recover_port_to_use(portId)
         #retList = []
         if portId == "":
             localMessage = "ERROR get_set_wavelenght: portId  [{}] not specified".format(portId)
@@ -1946,7 +2141,7 @@ class InstrumentONT(Equipment):
                 False: error in command execution, details in error list string
         """
         methodLocalName = self.__lc_current_method_name()
-        portId = self.__prs.get_elem(self.get_label(), portId)
+        portId = self.__recover_port_to_use(portId)
         if self.__ontType  == "5xx":
             ONTCmdString=":SENS:DATA:TEL:OPT:RATE"
         else:
@@ -2006,7 +2201,7 @@ class InstrumentONT(Equipment):
                 False: error in command execution, details in error list string
         """
         methodLocalName = self.__lc_current_method_name(True)
-        portId = self.__prs.get_elem(self.get_label(), portId)
+        portId = self.__recover_port_to_use(portId)
         if self.__ontType  == "5xx":
             ONTCmdString=":SENS:DATA:TEL:OPT:RATE"
         else:
@@ -2066,7 +2261,7 @@ class InstrumentONT(Equipment):
                 False: error in command execution, details in error list string
         """
         methodLocalName = self.__lc_current_method_name(True)
-        portId = self.__prs.get_elem(self.get_label(), portId)
+        portId = self.__recover_port_to_use(portId)
         if self.__ontType  == "5xx":
             ONTCmdString=":SENS:DATA:TEL:RCL:TX:CLOC:SEL"
             ontSpecificLocalClockParam="CM"     # Local mode string "CM"
@@ -2115,7 +2310,7 @@ class InstrumentONT(Equipment):
                 False: error in command execution, details in error list string
         """
         methodLocalName = self.__lc_current_method_name(True)
-        portId = self.__prs.get_elem(self.get_label(), portId)
+        portId = self.__recover_port_to_use(portId)
         if self.__ontType  == "5xx":
             pass
         else:
@@ -2176,7 +2371,7 @@ class InstrumentONT(Equipment):
                 False: error in command execution, details in error list string
         """
         methodLocalName = self.__lc_current_method_name(True)
-        portId = self.__prs.get_elem(self.get_label(), portId)
+        portId = self.__recover_port_to_use(portId)
 
         if portId == "":
             localMessage = "ERROR get_set_rx_channel_mapping_size: portId  [{}] not specified".format(portId)
@@ -2354,7 +2549,7 @@ class InstrumentONT(Equipment):
                 False: error in command execution, details in error list string
         """
         methodLocalName = self.__lc_current_method_name(True)
-        portId = self.__prs.get_elem(self.get_label(), portId)
+        portId = self.__recover_port_to_use(portId)
         if self.__ontType  == "5xx":
             ONTCmdString=":SOUR:DATA:TEL:ALAR:BURS:ACTI"
         else:
@@ -2407,7 +2602,7 @@ class InstrumentONT(Equipment):
         localCommand="{}?".format(ONTCmdString)
         """
         methodLocalName = self.__lc_current_method_name(True)
-        portId = self.__prs.get_elem(self.get_label(), portId)
+        portId = self.__recover_port_to_use(portId)
         if self.__ontType  == "5xx":
             ONTCmdString=":SOUR:DATA:TEL:ALAR:BURS:INAC"
         else:
@@ -2457,7 +2652,7 @@ class InstrumentONT(Equipment):
                 False: error in command execution, details in error list string
         """
         methodLocalName = self.__lc_current_method_name(True)
-        portId = self.__prs.get_elem(self.get_label(), portId)
+        portId = self.__recover_port_to_use(portId)
         if self.__ontType  == "5xx":
             ONTCmdString=":SOUR:DATA:TEL:ALAR:INS"
         else:
@@ -2517,7 +2712,7 @@ class InstrumentONT(Equipment):
                 False: error in command execution, details in error list string
         """
         methodLocalName = self.__lc_current_method_name(True)
-        portId = self.__prs.get_elem(self.get_label(), portId)
+        portId = self.__recover_port_to_use(portId)
         if self.__ontType  == "5xx":
             ONTCmdString=":SOUR:DATA:TEL:ALAR:MODE"
         else:
@@ -2586,7 +2781,7 @@ class InstrumentONT(Equipment):
                 False: error in command execution, details in error list string
         """
         methodLocalName = self.__lc_current_method_name(True)
-        portId = self.__prs.get_elem(self.get_label(), portId)
+        portId = self.__recover_port_to_use(portId)
         if portId == "":
             localMessage = "ERROR get_set_alarm_insertion_type: portId  [{}] not specified".format(portId)
             self.__lc_msg(localMessage)
@@ -2673,7 +2868,7 @@ class InstrumentONT(Equipment):
                 False: error in command execution, details in error list string
         """
         methodLocalName = self.__lc_current_method_name(True)
-        portId = self.__prs.get_elem(self.get_label(), portId)
+        portId = self.__recover_port_to_use(portId)
         if self.__ontType  == "5xx":
             ONTCmdString=":SOUR:DATA:TEL:ERR:BURS:ACTI"
         else:
@@ -2724,7 +2919,7 @@ class InstrumentONT(Equipment):
                 False: error in command execution, details in error list string
         """
         methodLocalName = self.__lc_current_method_name(True)
-        portId = self.__prs.get_elem(self.get_label(), portId)
+        portId = self.__recover_port_to_use(portId)
         if self.__ontType  == "5xx":
             ONTCmdString=":SOUR:DATA:TEL:ERR:BURS:INAC"
         else:
@@ -2775,7 +2970,7 @@ class InstrumentONT(Equipment):
                 False: error in command execution, details in error list string
         """
         methodLocalName = self.__lc_current_method_name(True)
-        portId = self.__prs.get_elem(self.get_label(), portId)
+        portId = self.__recover_port_to_use(portId)
         if self.__ontType  == "5xx":
             ONTCmdString=":SOUR:DATA:TEL:ERR:INS"  # ONT original command string put here
         else:
@@ -2844,7 +3039,7 @@ class InstrumentONT(Equipment):
                 False: error in command execution, details in error list string
        """
         methodLocalName = self.__lc_current_method_name(True)
-        portId = self.__prs.get_elem(self.get_label(), portId)
+        portId = self.__recover_port_to_use(portId)
         if self.__ontType  == "5xx":
             ONTCmdString=":SOUR:DATA:TEL:ERR:MODE"
         else:
@@ -2900,7 +3095,7 @@ class InstrumentONT(Equipment):
                 False: error in command execution, details in error list string
         """
         methodLocalName = self.__lc_current_method_name(True)
-        portId = self.__prs.get_elem(self.get_label(), portId)
+        portId = self.__recover_port_to_use(portId)
         if self.__ontType  == "5xx":
             ONTCmdString=":SOUR:DATA:TEL:ERR:RATE"
         else:
@@ -2961,7 +3156,7 @@ class InstrumentONT(Equipment):
                 False: error in command execution, details in error list string
         """
         methodLocalName = self.__lc_current_method_name(True)
-        portId = self.__prs.get_elem(self.get_label(), portId)
+        portId = self.__recover_port_to_use(portId)
         if portId == "":
             localMessage = "ERROR get_set_error_insertion_type: portId  [{}] not specified".format(portId)
             self.__lc_msg(localMessage)
@@ -3036,7 +3231,7 @@ class InstrumentONT(Equipment):
                 False: error in command execution, details in error list string
         """
         methodLocalName = self.__lc_current_method_name(True)
-        portId = self.__prs.get_elem(self.get_label(), portId)
+        portId = self.__recover_port_to_use(portId)
         if self.__ontType  == "5xx":
             ONTCmdString=":SOUR:DATA:TEL:OPT:RATE"
         else:
@@ -3096,7 +3291,7 @@ class InstrumentONT(Equipment):
                 False: error in command execution, details in error list string
         """
         methodLocalName = self.__lc_current_method_name(True)
-        portId = self.__prs.get_elem(self.get_label(), portId)
+        portId = self.__recover_port_to_use(portId)
         ONTCmdString=":SOUR:DATA:TEL:SDH:PATH1:CHAN"  # ONT original command string put here
         if self.__ontType  == "5xx":
             pass
@@ -3157,7 +3352,7 @@ class InstrumentONT(Equipment):
                 False: error in command execution, details in error list string
         """
         methodLocalName = self.__lc_current_method_name(True)
-        portId = self.__prs.get_elem(self.get_label(), portId)
+        portId = self.__recover_port_to_use(portId)
         if portId == "":
             localMessage = "ERROR get_set_tx_channel_mapping_size: portId  [{}] not specified".format(portId)
             self.__lc_msg(localMessage)
@@ -3227,7 +3422,7 @@ class InstrumentONT(Equipment):
                 False: error in command execution, details in error list string
         """
         methodLocalName = self.__lc_current_method_name(True)
-        portId = self.__prs.get_elem(self.get_label(), portId)
+        portId = self.__recover_port_to_use(portId)
         if self.__ontType  == "5xx":
             ONTCmdString=":SOUR:DATA:TEL:SDH:TRIB:PATH1:CHAN"
         else:
@@ -3289,7 +3484,7 @@ class InstrumentONT(Equipment):
                 False: error in command execution, details in error list string
         """
         methodLocalName = self.__lc_current_method_name(True)
-        portId = self.__prs.get_elem(self.get_label(), portId)
+        portId = self.__recover_port_to_use(portId)
         if self.__ontType  == "5xx":
             ONTCmdString=":SENS:DATA:TEL:SDH:TRIB:PATH1:CHAN"
         else:
@@ -3346,7 +3541,7 @@ class InstrumentONT(Equipment):
                 False: error in command execution, details in error list string
         """
         methodLocalName = self.__lc_current_method_name(True)
-        portId = self.__prs.get_elem(self.get_label(), portId)
+        portId = self.__recover_port_to_use(portId)
         if self.__ontType  == "6xx":
             ONTCmdString=":SOUR:DATA:TEL:SDH:BCH:MODE"
         else:
@@ -3402,7 +3597,7 @@ class InstrumentONT(Equipment):
                 False: error in command execution, details in error list string
         """
         methodLocalName = self.__lc_current_method_name(True)
-        portId = self.__prs.get_elem(self.get_label(), portId)
+        portId = self.__recover_port_to_use(portId)
         if self.__ontType  == "6xx":
             ONTCmdString=":SOUR:DATA:TEL:SDH:BCH:PATH:J1TR:MODE"
         else:
@@ -3460,7 +3655,7 @@ class InstrumentONT(Equipment):
                 False: error in command execution, details in error list string
         """
         methodLocalName = self.__lc_current_method_name(True)
-        portId = self.__prs.get_elem(self.get_label(), portId)
+        portId = self.__recover_port_to_use(portId)
         if self.__ontType  == "6xx":
             ONTCmdString=":SENS:DATA:TEL:SDH:PATH:SEL:J1TR:MODE"
         else:
@@ -3521,7 +3716,7 @@ class InstrumentONT(Equipment):
                 False: error in command execution, details in error list string
         """
         methodLocalName = self.__lc_current_method_name(True)
-        portId = self.__prs.get_elem(self.get_label(), portId)
+        portId = self.__recover_port_to_use(portId)
         if self.__ontType  == "6xx":
             ONTCmdString=":SOUR:DATA:TEL:SDH:PATH:SEL:J1TR:MODE"
         else:
@@ -3578,7 +3773,7 @@ class InstrumentONT(Equipment):
                 False: error in command execution, details in error list string
         """
         methodLocalName = self.__lc_current_method_name(True)
-        portId = self.__prs.get_elem(self.get_label(), portId)
+        portId = self.__recover_port_to_use(portId)
         if portId == "":
             localMessage = "ERROR get_set_au_path_trace_rx_TR16_string: portId  [{}] not specified".format(portId)
             self.__lc_msg(localMessage)
@@ -3627,7 +3822,7 @@ class InstrumentONT(Equipment):
                 False: error in command execution, details in error list string
         """
         methodLocalName = self.__lc_current_method_name(True)
-        portId = self.__prs.get_elem(self.get_label(), portId)
+        portId = self.__recover_port_to_use(portId)
         if portId == "":
             localMessage = "ERROR get_set_au_path_trace_tx_TR16_string: portId  [{}] not specified".format(portId)
             self.__lc_msg(localMessage)
@@ -3801,7 +3996,6 @@ if __name__ == "__main__xxx":   #now skip this part
     #localUser="preint" ghelfi
     #localPwd="preint"  ghelfi
 
-    currDir,fileName = os.path.split(os.path.realpath(__file__))
     xmlReport = currDir + '/test-reports/TestSuite.'+ fileName
     r = Kunit(xmlReport)
     r.frame_open(xmlReport)
@@ -3818,7 +4012,7 @@ if __name__ == "__main__xxx":   #now skip this part
     callResult = tester.connect()
     print("tester.connect result: [{}]".format(callResult))
 
-    callResult = tester.create_session("SessionLore")
+    callResult = tester.create_session(self.__sessionName)
     print("tester.create_session result: [{}]".format(callResult))
 
     #    callResult = tester.wait_ops_completed()
@@ -3973,7 +4167,7 @@ if __name__ == "__main__xxx":   #now skip this part
     callResult = tester.deselect_port(portId3)   # uncomment to deselect the specified port
     print("tester.deselect_port result: [{}]".format(callResult))
 
-    callResult = tester.delete_session("SessionLore")
+    callResult = tester.delete_session(self.__sessionName)
     print("tester.delete_session result: [{}]".format(callResult))
 
     print(" ")
