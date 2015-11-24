@@ -1610,6 +1610,168 @@ class InstrumentONT(Equipment):
 
 
 
+    def retrieve_sdh_alarms(self, portId):   # ONT-5xx  and ONT-6xx    ### krepo added ###       
+        """ ONT-5XX  and ONT-6xx 
+            Retrieve SDH Alarms in both instruments types, without no HO/LO distinction.
+            Use this method to ease the alarms retrieving for all JDSU/ Ont5xx/6xx instruments
+            ONT-5XX / Higher Order SDH Alarms:  
+              OOF
+              LOF
+              MS-AIS
+              MS-RDI
+              AU-AIS
+              AU-LOP
+              HP-UNEQ
+              RS-TIM
+              HP-TIM
+              HP-PLM
+            ONT-5XX / Lower Order SDH Alarms
+              TU-AIS
+              LP-RDI
+              TU-LOP
+              LP-UNEQ
+              TU-LOM
+              LP-RFI
+              LP-TIM
+              LP-PLM
+              ONT-6XX only both HO and LO alarms SDH Alarms
+              LOPL
+              LOF
+              OOF
+              RS-TIM
+              MS-AIS
+              MS-RDI
+              AU-AIS
+              AU-LOP
+              AU-NDF
+              HP-TIM
+              HP-UNEQ
+              HP-PLM
+              HP-RDI
+              HP-RDI-C
+              HP-RDI-S
+              HP-RDI-P
+              LOM
+              TU-AIS
+              TU-LOP
+              LP-TIM
+              LP-UNEQ
+              LP-PLM
+              LP-RDI
+              LP-RFI
+              LSS
+            Return tuple:
+            ( "True|False" , "<return string / error list>)
+            True : command execution ok, the return string contains the alarm list (empty if no alarm)
+            False: command execution failed, error string for debug purposes
+        """
+        methodLocalName = self.__lc_current_method_name(True)
+        portId = self.__recover_port_to_use(portId)
+        if portId == "":
+            localMessage = "[{}] ERROR retrieve_ho_alarms: portId  [{}] not specified".format(methodLocalName,portId)
+            self.__lc_msg(localMessage)
+            self.__t_failure(methodLocalName, None, "", localMessage)
+            return False, localMessage
+        retList = []
+        if self.__ontType  == "6xx":  # ONT 6xx management
+            localCommand="SDH:SEL:CST:ALAR?"
+            rawCallResult = self.__send_port_cmd(portId, localCommand)
+            sdhAnswer = self.__remove_dust(rawCallResult[1])
+            resultItemsArray=sdhAnswer.split(",")
+            if resultItemsArray[0] == "-1":  # SDH command error
+                localMessage = "ERROR: retrieve_ho_lo_alarms ({}) answers :[{}] ".format(localCommand,resultItemsArray[0])
+                self.__lc_msg(localMessage)
+                self.__t_failure(methodLocalName, None, "", localMessage)
+                return False, localMessage
+            alarmCodes = resultItemsArray[1]
+            localMessage="[6xx] Optical alarms retcode: [{}]".format(str(alarmCodes))
+            self.__lc_msg(str(localMessage))
+            alarmCodes=int(float(alarmCodes))
+            if alarmCodes & 1 :           retList += ["LOPL"]
+            if alarmCodes & 2 :           retList += ["LOF"]
+            if alarmCodes & 4 :           retList += ["OOF"]
+            if alarmCodes & 8 :           retList += ["RS-TIM"]
+            if alarmCodes & 16 :          retList += ["MS-AIS"]
+            if alarmCodes & 32 :          retList += ["MS-RDI"]
+            if alarmCodes & 64 :          retList += ["AU-AIS"]
+            if alarmCodes & 128 :         retList += ["AU-LOP"]
+            if alarmCodes & 256 :         retList += ["AU-NDF"]
+            if alarmCodes & 512 :         retList += ["HP-TIM"]
+            if alarmCodes & 1024 :        retList += ["HP-UNEQ"]
+            if alarmCodes & 2048 :        retList += ["HP-PLM"]
+            if alarmCodes & 8192 :        retList += ["HP-RDI"]
+            if alarmCodes & 16384 :       retList += ["HP-RDI-C"]
+            if alarmCodes & 32768 :       retList += ["HP-RDI-S"]
+            if alarmCodes & 65536 :       retList += ["HP-RDI-P"]
+            if alarmCodes & 131072 :      retList += ["LOM"]
+            if alarmCodes & 262144 :      retList += ["TU-AIS"]
+            if alarmCodes & 524288 :      retList += ["TU-LOP"]
+            if alarmCodes & 2097152 :     retList += ["LP-TIM"]
+            if alarmCodes & 4194304 :     retList += ["LP-UNEQ"]
+            if alarmCodes & 8388608 :     retList += ["LP-PLM"]
+            if alarmCodes & 33554432 :    retList += ["LP-RDI"]
+            if alarmCodes & 536870912 :   retList += ["LP-RFI"]
+            if alarmCodes & 1073741824 :  retList += ["LSS"]
+            localMessage="High Order and Lower Order Found Alarms: [{}]".format(retList)
+            self.__lc_msg(localMessage)
+            self.__t_success(methodLocalName, None, localMessage)
+            return True, retList
+        elif self.__ontType  == "5xx":  # ONT 5xx management :
+            localCommand=":HST:RX:SDH?"
+            rawCallResult = self.__send_port_cmd(portId, localCommand)
+            sdhAnswer = self.__remove_dust(rawCallResult[1])
+            resultItemsArray=sdhAnswer.split(",")
+            if resultItemsArray[0] == "-1":  # SDH command error
+                localMessage = "ERROR: retrieve_ho_alarms ({}) answers :[{}] ".format(localCommand,resultItemsArray[0])
+                self.__lc_msg(localMessage)
+                self.__t_failure(methodLocalName, None, "", localMessage)
+                return False, localMessage
+            alarmCodes = resultItemsArray[1]
+            alarmCodes=int(float(alarmCodes))
+            if alarmCodes & 4:            retList += ["OOF"]
+            if alarmCodes & 8:            retList += ["LOF"]
+            if alarmCodes & 16:           retList += ["MS-AIS"]
+            if alarmCodes & 32:           retList += ["MS-RDI"]
+            if alarmCodes & 128:          retList += ["AU-AIS"]
+            if alarmCodes & 256:          retList += ["HP-RDI"]
+            if alarmCodes & 4096:         retList += ["AU-LOP"]
+            if alarmCodes & 8192:         retList += ["HP-UNEQ"]
+            if alarmCodes & 16384:        retList += ["RS-TIM"]
+            if alarmCodes & 32768:        retList += ["HP-TIM"]
+            if alarmCodes & 65536:        retList += ["HP-PLM"] #if alarmCodes & 65535:
+             
+            localCommand=":HST:RX:SDH:TRIB?"
+            rawCallResult = self.__send_port_cmd(portId, localCommand)
+            sdhAnswer = self.__remove_dust(rawCallResult[1])
+            resultItemsArray=sdhAnswer.split(",")
+            if resultItemsArray[0] == "-1":  # SDH command error
+                localMessage = "ERROR: retrieve_lo_alarms ({}) answers :[{}] ".format(localCommand,resultItemsArray[0])
+                self.__lc_msg(localMessage)
+                self.__t_failure(methodLocalName, None, "", localMessage)
+                return False, localMessage
+            alarmCodes = resultItemsArray[1]
+            alarmCodes=int(float(alarmCodes))
+            if alarmCodes & 1:            retList += ["TU-AIS"]
+            if alarmCodes & 2:            retList += ["LP-RDI"]
+            if alarmCodes & 4:            retList += ["TU-LOP"]
+            if alarmCodes & 8:            retList += ["LP-UNEQ"]
+            if alarmCodes & 16:           retList += ["TU-LOM"]
+            if alarmCodes & 32:           retList += ["LP-RFI"]
+            if alarmCodes & 128:          retList += ["LP-TIM"]
+            if alarmCodes & 256:          retList += ["LP-PLM"]
+            localMessage="Found Alarms: [{}]".format(retList)
+            self.__lc_msg(localMessage)
+            self.__t_success(methodLocalName, None, localMessage)
+            return True, retList
+
+        else :  # "Instrument not supported" case management :
+            localMessage="Instrument [{}] not supported".format(retList)
+            self.__lc_msg(localMessage)
+            self.__t_failure(methodLocalName, None, "", localMessage)
+            return False, retList
+
+
+
     def retrieve_ho_alarms(self, portId):   # ONT-5xx  Only    ### krepo added ###       
         """ ONT-5XX only
             Retrieve the following Higher Order SDH Alarms
