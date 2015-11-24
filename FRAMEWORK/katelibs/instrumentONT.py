@@ -26,6 +26,7 @@ import string
 import getpass
 import inspect
 import telnetlib
+import datetime
 
 from katelibs.equipment import Equipment
 from katelibs.kenviron import KEnvironment
@@ -52,7 +53,7 @@ class InstrumentONT(Equipment):
         self.__prs                  = kenv.kprs        # Presets for running environment
         # Session
         self.__ontType              = None             #  Specify 5xx for Ont50,506,512  6xx for Ont 601
-        self.__sessionName          = "Session5xxLore"    #  To be changed: meaningfuls only for  5xx 
+        self.__sessionName          = "Session5xx_KATE"    #  To be changed: meaningfuls only for  5xx 
         # Connection
         self.__ontUser              = None             #  Ont session authentication user
         self.__ontPassword          = None             #  Ont session user's password
@@ -62,8 +63,6 @@ class InstrumentONT(Equipment):
         self.__pingRetryNumber      = 1                #  Retry number for -c ping option
         self.__telnetExpectedPrompt = [b'> ']          #  it must be specified as keys LIST...
         self.__telnetTimeout        = 2
-        # Session
-        self.__sessionName          = None
         # Ont command execution
         self.__ontSleepTimeForRetry = 0.5              # one retry every 0.5 second
         self.__ontCmdMaxRetry       = 120              # max 120 retries
@@ -82,6 +81,9 @@ class InstrumentONT(Equipment):
         self.__ontUser        = self.__prs.get_elem(self.get_label(), 'USER')
         self.__ontPassword    = self.__prs.get_elem(self.get_label(), 'PWD')
         self.__ontApplication = self.__prs.get_elem(self.get_label(), 'APPL')
+        # Unique 5xx sessionName generation bound to start date&time (UTC)  Comment next row if a single static name needed
+        self.__sessionName          = "Session__" + datetime.datetime.utcnow().strftime("%d%b_%H%M%S") + "__UTC"
+
 
 
     def clean_up(self):
@@ -207,7 +209,7 @@ class InstrumentONT(Equipment):
             myApplication="SdhBert"
             #tester = InstrumentONT(localUser,localPwd, krepo=r)
             callResult = self.connect()
-            callResult = self.create_session("SessionLore")
+            callResult = self.create_session(self.__sessionName)
             callResult = self.select_port(portId)
             callResult = self.get_selected_ports("")
 
@@ -237,11 +239,11 @@ class InstrumentONT(Equipment):
 
 
     def __recover_port_to_use(self, portId):
-        """ Smart port translator (6xx only):
+        """ Smart port translator (5xx/6xx):
             if portId=/rack/slot/portNo  --> return      /rack/slot/portNo  
             if portId=Px                 --> return its  /rack/slot/portNo format """
-        if self.__ontType  != "6xx":   # ONT-5xx, or ontType not yet initialize: do nothing
-            return portId
+        #if self.__ontType  != "6xx":   # ONT-5xx, or ontType not yet initialize: do nothing
+        #    return portId
 
         try: # port specified as P1,P2, ...
             originalPortId = self.__labelToPortId[portId]
@@ -277,7 +279,7 @@ class InstrumentONT(Equipment):
             callResult = self.unload_app(portId, myApplication)
             time.sleep(5)
             callResult = self.deselect_port(portId)    # uncomment to deselect the specified port
-            callResult = self.delete_session("SessionLore")
+            callResult = self.delete_session(self.__sessionName)
 
         localMessage="[{}]: deinit_instrument: instrument correctly initialized".format(self.__ontType)
         self.__lc_msg(localMessage)
@@ -1032,7 +1034,7 @@ class InstrumentONT(Equipment):
 
     def __create_port_connection(self,portId):    ### krepo not added ###
         # create a telnet connection with the portId custom TCP port of the ONT for Application cmd issue ( /rack/slotNo/portNo ) port
-        #portId = self.__recover_port_to_use(portId)
+        portId = self.__recover_port_to_use(portId)
         tcpPortNumber = self.__portToSocketMap[portId]
         localMessage="Port [{}] bound to TCP Socket [{}][{}]".format(portId,self.__ontIpAddress, tcpPortNumber)
         self.__lc_msg(localMessage)
@@ -3994,7 +3996,6 @@ if __name__ == "__main__xxx":   #now skip this part
     #localUser="preint" ghelfi
     #localPwd="preint"  ghelfi
 
-    currDir,fileName = os.path.split(os.path.realpath(__file__))
     xmlReport = currDir + '/test-reports/TestSuite.'+ fileName
     r = Kunit(xmlReport)
     r.frame_open(xmlReport)
@@ -4011,7 +4012,7 @@ if __name__ == "__main__xxx":   #now skip this part
     callResult = tester.connect()
     print("tester.connect result: [{}]".format(callResult))
 
-    callResult = tester.create_session("SessionLore")
+    callResult = tester.create_session(self.__sessionName)
     print("tester.create_session result: [{}]".format(callResult))
 
     #    callResult = tester.wait_ops_completed()
@@ -4166,7 +4167,7 @@ if __name__ == "__main__xxx":   #now skip this part
     callResult = tester.deselect_port(portId3)   # uncomment to deselect the specified port
     print("tester.deselect_port result: [{}]".format(callResult))
 
-    callResult = tester.delete_session("SessionLore")
+    callResult = tester.delete_session(self.__sessionName)
     print("tester.delete_session result: [{}]".format(callResult))
 
     print(" ")
