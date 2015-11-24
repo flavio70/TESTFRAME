@@ -29,7 +29,7 @@ class TestCase(object):
         '''
         function used t skip test section
         '''
-        print(run_section + ' Skipped\n')
+        self.trc_inf(run_section + ' Skipped\n')
         self.kenvironment.krepo.add_skipped(None, run_section, '0', run_section + " Skipped by User", run_section + " Skipped by User")
 
 
@@ -37,17 +37,17 @@ class TestCase(object):
         '''
         Main class constructor
         '''
-        print('\nInitializing ', self.kenvironment.get_test_file_name(), ' environment ...')
-        print('DONE \n')
+        self.trc_inf('\nInitializing {:s} environment ...'.format(self.kenvironment.get_test_file_name()))
+        self.trc_inf('DONE \n')
 
 
     def close(self):
         '''
         function used to finalize test execution
         '''
-        print('\nFinalizing  ...')
+        self.trc_inf('\nFinalizing  ...')
         self.kenvironment.clean_up()
-        print('DONE \n')
+        self.trc_inf('DONE \n')
 
 
     def dut_setup(self):
@@ -55,7 +55,7 @@ class TestCase(object):
         Empty dut setup common function
         should be overwritten by user implementation
         '''
-        print('Running empty DUT SetUp...')
+        self.trc_inf('Running empty DUT SetUp...')
 
 
     def test_setup(self):
@@ -63,7 +63,7 @@ class TestCase(object):
         Empty test setup common function
         should be overwritten by user implementation
         '''
-        print('Running empty test Setup...')
+        self.trc_inf('Running empty test Setup...')
 
 
     def test_body(self):
@@ -71,7 +71,7 @@ class TestCase(object):
         Empty test body common function
         should be overwritten by user implementation
         '''
-        print('Running empty Main Test...')
+        self.trc_inf('Running empty Main Test...')
 
 
     def test_cleanup(self):
@@ -79,7 +79,7 @@ class TestCase(object):
         Empty test cleanup common function
         should be overwritten by user implementation
         '''
-        print('Running empty Test cleanUp...')
+        self.trc_inf('Running empty Test cleanUp...')
 
 
     def dut_cleanup(self):
@@ -87,7 +87,7 @@ class TestCase(object):
         Empty dut cleanup common function
         should be overwritten by user implementation
         '''
-        print('Running empty DUT cleanUp...')
+        self.trc_inf('Running empty DUT cleanUp...')
 
 
     def run(self):
@@ -111,16 +111,48 @@ class TestCase(object):
         '''
         test sections run
         '''
-        print('\n----Main Test flow execution----\n')
+        self.trc_inf('\n----Main Test flow execution----\n')
         if (args.DUTSet == False) and (args.testSet == False) and (args.testBody == False) and (args.testClean == False) and (args.DUTClean == False):
             args.DUTSet = True
             args.testSet = True
             args.testBody = True
             args.testClean = True
             args.DUTClean = True
-        print(args)
+
+        self.trc_inf(str(args))
+
         self.dut_setup() if args.DUTSet else self.skip_section('DUT Setup')
         self.test_setup() if args.testSet else self.skip_section('test Setup')
         self.test_body() if args.testBody else self.skip_section('test Body')
         self.test_cleanup() if args.testClean else self.skip_section('test Clean Up')
         self.dut_cleanup() if args.DUTClean else self.skip_section('DUT Cleanup')
+
+
+    def start_tps_block(self, tps_area, tps_name):
+        '''
+        Start an official block containg all code related to aspecific TPS (Test Procedure)
+        calling this function into testcase object will generate a specific XML report file for each TPSName provided
+        '''
+        self.kenvironment.krepo.start_tps_block(tps_area, tps_name)
+
+
+    def stop_tps_block(self, tps_area, tps_name):
+        """ 
+        Stop the block containing the code related to the specific TPS (test Procedure)
+        This function will terminate the specific XML report file related to TPSName test id
+        """ 
+        self.kenvironment.krepo.stop_tps_block(tps_area, tps_name)
+
+
+    def trc_inf(self, msg):
+        """ Perform an information message trace. The supplied message will be logged with a time stamp
+            and module, row and function/method
+        """
+        self.kenvironment.ktrc.k_tracer_info(msg)
+
+
+    def trc_err(self, msg):
+        """ Perform an error message trace. The supplied message will be logged with a time stamp
+            and module, row and function/method
+        """
+        self.kenvironment.ktrc.k_tracer_error(msg)

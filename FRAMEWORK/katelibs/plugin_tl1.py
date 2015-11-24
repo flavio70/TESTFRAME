@@ -14,8 +14,6 @@ import re
 import threading
 import time
 import os
-import sys
-import json
 
 from katelibs.tl1_facility import TL1message
 
@@ -36,6 +34,7 @@ class Plugin1850TL1():
         krepo     : reference to KUnit reporting instance
         eRef      : reference to equipment (for label)
         collector : file name for event collector
+        ktrc      : reference to Kate Tracer
         """
 
         self.__the_ip      = IP
@@ -45,7 +44,8 @@ class Plugin1850TL1():
         self.__ktrc        = ktrc   # Tracer object
         self.__if_cmd      = None   # main TL1 interface (used for sending usr command)
         self.__if_eve      = None   # secondary TL1 interface (used for capturing events)
-        self.__last_output = ""     # store the output of latest TL1 command
+        self.__last_cmd    = ""     # store the latest tl1 command sent
+        self.__last_output = ""     # store the output of latest TL1 command sent
         self.__time_mark   = None   # Time mark to aborting a TL1 interaction
 
         # File for Event collector
@@ -64,16 +64,10 @@ class Plugin1850TL1():
         self.__enable_collect = False # Status of Event Collector
 
         # TL1 Event Collector Thread Initialization and Starting
-        self.__thread = threading.Thread(   target=self.__thr_manager,
-                                            name="TL1_Event_Collector"  )
+        self.__thread = threading.Thread(target=self.__thr_manager,
+                                         name="TL1_Event_Collector")
         self.__thread.daemon = False
         self.__thread.start()
-
-
-    def __del__(self):
-        """ INTERNAL USAGE
-        """
-        # self.__disconnect()
 
 
     def get_last_outcome(self):
@@ -94,6 +88,7 @@ class Plugin1850TL1():
                       for involved AID goes to specified value. The timeout parameters will be
                       evaluated in order to close procedure
         """
+        self.__last_cmd = cmd
         self.__time_mark = time.time() + timeout
 
         if self.__krepo:
@@ -119,11 +114,11 @@ class Plugin1850TL1():
                 time.sleep(1)
             else:
                 error_msg = "TIMEOUT ({:d}s) DETECTED ON SENDING '{:s}'".format(timeout, cmd)
-                self.__trc(error_msg)
+                self.__trc_error(error_msg)
                 result = False
                 break
 
-        self.__trc("DEBUG: result := {:s} - errmsg := [{:s}]\n".format(str(result), error_msg))
+        self.__trc_inf("DEBUG: result := {:s} - errmsg := [{:s}]\n".format(str(result), error_msg))
 
         if result:
             self.__t_success(cmd, None, self.get_last_outcome())
@@ -152,9 +147,10 @@ class Plugin1850TL1():
 
         if policy == "COND":
             if condPST is None  and  condSST is None:
-                self.__trc("ATTENZIONE: ALMENO UNO TRA condPST e condSST deve essere valorizzato")
+                self.__trc_error("ATTENZIONE: ALMENO UNO TRA condPST e condSST deve essere valorizzato")
                 return False
 
+        self.__last_cmd = cmd
         self.__time_mark = time.time() + timeout
 
         if self.__krepo:
@@ -176,7 +172,7 @@ class Plugin1850TL1():
                 error_msg = "No AID found on TL1 response"
                 result = False
 
-        self.__trc("DEBUG: result := {:s} - errmsg := [{:s}]\n".format(str(result), error_msg))
+        self.__trc_inf("DEBUG: result := {:s} - errmsg := [{:s}]\n".format(str(result), error_msg))
 
         if result:
             self.__t_success(cmd, None, self.get_last_outcome())
@@ -189,83 +185,91 @@ class Plugin1850TL1():
     def __do(self, channel, cmd, policy):
         """ INTERNAL USAGE
         """
-        if channel == "CMD":
-            self.__trc("sending [{:s}]".format(cmd))
-        else:
-            self.__trc("sending [{:s}] (EVENT INTERFACE)".format(cmd))
+        self.__last_cmd = cmd   # added for internal running invocation
 
-        verb_lower = cmd.replace(";", "").split(":")[0].lower().replace("\r", "").replace("\n", "")
+        if channel == "CMD":
+            self.__trc_inf("sending [{:s}]".format(cmd))
+        else:
+            self.__trc_inf("sending [{:s}] (EVENT INTERFACE)".format(cmd))
+
+        tl1_verb = cmd.replace(";", "").split(":")[0].lower().replace("\r", "").replace("\n", "")
 
         # Trash all trailing characters from stream
         if self.__read_all(channel) == False:
-            self.__trc("error [1] sending TL1 command [{:s}]".format(cmd))
+            self.__trc_error("error [1] sending TL1 command [{:s}]".format(cmd))
             self.__last_output = "TIMEOUT DETECTED ON TL1 INTERFACE"
             return False
 
         # Sending command to interface
         if self.__write(channel, cmd) == False:
-            self.__trc("error [2] sending TL1 command [{:s}]".format(cmd))
+            self.__trc_error("error [2] sending TL1 command [{:s}]".format(cmd))
             self.__last_output = "TIMEOUT DETECTED ON TL1 INTERFACE"
             return False
 
 
         if cmd.lower() == "canc-user;":
-            msg_str = " COMPLD "
+            tl1_response = " COMPLD "
         else:
-            msg_str  = ""
+            tl1_response  = ""
+
             keepalive_count_max = 100
             keepalive_count = 0
 
             while True:
-                res_list  = self.__expect(channel, [b"\n\>", b"\n\;"])
-                if res_list == ([], [], []):
-                    self.__trc("error [3] sending TL1 command [{:s}]".format(cmd))
+                result_list = self.__expect(channel, [b"\n\>", b"\n\;"])
+
+                if result_list == ([],[],[]):
+                    self.__trc_error("error [3] sending TL1 command [{:s}]".format(cmd))
                     self.__last_output = "TIMEOUT DETECTED ON TL1 INTERFACE"
                     return False
 
-                match_idx = res_list[0]
-                msg_tmp   = str(res_list[2], 'utf-8')
+                msg_tmp = str(result_list[2], 'utf-8')
 
                 if msg_tmp.find("\r\n\n") == -1:
                     continue
 
-                resp_part_list = msg_tmp.split("\r\n\n")
-                msg_tmp        = "\r\n\n".join(resp_part_list[1:])
+                response_partial_list = msg_tmp.split("\r\n\n")
+                msg_tmp = "\r\n\n".join(response_partial_list[1:])
 
-                if match_idx ==  1:
-                    if     msg_tmp.find(" REPT ") != -1:
+                if result_list[0] ==  1:
+                    if msg_tmp.find(" REPT ") != -1:
                         continue
 
-                    elif   msg_tmp.find("KEEP ALIVE MESSAGE") != -1 :
+                    elif msg_tmp.find("KEEP ALIVE MESSAGE") != -1:
                         keepalive_count = keepalive_count + 1
                         if keepalive_count == keepalive_count_max:
-                            return 1
+                            self.__trc_error("error [4] sending TL1 command [{:s}]".format(cmd))
+                            self.__last_output = "MAXIMUM KEEPALINE ON TL1 RESPONSE REACHED"
+                            return False
                         continue
 
                     else:
-                        msg_str = msg_str + re.sub('(\r\n)+', "\r\n", msg_tmp, 0)
-                        if verb_lower != "ed-pid"  and  verb_lower != "act-user":
-                            if msg_str.count(";") > 1:
-                                return 1
-                        if msg_str.strip() == ";":
+                        tl1_response = tl1_response + re.sub('(\r\n)+', "\r\n", msg_tmp, 0)
+                        if tl1_verb != "ed-pid"  and  tl1_verb != "act-user":
+                            if tl1_response.count(";") > 1:
+                                self.__trc_error("error [5] sending TL1 command [{:s}]".format(cmd))
+                                self.__last_output = "INVALID TL1 TERMINATION"
+                                return False
+                        if tl1_response.strip() == ";":
                             continue
                         break
 
-                elif match_idx ==  0:
-                    msg_str = msg_str + msg_tmp + "\n"
+                elif result_list[0] ==  0:
+                    tl1_response = tl1_response + msg_tmp + "\n"
                     continue
 
-            msg_str = re.sub('(\r\n)+', "\r\n", msg_str, 0)
+            tl1_response = re.sub('(\r\n)+', "\r\n", tl1_response, 0)
 
-        if  (msg_str.find(" COMPLD") != -1  or
-             msg_str.find(" DELAY")  != -1  ):
+
+        if  (tl1_response.find(" COMPLD") != -1  or
+             tl1_response.find(" DELAY")  != -1  ):
             # Positive TL1 response
             result = (policy == "COMPLD")
         else:
             # Negative TL1 response
             result = (policy == "DENY")
 
-        self.__last_output = msg_str
+        self.__last_output = tl1_response
 
         return result
 
@@ -317,8 +321,8 @@ class Plugin1850TL1():
 
         for _ in (1,2):
             try:
-                res_list = tl1_interface.expect(key_list)
-                return res_list
+                result_list = tl1_interface.expect(key_list)
+                return result_list
             except Exception:
                 tl1_interface = self.__connect(channel)     # renewing interface
 
@@ -331,40 +335,40 @@ class Plugin1850TL1():
         is_connected = False
 
         if channel == "CMD":
-            self.__trc("(re)CONNECTING TL1...")
+            self.__trc_inf("(re)CONNECTING TL1...")
 
             while int(time.time()) <= self.__time_mark:
                 try:
                     self.__if_cmd = telnetlib.Telnet(self.__the_ip, self.__the_port, 5)
-                    self.__trc("... TL1 INTERFACE for commands ready.")
+                    self.__trc_inf("... TL1 INTERFACE for commands ready.")
                     is_connected = True
                     break
                 except Exception as eee:
-                    self.__trc("TL1: error connecting CMD channel - {:s}".format(str(eee)))
-                    self.__trc("... retrying in 1s ...")
+                    self.__trc_inf("TL1: error connecting CMD channel - {:s}".format(str(eee)))
+                    self.__trc_inf("... retrying in 1s ...")
                     time.sleep(1)
 
             if not is_connected:
-                self.__trc("TL1: Timeout on connection")
+                self.__trc_error("TL1: Timeout on connection")
 
             return self.__if_cmd
 
         else:
-            self.__trc("(re)CONNECTING TL1 (Event channel)...")
+            self.__trc_inf("(re)CONNECTING TL1 (Event channel)...")
 
             while int(time.time()) <= self.__time_mark:
                 try:
                     self.__if_eve = telnetlib.Telnet(self.__the_ip, self.__the_port, 5)
-                    self.__trc("... TL1 INTERFACE for events ready.")
+                    self.__trc_inf("... TL1 INTERFACE for events ready.")
                     is_connected = True
                     break
                 except Exception as eee:
-                    self.__trc("TL1: error connecting EVE channel - {:s}".format(str(eee)))
-                    self.__trc("... retrying in 1s ...")
+                    self.__trc_inf("TL1: error connecting EVE channel - {:s}".format(str(eee)))
+                    self.__trc_inf("... retrying in 1s ...")
                     time.sleep(1)
 
             if not is_connected:
-                self.__trc("TL1: Timeout on connection")
+                self.__trc_error("TL1: Timeout on connection")
 
             return self.__if_eve
 
@@ -376,7 +380,7 @@ class Plugin1850TL1():
             self.__do("EVE", "CANC-USER;", "COMPLD")
         except Exception as eee:
             msg = "Error in disconnection - {:s}".format(str(eee))
-            self.__trc(msg)
+            self.__trc_error(msg)
 
         self.__if_eve = None
 
@@ -384,7 +388,7 @@ class Plugin1850TL1():
             self.__do("CMD", "CANC-USER;", "COMPLD")
         except Exception as eee:
             msg = "Error in disconnection - {:s}".format(str(eee))
-            self.__trc(msg)
+            self.__trc_error(msg)
 
         self.__if_cmd = None
 
@@ -450,14 +454,13 @@ class Plugin1850TL1():
             if not do_repeat:
                 break
 
-            msg_str  = ""
+            tl1_response  = ""
 
             while True:
-                res_list  = self.__if_eve.expect([b"\n\>", b"\n\;"], timeout=10)
-                match_idx = res_list[0]
-                msg_tmp   = str(res_list[2], 'utf-8')
+                result_list = self.__if_eve.expect([b"\n\>", b"\n\;"], timeout=10)
+                msg_tmp = str(result_list[2], 'utf-8')
 
-                if match_idx == -1:
+                if result_list[0] == -1:
                     # Timeout Detected
                     timeout_detected = True
                     break
@@ -467,26 +470,26 @@ class Plugin1850TL1():
                 if msg_tmp.find("\r\n\n") == -1:
                     continue
 
-                resp_part_list = msg_tmp.split("\r\n\n")
-                msg_tmp        = "\r\n\n".join(resp_part_list[1:])
+                response_partial_list = msg_tmp.split("\r\n\n")
+                msg_tmp = "\r\n\n".join(response_partial_list[1:])
 
-                if   match_idx ==  1:
+                if   result_list[0] ==  1:
                     # Ending block detected (';' at begin of line)
-                    msg_str = msg_str + re.sub('(\r\n)+', "\r\n", msg_tmp, 0)
-                    if msg_str.strip() == ";":
+                    tl1_response = tl1_response + re.sub('(\r\n)+', "\r\n", msg_tmp, 0)
+                    if tl1_response.strip() == ";":
                         continue
                     break
 
-                elif match_idx ==  0:
+                elif result_list[0] ==  0:
                     # Continuoing mark detected ('>' at begin of line)
-                    msg_str = msg_str + msg_tmp + "\n"
+                    tl1_response = tl1_response + msg_tmp + "\n"
                     continue
 
-            msg_str = re.sub('(\r\n)+', "\r\n", msg_str, 0)
+            tl1_response = re.sub('(\r\n)+', "\r\n", tl1_response, 0)
 
             if not timeout_detected:
                 if self.__enable_collect:
-                    msg_coded = TL1message(msg_str)
+                    msg_coded = TL1message(tl1_response)
                     self.__f.writelines("{:s}\n".format(msg_coded.decode("JSON")))
 
 
@@ -511,18 +514,29 @@ class Plugin1850TL1():
             self.__krepo.add_skipped(self.__eqpt_ref, title, e_time, out_text, err_text, skip_text)
 
 
-    def __trc(self, msg):
+    def __trc_inf(self, msg, level=None):
         """ INTERNAL USAGE
         """
         if self.__ktrc is not None:
-            self.__ktrc.k_tracer_function(msg)
+            self.__ktrc.k_tracer_info(msg, level)
+
+
+    def __trc_error(self, msg, level=None):
+        """ INTERNAL USAGE
+        """
+        if self.__ktrc is not None:
+            self.__ktrc.k_tracer_error(msg, level)
 
 
 
 if __name__ == "__main__":
+    from katelibs.ktracer   import KTracer
+
     print("DEBUG")
 
-    tl1 = Plugin1850TL1("135.221.125.79")
+    trace = KTracer(level="INFO")
+    tl1 = Plugin1850TL1("135.221.125.79", ktrc=trace)
+    trace.k_tracer_error("PROVA", level=0)
 
     if False:
         # DB PULITO
