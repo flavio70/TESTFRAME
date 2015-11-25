@@ -81,7 +81,7 @@ class KTracer():
         except:
             label = "FRAMEWORK"
 
-        for row in msg.splitlines():
+        for row in str(msg).splitlines():
             self.__main_fh.write("[{:s} {:50s}] {:s}\n".format(ts, label, row))
         self.__main_fh.write("[{:s} {:50s}]\n".format(ts, label))
 
