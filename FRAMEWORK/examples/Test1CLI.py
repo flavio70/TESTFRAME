@@ -94,7 +94,7 @@ class Test(TestCase):
         insert Main body code for your test below
         '''
 
-        NE1.cli.do("interface show", condition=".. message: not found interfacexx")
+        NE1.cli.do("interface show", policy="DENY", condition=".. message: not found interfacexx")
         if NE1.cli.get_last_cmd_status() == "SUCCESS":
             print("[+++\n" + NE1.cli.get_last_outcome() + "\n+++]")
         else:
