@@ -2,6 +2,8 @@
 """
 ###############################################################################
 # MODULE: plugin_cli.py
+#         This moduled contains the definition of Class and Methods available
+#         to invoke CLI commands on 1850TSS equipments.
 #
 # AUTHOR: G.Bonalume
 # DATE  : 28/10/2015
@@ -283,7 +285,7 @@ class Plugin1850CLI():
             self.__ktrc.k_tracer_info(msg, level)
 
 
-    def __trc_error(self, msg, level=None):
+    def __trc_err(self, msg, level=None):
         """ INTERNAL USAGE
         """
         if self.__ktrc is not None:
@@ -325,7 +327,7 @@ if __name__ == "__main__":
 
     repo = Kunit('/users/bonalg/WRK', 'prova.py')
     trace = KTracer('/users/bonalg/WRK', level="ERROR", trunk=True)
-    cli = Plugin1850CLI("135.221.125.80", krepo=repo, ktrc=trace)
+    cli = Plugin1850CLI("135.221.125.81", krepo=repo, ktrc=trace)
 
     cli.do("interface show", timeout=5, policy="COMPLD", condition=".. message: not found interface")
     if cli.get_last_cmd_status() == "SUCCESS":
