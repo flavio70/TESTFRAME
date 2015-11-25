@@ -21,16 +21,18 @@ class Plugin1850CLI():
     """
         CLI plugin for 1850TSS Equipment
     """
-    def __init__(self, IP, PORT=1123, krepo=None, eRef=None):
+    def __init__(self, IP, PORT=1123, krepo=None, ktrc=None, eRef=None):
         """
             Costructor for generic CLI interface
             IP   : equipment's IP Address
             PORT : CLI interface Port
         """
 
+        # Private members:
         self.__the_ip = IP
         self.__the_port = PORT
         self.__krepo = krepo              # result report (Kunit class instance)
+        self.__ktrc = ktrc                # Tracer object
         self.__eqpt_ref = eRef            # equipment reference
         self.__if_cmd = None              # CLI command interface
         self.__connected = False          # flag indicating connection performed
@@ -70,7 +72,7 @@ class Plugin1850CLI():
         if self.__connected:       # already connected
             return True
 
-        print("CONNECTING CLI...")
+        self.__trc_inf("CONNECTING CLI...")
         try:
             # Creates telnet instance and opens connection
             self.__if_cmd = telnetlib.Telnet()
@@ -84,12 +86,12 @@ class Plugin1850CLI():
             self.__if_cmd.read_until(self.__prompt.encode(), timeout=self.__timeout)
         except socket.timeout as eee:
             msg = "Timeout connecting {:s}/{:s} - Timeout: {:s} sec.".format(str(self.__the_ip), str(self.__the_port), str(self.__timeout))
-            print(msg)
+            self.__trc_err(msg)
             self.__last_status = "TIMEOUT"
             return False
         except Exception as eee:
             msg = "Error connecting {:s}/{:s} - {:s}".format(str(self.__the_ip), str(self.__the_port), str(eee))
-            print(msg)
+            self.__trc_err(msg)
             self.__last_status = "FAILURE"
             return False
 
@@ -106,7 +108,7 @@ class Plugin1850CLI():
             self.disconnect()
             return False
 
-        print("... CLI INTERFACE for commands ready.")
+        self.__trc_inf("... CLI INTERFACE for commands ready.")
         return True
 
 
@@ -133,7 +135,7 @@ class Plugin1850CLI():
             self.__timer.start()
         except Exception as eee:
             msg = "Error in timer start - {:s}".format(str(eee))
-            print(msg)
+            self.__trc_err(msg)
             return False
         if not self.__do("\n", keepalive=True):
             return False
@@ -156,7 +158,7 @@ class Plugin1850CLI():
 
         if policy != "COMPLD" and policy != "DENY":
             msg = "Policy parameter must be COMPLD or DENY"
-            print(msg)
+            self.__trc_err(msg)
             self.__last_status = "FAILURE"
             return
 
@@ -173,24 +175,28 @@ class Plugin1850CLI():
         # Send command and retrieve result
         cmd_success = self.__do(cmd)
 
-        if condition and cmd_success:
-            cmd_success = self.__verify_condition(condition)
-        print(cmd_success)
+        if not cmd_success:
+            self.__t_failure(cmd, None, self.get_last_outcome(), self.get_last_cmd_status())
+
+        # Verify condition
+        if condition:
+            cnd_success = self.__verify_condition(condition)
+        else:
+            cnd_success = False
 
         if policy == "COMPLD":
-            errmsg = "COMPLD policy -- {:s}".format(str(self.get_last_cmd_status()))
-            if cmd_success:
+            if not condition or cnd_success:
                 self.__t_success(cmd, None, self.get_last_outcome())
             else:
+                errmsg = "POLICY: COMPLD -- CONDITION ({:s}): NOT-SATISFIED".format(condition)
                 self.__t_failure(cmd, None, self.get_last_outcome(), errmsg)
-                self.__last_status = "FAILURE"
         else:
-            errmsg = "DENY policy -- SUCCESS result"
-            if cmd_success:
+            if not condition or not cnd_success:
+                self.__t_success(cmd, None, self.get_last_outcome())
+            else:
+                errmsg = "POLICY: DENY -- CONDITION ({:s}): SATISFIED".format(condition)
                 self.__t_failure(cmd, None, self.get_last_outcome(), errmsg)
                 self.__last_status = "FAILURE"
-            else:
-                self.__t_success(cmd, None, self.get_last_outcome())
         return
 
 
@@ -211,7 +217,7 @@ class Plugin1850CLI():
             # Set current timeout value
             if not self.__to_set():
                 msg = "Timeout detected before invoking commad {:s} execution".format(cmd)
-                print(msg)
+                self.__trc_err(msg)
                 self.__last_status = "TIMEOUT"
                 return False
 
@@ -220,7 +226,7 @@ class Plugin1850CLI():
             self.__if_cmd.write(cmd.encode() + b"\r\n")
         except EOFError as eee:
             msg = "Error invoking cli command({:s})\nException: {:s}".format(cmd, str(eee))
-            print(msg)
+            self.__trc_err(msg)
             self.__last_status = "FAILURE"
             return False
 
@@ -229,12 +235,12 @@ class Plugin1850CLI():
                 buf = self.__if_cmd.read_until(self.__prompt.encode(), timeout=self.__timeout)
             except socket.timeout as eee:
                 msg = "Timeout in waiting for commad execution"
-                print(msg)
+                self.__trc_err(msg)
                 self.__last_status = "TIMEOUT"
                 return False
             except EOFError as eee:
                 msg = "Error in waiting for commad execution - {:s}".format(str(eee))
-                print(msg)
+                self.__trc_err(msg)
                 self.__last_status = "FAILURE"
                 return False
             self.__last_output = buf.decode()
@@ -270,6 +276,19 @@ class Plugin1850CLI():
 
 
 
+    def __trc_inf(self, msg, level=None):
+        """ INTERNAL USAGE
+        """
+        if self.__ktrc is not None:
+            self.__ktrc.k_tracer_info(msg, level)
+
+
+    def __trc_error(self, msg, level=None):
+        """ INTERNAL USAGE
+        """
+        if self.__ktrc is not None:
+            self.__ktrc.k_tracer_error(msg, level)
+
     def __to_start(self):
         """
             Initialize variables for starting timeout verification
@@ -298,16 +317,23 @@ class Plugin1850CLI():
 
 
 if __name__ == "__main__":
+
+    from katelibs.kunit         import Kunit
+    from katelibs.ktracer       import KTracer
+
     print("DEBUG")
 
-    cli = Plugin1850CLI("135.221.125.79")
+    repo = Kunit('/users/bonalg/WRK', 'prova.py')
+    trace = KTracer('/users/bonalg/WRK', level="ERROR", trunk=True)
+    cli = Plugin1850CLI("135.221.125.80", krepo=repo, ktrc=trace)
 
-    cli.do("interface show", timeout=5, condition=".. message: not found interfacexx")
+    cli.do("interface show", timeout=5, policy="COMPLD", condition=".. message: not found interface")
     if cli.get_last_cmd_status() == "SUCCESS":
-        print("[+++\n" + cli.get_last_outcome() + "\n+++]")
+        trace.k_tracer_info("[+++\n" + cli.get_last_outcome() + "\n+++]", level=0)
     else:
-        print("[+++" + cli.get_last_cmd_status() + "+++]")
+        trace.k_tracer_info("[+++" + cli.get_last_cmd_status() + "+++]", level=0)
 
     cli.disconnect()
+    repo.frame_close()
 
     print("FINE")
