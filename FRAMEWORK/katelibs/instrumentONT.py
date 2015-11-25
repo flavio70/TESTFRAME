@@ -1636,7 +1636,7 @@ class InstrumentONT(Equipment):
               LP-RFI
               LP-TIM
               LP-PLM
-              ONT-6XX only both HO and LO alarms SDH Alarms
+            ONT-6XX only both HO and LO alarms SDH Alarms
               LOPL
               LOF
               OOF
@@ -1746,26 +1746,26 @@ class InstrumentONT(Equipment):
             rawCallResult = self.__send_port_cmd(portId, localCommand)
             sdhAnswer = self.__remove_dust(rawCallResult[1])
             resultItemsArray=sdhAnswer.split(",")
-            if resultItemsArray[0] == "-1":  # SDH command error
-                localMessage = "ERROR: retrieve_lo_alarms ({}) answers :[{}] ".format(localCommand,resultItemsArray[0])
+            if resultItemsArray[0] == "-1":  # SDH command errorJust print a message in case of lower order alarms
+                localMessage = "INFO: retrieve_lo_alarms ({}) answers :[{}] skipping LO sdh alarm processing".format(localCommand,resultItemsArray[0])
                 self.__lc_msg(localMessage)
-                self.__t_failure(methodLocalName, None, "", localMessage)
-                return False, localMessage
-            alarmCodes = resultItemsArray[1]
-            alarmCodes=int(float(alarmCodes))
-            if alarmCodes & 1:            retList += ["TU-AIS"]
-            if alarmCodes & 2:            retList += ["LP-RDI"]
-            if alarmCodes & 4:            retList += ["TU-LOP"]
-            if alarmCodes & 8:            retList += ["LP-UNEQ"]
-            if alarmCodes & 16:           retList += ["TU-LOM"]
-            if alarmCodes & 32:           retList += ["LP-RFI"]
-            if alarmCodes & 128:          retList += ["LP-TIM"]
-            if alarmCodes & 256:          retList += ["LP-PLM"]
+                #self.__t_failure(methodLocalName, None, "", localMessage)
+                #return False, localMessage
+            else:  # with no errors in lower order alarm retrieve process alarmCodes
+                alarmCodes = resultItemsArray[1]
+                alarmCodes=int(float(alarmCodes))
+                if alarmCodes & 1:            retList += ["TU-AIS"]
+                if alarmCodes & 2:            retList += ["LP-RDI"]
+                if alarmCodes & 4:            retList += ["TU-LOP"]
+                if alarmCodes & 8:            retList += ["LP-UNEQ"]
+                if alarmCodes & 16:           retList += ["TU-LOM"]
+                if alarmCodes & 32:           retList += ["LP-RFI"]
+                if alarmCodes & 128:          retList += ["LP-TIM"]
+                if alarmCodes & 256:          retList += ["LP-PLM"]
             localMessage="Found Alarms: [{}]".format(retList)
             self.__lc_msg(localMessage)
             self.__t_success(methodLocalName, None, localMessage)
             return True, retList
-
         else :  # "Instrument not supported" case management :
             localMessage="Instrument [{}] not supported".format(retList)
             self.__lc_msg(localMessage)
