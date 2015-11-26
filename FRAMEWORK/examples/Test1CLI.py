@@ -94,11 +94,12 @@ class Test(TestCase):
         insert Main body code for your test below
         '''
 
-        NE1.cli.do("interface show", policy="DENY", condition=".. message: not found interfacexx")
+        NE1.cli.do("interface show", policy="COMPLD")
+
         if NE1.cli.get_last_cmd_status() == "SUCCESS":
-            print("[+++\n" + NE1.cli.get_last_outcome() + "\n+++]")
+            self.trc_inf("[\n{:s}\n]".format(NE1.cli.get_last_outcome()))
         else:
-            print("[+++" + NE1.cli.get_last_cmd_status() + "+++]")
+            self.trc_inf("[\nCommand: {:s}\nResult:  {:s}\n]".format(NE1.cli.get_last_cmd(), NE1.cli.get_last_cmd_status()))
 
     def test_cleanup(self):
         '''

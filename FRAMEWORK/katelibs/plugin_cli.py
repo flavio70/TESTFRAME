@@ -45,19 +45,27 @@ class Plugin1850CLI():
         self.__user = "admin"
         self.__password = "Alcatel1"
         self.__prompt = "Cli:{:s} > ".format(self.__user)
-        self.__last_output = ""           # output of latest CLI command
-        self.__last_status = "SUCCESS"    # status of latest CLI command)
+        self.__last_cmd = ""              # last CLI command
+        self.__last_output = ""           # last CLI command output
+        self.__last_status = "SUCCESS"    # last CLI command status)
+
+    def get_last_cmd(self):
+        """
+            Return the last CLI command
+        """
+        return self.__last_cmd
+
 
     def get_last_outcome(self):
         """
-            Return the latest CLI command output (multi-line string)
+            Return the last CLI command output (multi-line string)
         """
         return self.__last_output
 
 
     def get_last_cmd_status(self):
         """
-            Return the latest CLI command status ("CMPLD"/"DENY")
+            Return the last CLI command status ("CMPLD"/"DENY")
         """
         return self.__last_status
 
@@ -144,61 +152,87 @@ class Plugin1850CLI():
         return True
 
 
-    def do(self, cmd, timeout=None, policy="COMPLD", condition=None):
+    def do(self, cmd, timeout=None, policy=None, condition=None):
         """
             Send the specified CLI command to equipment.
             It is possible specify a positive or negative behaviour and a
             matching condition string
             cmd       = CLI command string
             timeout   = timeout to close a conditional command (seconds)
-            policy    = "COMPLD" -> positive result expected (default)
+            policy    = "COMPLD" -> positive result expected
                         "DENY"   -> negative result expected
+                        none     -> returns any supplied result (default)
             condition = condition string that could mactch in command result
             Returns False if detected exceptions otherwise returns True.
         """
 
 
-        if policy != "COMPLD" and policy != "DENY":
-            msg = "Policy parameter must be COMPLD or DENY"
+        if policy is not None and policy != "COMPLD" and policy != "DENY":
+            msg = "Policy parameter must be <none> or COMPLD or DENY"
             self.__trc_err(msg)
             self.__last_status = "FAILURE"
             return
 
+        # Setting current timeout value
         if timeout is not None:
             self.__curr_timeout = timeout
 
-        # Activating cli command interface
-        if not self.connect():
-            return
-
+        # Initializing kunit interface interface
         if self.__krepo:
             self.__krepo.start_time()
 
+        # Activating cli command interface
+        if not self.connect():
+            self.__t_failure(cmd, None, "CLI CONNECTION", self.get_last_cmd_status())
+            return
+
         # Send command and retrieve result
         cmd_success = self.__do(cmd)
-
         if not cmd_success:
             self.__t_failure(cmd, None, self.get_last_outcome(), self.get_last_cmd_status())
+            return
+
+        # Verify result
+        if policy is not None:
+            cnd_success = self.__verify_result()
+        else:
+            cnd_success = True
 
         # Verify condition
         if condition:
             cnd_success = self.__verify_condition(condition)
-        else:
-            cnd_success = False
 
+        # Verify command result according with supplied policy
         if policy == "COMPLD":
-            if not condition or cnd_success:
+            if cnd_success:
                 self.__t_success(cmd, None, self.get_last_outcome())
             else:
-                errmsg = "POLICY: COMPLD -- CONDITION ({:s}): NOT-SATISFIED".format(condition)
-                self.__t_failure(cmd, None, self.get_last_outcome(), errmsg)
-        else:
-            if not condition or not cnd_success:
-                self.__t_success(cmd, None, self.get_last_outcome())
-            else:
-                errmsg = "POLICY: DENY -- CONDITION ({:s}): SATISFIED".format(condition)
+                if condition:
+                    errmsg = "Policy: COMPLD -- Condition ({:s}): NOT-SATISFIED".format(condition)
+                else:
+                    errmsg = "Policy: COMPLD -- Result: DENY"
                 self.__t_failure(cmd, None, self.get_last_outcome(), errmsg)
                 self.__last_status = "FAILURE"
+        elif policy == "DENY":
+            if not cnd_success:
+                self.__t_success(cmd, None, self.get_last_outcome())
+            else:
+                if condition:
+                    errmsg = "Policy: DENY -- Condition ({:s}): SATISFIED".format(condition)
+                else:
+                    errmsg = "Policy: DENY -- Result: COMPLD"
+                self.__t_failure(cmd, None, self.get_last_outcome(), errmsg)
+                self.__last_status = "FAILURE"
+        else:
+            if condition:
+                if not cnd_success:
+                    errmsg = "Policy: NONE -- Condition ({:s}): NOT-SATISFIED".format(condition)
+                    self.__t_failure(cmd, None, self.get_last_outcome(), errmsg)
+                    self.__last_status = "FAILURE"
+                else:
+                    self.__t_success(cmd, None, self.get_last_outcome())
+            else:
+                self.__t_success(cmd, None, self.get_last_outcome())
         return
 
 
@@ -210,6 +244,9 @@ class Plugin1850CLI():
             Returns False if detected exceptions otherwise returns True.
             self.__last_output contains the result of the coomand.
         """
+
+        # Trash all trailing characters from stream
+        self.__last_cmd = cmd
 
         # Trash all trailing characters from stream
         while str(self.__if_cmd.read_very_eager().strip(), 'utf-8') != "":
@@ -249,6 +286,16 @@ class Plugin1850CLI():
 
         return True
 
+
+    def __verify_result(self):
+        """ INTERNAL USAGE
+        """
+        cond_list_ok = ("DUMMY"," .. message: successful completed command\n")
+            
+        for cond in cond_list_ok:
+            if self.__verify_condition(cond):
+                return True
+        return False
 
     def __verify_condition(self, condition):
         """ INTERNAL USAGE
@@ -327,13 +374,14 @@ if __name__ == "__main__":
 
     repo = Kunit('/users/bonalg/WRK', 'prova.py')
     trace = KTracer('/users/bonalg/WRK', level="ERROR", trunk=True)
-    cli = Plugin1850CLI("135.221.125.81", krepo=repo, ktrc=trace)
+    cli = Plugin1850CLI("135.221.125.80", krepo=repo, ktrc=trace)
 
-    cli.do("interface show", timeout=5, policy="COMPLD", condition=".. message: not found interface")
+    cli.do("interface show", timeout=5, policy="COMPLD", condition=".. message: not found interface\n")
+
     if cli.get_last_cmd_status() == "SUCCESS":
-        trace.k_tracer_info("[+++\n" + cli.get_last_outcome() + "\n+++]", level=0)
+        trace.k_tracer_info("[\n{:s}\n]".format(cli.get_last_outcome()), level=0)
     else:
-        trace.k_tracer_info("[+++" + cli.get_last_cmd_status() + "+++]", level=0)
+        trace.k_tracer_info("[\nCommand: {:s}\nResult:  {:s}\n]".format(cli.get_last_cmd(), cli.get_last_cmd_status()), level=0)
 
     cli.disconnect()
     repo.frame_close()
