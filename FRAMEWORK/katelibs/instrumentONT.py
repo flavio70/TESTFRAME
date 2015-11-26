@@ -82,7 +82,7 @@ class InstrumentONT(Equipment):
         self.__ontPassword    = self.__prs.get_elem(self.get_label(), 'PWD')
         self.__ontApplication = self.__prs.get_elem(self.get_label(), 'APPL')
         # Unique 5xx sessionName generation bound to start date&time (UTC)  Comment next row if a single static name needed
-        self.__sessionName          = "Session__" + datetime.datetime.utcnow().strftime("%d%b_%H%M%S") + "__UTC"
+        #self.__sessionName          = "Session__" + datetime.datetime.utcnow().strftime("%d%b_%H%M%S") + "__UTC"
 
 
 
