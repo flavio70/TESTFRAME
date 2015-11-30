@@ -233,8 +233,6 @@ class SSH1850():
         self.__ip   = IP
         self.__sh   = None
 
-        #self.__setup_ssh()
-
 
     def close_ssh(self):
         """ TODO
@@ -248,7 +246,6 @@ class SSH1850():
             If connection is down, a reconnection is done
             cmd : a UNIX command
         """
-        print("SSH1850::send_cmd_simple in")
         if not self.__is_reachable_by_ip():
             self.__setup_ssh()
             if self.__sh is None:
@@ -265,8 +262,6 @@ class SSH1850():
                 print("SSH1850: error connectind '{:s}' ({:s}). Retrying...".format(self.__ip, str(eee)))
                 self.__setup_ssh()
 
-        print("esco da send_cmd_simple")
-
         return True
 
 
@@ -276,8 +271,6 @@ class SSH1850():
             cmd      : a UNIX command
             check_ok : (optional) string to check on command stdout response
         """
-        print("SSH1850::send_cmd_and_check in")
-
         if not self.__is_reachable_by_ip():
             self.__setup_ssh()
             if self.__sh is None:
@@ -344,65 +337,6 @@ class SSH1850():
         return res.replace('\\n','\n')
 
 
-    def telnet_tunnel(self, dest_ip, port=23):
-        """ TODO
-        """
-        if not self.__sh.get_transport():
-            try:
-                self.__sh.connect(self.__ip, username='root', password='alcatel', timeout=10)
-            except Exception as eee:
-                print("SSH1850: error connecting '" + self.__ip + "' (" + str(eee) +")")
-                self.__sh.close()
-                self.__sh = None
-                return
-
-        cmd = "telnet {:s} {:d}".format(dest_ip, port)
-        print("setup tunnel for " + cmd)
-
-        self.__send_string(cmd,       'login: ')
-        self.__send_string('root',    'Password: ')
-        self.__send_string('alcatel', ':~# ')
-
-
-    def send_bm_command(self, dest_ip, cmd):
-        """ TODO
-        """
-        if not self.__sh.get_transport():
-            try:
-                self.__sh.connect(self.__ip, username='root', password='alcatel', timeout=10)
-            except Exception as eee:
-                print("SSH1850: error connectind '" + self.__ip + "' (" + str(eee) +")")
-                self.__sh.close()
-                self.__sh = None
-                return
-
-        telnet_cmd = "telnet {:s} 4000".format(dest_ip)
-
-        self.__send_string(telnet_cmd, 'SLC> ')
-
-        cmd = "bm : {:s}".format(cmd)
-        print("Sending BM command '" + cmd + "'")
-
-        self.__send_string(cmd, 'SLC> ')
-
-
-    def __send_string(self, string_to_send, string_to_expect):
-        """ INTERNAL USAGE
-        """
-        chan = self.__sh.invoke_shell()
-
-        chan.send(string_to_send + '\n\r')
-
-        buff = ''
-        while not buff.endswith(string_to_expect):
-            resp_b = chan.recv(9999)
-            resp_a = str(resp_b)
-            resp_a = resp_a[2:-1]
-            buff += resp_a
-
-        print("@@@@" + buff + "@@@@")
-
-
     def __setup_ssh(self):
         """ INTERNAL USAGE
         """
@@ -418,6 +352,7 @@ class SSH1850():
             print("SSH1850: init error for '" + self.__ip + "' - connect - (" + str(eee) +")")
             self.__sh.close()
             self.__sh = None
+        print("...ssh setup done")
 
 
     def __is_reachable_by_ip(self):
