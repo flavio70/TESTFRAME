@@ -239,11 +239,29 @@ class InstrumentONT(Equipment):
             # 6xx init
             #tester = InstrumentONT(localUser,localPwd,localOntIpAddress, krepo=r)
             callResult = self.connect()
+            if self.__check_method_execution("connect") == False: 
+                localMessage="Error in method [{}] call \n".format(localMethodName)
+                self.__lc_msg(localMessage)
+                return False, "Error in method "+ localMethodName +" call "
+            self.__lc_msg("Step 1 ++++++++++++++++++++++++++")
+
             callResult = self.open_port_channel(portId)
+            if self.__check_method_execution("open_port_channel") == False: 
+                localMessage="Error in method [{}] call \n".format(localMethodName)
+                self.__lc_msg(localMessage)
+                return False, "Error in method "+ localMethodName +" call "
+            self.__lc_msg("Step 2 ++++++++++++++++++++++++++")
+
+
 
             # Check declared and found instrument type
             declaredOntType = self.__ontType
             callResult = self.get_instrument_id()
+            if self.__check_method_execution("get_instrument_id") == False: 
+                localMessage="Error in method [{}] call \n".format(localMethodName)
+                self.__lc_msg(localMessage)
+                return False, "Error in method "+ localMethodName +" call "
+            self.__lc_msg("Step 3 ++++++++++++++++++++++++++")
             if declaredOntType == self.__ontType: 
                 localMessage="Instrument declared [{}] and found [{}] consistency verified".format(declaredOntType, self.__ontType)
                 self.__lc_msg(localMessage)
@@ -257,8 +275,19 @@ class InstrumentONT(Equipment):
             time.sleep(10)
             #callResult = self.get_currently_loaded_app(portId)
             callResult = self.load_app(portId, myApplication)
+            if self.__check_method_execution("load_app") == False: 
+                localMessage="Error in method [{}] call \n".format(localMethodName) 
+                self.__lc_msg(localMessage)
+                return False, "Error in method "+ localMethodName +" call "
             time.sleep(20)
+            self.__lc_msg("Step 4 ++++++++++++++++++++++++++")
             callResult = self.set_current_signal_structure(portId,"PHYS_SDH")  
+            if self.__check_method_execution("set_current_signal_structure") == False: 
+                localMessage="Error in method [{}] call \n".format(localMethodName) 
+                self.__lc_msg(localMessage)
+                return False, "Error in method "+ localMethodName +" call "
+
+            self.__lc_msg("Step 5 ++++++++++++++++++++++++++")
         else:                         # ONT-5xx Init
             # 5xx init
             myApplication="SdhBert"
@@ -270,7 +299,7 @@ class InstrumentONT(Equipment):
                 self.__lc_msg(localMessage)
                 return False, "Error in method "+ localMethodName +" call "
 
-            self.__lc_msg("Step 0 ++++++++++++++++++++++++++")
+            self.__lc_msg("Step 1 ++++++++++++++++++++++++++")
            
             callResult = self.create_session(self.__sessionName)
             if self.__check_method_execution("create_session") == False: 
@@ -278,7 +307,7 @@ class InstrumentONT(Equipment):
                 self.__lc_msg(localMessage)
                 return False, "Error in method "+ localMethodName +" call "
 
-            self.__lc_msg("Step 1 ++++++++++++++++++++++++++")
+            self.__lc_msg("Step 2 ++++++++++++++++++++++++++")
 
             callResult = self.select_port(portId)
             if self.__check_method_execution("select_port") == False: 
@@ -287,7 +316,7 @@ class InstrumentONT(Equipment):
                 self.__lc_msg(localMessage)
                 return False, "Error in method "+ localMethodName +" call "
 
-            self.__lc_msg("Step 2 ++++++++++++++++++++++++++")
+            self.__lc_msg("Step 3 ++++++++++++++++++++++++++")
             
             callResult = self.get_selected_ports("")
             if self.__check_method_execution("get_selected_ports") == False: 
@@ -295,7 +324,7 @@ class InstrumentONT(Equipment):
                 self.__lc_msg(localMessage)
                 return False, "Error in method "+ localMethodName +" call "
                 
-            self.__lc_msg("Step 3 ++++++++++++++++++++++++++")
+            self.__lc_msg("Step 4 ++++++++++++++++++++++++++")
 
             # Check declared and found instrument type
             declaredOntType = self.__ontType
@@ -306,7 +335,7 @@ class InstrumentONT(Equipment):
                 self.__lc_msg(localMessage)
                 return False, "Error in method "+ localMethodName +" call "
             
-            self.__lc_msg("Step 4 ++++++++++++++++++++++++++")
+            self.__lc_msg("Step 5 ++++++++++++++++++++++++++")
             
             if declaredOntType == self.__ontType: 
                 localMessage="Instrument declared [{}] and found [{}] consistency verified".format(declaredOntType, self.__ontType)
@@ -316,8 +345,7 @@ class InstrumentONT(Equipment):
                 self.__lc_msg(localMessage)
                 return False, localMessage
             
-            self.__lc_msg("Step 5 ++++++++++++++++++++++++++")
-            
+            self.__lc_msg("Step 6 ++++++++++++++++++++++++++")
             
             callResult = self.init_port_to_socket_map()
             if self.__check_method_execution("init_port_to_socket_map") == False: 
@@ -325,7 +353,7 @@ class InstrumentONT(Equipment):
                 self.__lc_msg(localMessage)
                 return False, "Error in method "+ localMethodName +" call "
             
-            self.__lc_msg("Step 6 ++++++++++++++++++++++++++")
+            self.__lc_msg("Step 7 ++++++++++++++++++++++++++")
             
             callResult = self.open_port_channel(portId)
             if self.__check_method_execution("open_port_channel") == False: 
@@ -333,19 +361,19 @@ class InstrumentONT(Equipment):
                 self.__lc_msg(localMessage)
                 return False, "Error in method "+ localMethodName +" call "
             
-            self.__lc_msg("Step 7 ++++++++++++++++++++++++++")
+            self.__lc_msg("Step 8 ++++++++++++++++++++++++++")
             
             callResult = self.get_currently_loaded_app(portId)
             #if self.__check_method_execution("get_currently_loaded_app") == False: 
             #    print("Error in method [{}] call \n".format(localMethodName))
             #    return False, "Error in method "+ localMethodName +" call "
             
-            self.__lc_msg("Step 8 ++++++++++++++++++++++++++")
+            self.__lc_msg("Step 9 ++++++++++++++++++++++++++")
             
             callResult = self.unload_app(portId, myApplication)
             time.sleep(10)
             
-            self.__lc_msg("Step 9 ++++++++++++++++++++++++++")
+            self.__lc_msg("Step 10 ++++++++++++++++++++++++++")
             
             callResult = self.load_app(portId, myApplication)
             if self.__check_method_execution("load_app") == False: 
