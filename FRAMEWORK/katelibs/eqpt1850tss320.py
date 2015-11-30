@@ -19,6 +19,7 @@ from katelibs.access1850    import SER1850, SSH1850
 from katelibs.tl1_facility  import TL1message
 from katelibs.plugin_tl1    import Plugin1850TL1
 from katelibs.plugin_cli    import Plugin1850CLI
+from katelibs.plugin_bm     import Plugin1850BM
 from katelibs.database      import *
 
 
@@ -33,8 +34,9 @@ class Eqpt1850TSS320(Equipment):
             kenv    : instance of KEnvironment (initialized by K@TE FRAMEWORK)
         """
         # Public members:
-        self.tl1        = None          # main TL1 channel (used to send user command to equipment)
-        self.cli        = None          # CLI channel (used to send user command to equipment)
+        self.tl1        = None          # TL1 plugin (used to send TL1 command to equipment)
+        self.cli        = None          # CLI plugin (used to send CLI command to equipment)
+        self.bm         = None          # BM  plugin (used to send BM command to equipment)
         # Private members:
         self.__kenv     = kenv          # Kate Environment
         self.__krepo    = kenv.krepo    # result report (Kunit class instance)
@@ -56,18 +58,27 @@ class Eqpt1850TSS320(Equipment):
         self.__net_con = SSH1850(self.__net.get_ip_str())
 
         tl1_event = "{:s}/{:s}_tl1_event.log".format(kenv.path_collector(), label)
-        self.tl1 = Plugin1850TL1(self.__net.get_ip_str(),
-                                 krepo=self.__krepo,
-                                 eRef=self,
-                                 collector=tl1_event,
-                                 ktrc=self.__kenv.ktrc)
 
-        self.cli = Plugin1850CLI(self.__net.get_ip_str(), krepo=self.__krepo, eRef=self)
+        self.tl1 = Plugin1850TL1(   self.__net.get_ip_str(),
+                                    eRef=self,
+                                    krepo=self.__krepo,
+                                    ktrc=self.__kenv.ktrc,
+                                    collector=tl1_event)
+
+        self.cli = Plugin1850CLI(   self.__net.get_ip_str(),
+                                    eRef=self,
+                                    krepo=self.__krepo)
+
+        self.bm  = Plugin1850BM(    self.__net.get_ip_str(),
+                                    eRef=self,
+                                    krepo=self.__krepo,
+                                    ktrc=self.__kenv.ktrc)
 
 
     def clean_up(self):
-        self.cli.disconnect()
         self.tl1.thr_event_terminate()
+        self.cli.disconnect()
+        self.bm.clean_up()
 
 
     def flc_ip_config(self):
@@ -170,25 +181,19 @@ class Eqpt1850TSS320(Equipment):
         """ Perform specified SLC reboot
             slot : slc slot number
         """
-        self.__trc_inf("REBOOT SLC " + str(slot))
-        flc_ip = self.__net.get_ip_str()
-        slc_ip = "100.0.1.{:s}".format(slot)
+        slc_ip = "100.0.1.{:d}".format(slot)
 
         if not self.__is_ongoing_to_address(slc_ip):
-            self.__t_skipped("SLC "+ str(slot) + " REBOOT", None, "SLC not present", "")
-        return True
+            self.__trc_inf("SLC {:s} NOT PRESENT ".format(slot))
+            self.__t_skipped("SLC {:d} REBOOT".format(slot), None, "SLC not present", "")
+            return True
 
-        try:
-            tmpsh = SSH1850(flc_ip)
-            tmpsh.telnet_tunnel(slc_ip)
-            tmpsh.send_bm_command(slc_ip, "reboot")
-            tmpsh.close_ssh()
-        except Exception as eee:
-            self.__trc_err(str(eee))
-            self.__t_failure("SLC "+ str(slot) + " REBOOT", None, "error in SLC rebooting", "")
-            return False
+        self.__trc_inf("REBOOT SLC {:s}".format(slot))
 
-        self.__t_success("SLC "+ str(slot) + " REBOOT", None, "SLC restarted")
+        self.bm.slc_reboot(slot)
+        print("BM COMMAND SENT")
+
+        self.__t_success("SLC {:s} REBOOT".format(slot), None, "SLC restarted")
 
         return True
 
@@ -406,7 +411,6 @@ class Eqpt1850TSS320(Equipment):
         cmd = "ping -c 4 {:s}".format(dest_ip)
         exp = "4 packets transmitted, 4 received, 0% packet loss,"
         res = self.__ser_con.send_cmd_and_check(cmd, exp)
-        self.__trc_inf(res)
         return res
 
 
@@ -508,30 +512,32 @@ class Eqpt1850TSS320(Equipment):
     def __trc_inf(self, msg):
         """ INTERNAL USAGE
         """
-        self.__kenv.ktrc.k_tracer_info(msg)
+        self.__kenv.ktrc.k_tracer_info(msg, level=1)
 
 
 
     def __trc_err(self, msg):
         """ INTERNAL USAGE
         """
-        self.__kenv.ktrc.k_tracer_error(msg)
+        self.__kenv.ktrc.k_tracer_error(msg, level=1)
 
 
 
 if __name__ == '__main__':
     print("DEBUG Eqpt1850TSS320")
-    r=Kunit('pippo')
+    #r=Kunit('pippo')
+    kenvironment = KEnvironment(testfilename="PROVA.py")
     #nodeA = Eqpt1850TSS320("nodeA", 1024)
-    nodeB = Eqpt1850TSS320("nodeB", 1025, krepo=r)
+    nodeB = Eqpt1850TSS320("nodeB", 1025)
 
     THE_SWP = SWP1850TSS()
     THE_SWP.init_from_db(swp_flv="FLV_ALC-TSS__BASE00.25.FD0491__VM")
 
     #nodeB.INSTALL(THE_SWP)
 
-    nodeB.flc_ip_config()
+    #nodeB.flc_ip_config()
     #nodeB.flc_reboot()
+    nodeB.slc_reboot(11)
     #nodeB.flc_ip_config()
     #nodeB.flc_wait_in_service()
 
@@ -539,6 +545,6 @@ if __name__ == '__main__':
 
     nodeB.clean_up()
 
-    r.frame_close()
+    #r.frame_close()
 
     print("FINE")
