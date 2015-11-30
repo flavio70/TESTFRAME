@@ -96,6 +96,8 @@ class Test(TestCase):
         '''
         test Body Section implementation
         insert Main body code for your test below
+        Try this test with the following command:
+        ./Test1NE_Instrument_Ont506_only.py --testSet    --testBody  --testClean    
         '''
         print("\n\n\n\n\nTESTING ONT5xx SECTION START *************************************")
         #input("press enter to continue...\n")
