@@ -66,6 +66,7 @@ class Test(TestCase):
 
         #NE1.flc_scratch_db()
         #NE1.flc_reboot()
+        #NE1.slc_reboot(11)
         #NE1.flc_ip_config()
         #NE1.flc_wait_in_service()
 
@@ -110,7 +111,6 @@ class Test(TestCase):
         '''
         self.trc_inf('@DUT CleanUP')
 
-        NE1.clean_up()
         self.stop_tps_block("EM", "1-2-3")
 
 
