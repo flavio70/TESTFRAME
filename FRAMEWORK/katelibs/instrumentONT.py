@@ -36,12 +36,6 @@ from katelibs.database import *
 
 class InstrumentONT(Equipment):
 
-    #def __init__(self, label, ID, krepo=None):
-    #    """ label   : equipment name used on Report file
-    #        ID      : equipment ID (see T_EQUIPMENT table on K@TE DB)
-    #        krepo   : reference to kunit report instance
-    #    """
-
     def __init__(self, label, kenv):
         """ label   : equipment name used on Report file
             kenv    : instance of KEnvironment (initialized by K@TE FRAMEWORK)
@@ -54,6 +48,12 @@ class InstrumentONT(Equipment):
         # Session
         self.__ontType              = None             #  Specify 5xx for Ont50,506,512  6xx for Ont 601
         self.__sessionName          = "Session5xx_KATE"    #  To be changed: meaningfuls only for  5xx 
+        # Initizalization flag:
+        # Inside init_instrument() call: True if previous step ok, 
+        # after: each method called inside "test_body" section must found this flag to True to be executed
+        self.__lastCallSuccess      = False            #  track if the last call was successfully executed (not to set in case of skip)
+        self.__calledMethodList     = []               #  used to track all method called
+        self.__calledMethodStatus   = dict()           #  used to track all method called and last execution result
         # Connection
         self.__ontUser              = None             #  Ont session authentication user
         self.__ontPassword          = None             #  Ont session user's password
@@ -91,6 +91,7 @@ class InstrumentONT(Equipment):
         """
         print("clean_up called [{}]".format(self.__ontType))
 
+
     #     
     # Krepo-related     
     #    
@@ -117,6 +118,59 @@ class InstrumentONT(Equipment):
             self.__krepo.add_skipped(self, title, e_time, out_text, err_text, skip_text)
 
 
+
+    def __method_success(self, title, elapsed_time, out_text):
+        """ INTERNAL USAGE
+        """
+        #self.__t_success(methodLocalName, None, localMessage)
+        self.__lastCallSuccess = True            # Mark current execution as successfully
+        self.__calledMethodStatus[title]= "success"  #
+        self.__t_success(title, elapsed_time, out_text)  # CG tracking
+
+
+    def __method_failure(self, title, e_time, out_text, err_text):
+        """ INTERNAL USAGE
+        """
+        #self.__t_failure(methodLocalName, None, "", localMessage)
+        self.__lastCallSuccess = False            # Mark current execution as successfully
+        self.__calledMethodStatus[title]= "error"  #
+        self.__t_failure(title, e_time, out_text, err_text) # CG tracking
+
+
+ 
+    def __method_skipped(self, title, e_time, out_text, err_text):
+        """ INTERNAL USAGE
+        """
+        #self.__t_failure(methodLocalName, None, "", localMessage)
+        #self.__lastCallSuccess = False            # Don't mark current execution as successfully
+        self.__calledMethodStatus[title]= "skip"  #
+        self.__t_skipped(title, e_time, out_text, err_text) # CG tracking
+
+
+    def __check_method_execution(self,methodToCheck):
+        """ INTERNAL USAGE
+            it verifies if the "methodToCheck" method has been successfully executed    
+        """
+        methodName = inspect.stack()[1][3]   # <-- daddy method name  : who calls this method
+        if methodToCheck in self.__calledMethodStatus:
+            pass
+        else:
+            localMessage = "[[[ #### ERROR: Method [{}] execution inside [{}] NOT FOUND in self.__calledMethodStatus: [[ {} ]]".format(methodToCheck,methodName,self.__calledMethodStatus)
+            print(localMessage) 
+            self.__lc_msg(localMessage)
+            return False 
+        methodExecLastResult =  self.__calledMethodStatus[methodToCheck]
+        if methodExecLastResult == "success":
+            pass
+        else:
+            #localMessage = "[[[ #### ERROR: Method [{}] execution inside [{}]: [{}] ".format(methodToCheck,methodName,methodExecLastResult)
+            localMessage = "[[[ #### ERROR: Method [{}] execution inside [{}] in self.__calledMethodStatus: [[ {} ]]".format(methodToCheck,methodName,self.__calledMethodStatus)
+            self.__lc_msg(localMessage)
+            return False 
+        localMessage = "[[[ #### [{}] verified [{}] ".format(methodToCheck,methodExecLastResult)
+        self.__lc_msg(localMessage)
+        return True
+ 
 
     #
     #  K@TE INTERFACE
@@ -174,7 +228,8 @@ class InstrumentONT(Equipment):
 
         localPortId = self.__prs.get_elem(self.get_label(), portId)
         self.__labelToPortId[portId]=localPortId
-
+        localMethodName = inspect.stack()[0][3]   # init_instrument
+        
         if self.__ontType  == "6xx":   # ONT-6xx Init
             localUser = self.__ontUser  
             localPwd = self.__ontPassword 
@@ -208,14 +263,51 @@ class InstrumentONT(Equipment):
             # 5xx init
             myApplication="SdhBert"
             #tester = InstrumentONT(localUser,localPwd, krepo=r)
+            
             callResult = self.connect()
+            if self.__check_method_execution("connect") == False: 
+                localMessage="Error in method [{}] call \n".format(localMethodName)
+                self.__lc_msg(localMessage)
+                return False, "Error in method "+ localMethodName +" call "
+
+            self.__lc_msg("Step 0 ++++++++++++++++++++++++++")
+           
             callResult = self.create_session(self.__sessionName)
+            if self.__check_method_execution("create_session") == False: 
+                localMessage="Error in method [{}] call \n".format(localMethodName)
+                self.__lc_msg(localMessage)
+                return False, "Error in method "+ localMethodName +" call "
+
+            self.__lc_msg("Step 1 ++++++++++++++++++++++++++")
+
             callResult = self.select_port(portId)
+            if self.__check_method_execution("select_port") == False: 
+                callResult = self.deselect_port(portId)    # uncomment to deselect the specified port
+                localMessage="Error in method [{}] call \n".format(localMethodName)
+                self.__lc_msg(localMessage)
+                return False, "Error in method "+ localMethodName +" call "
+
+            self.__lc_msg("Step 2 ++++++++++++++++++++++++++")
+            
             callResult = self.get_selected_ports("")
+            if self.__check_method_execution("get_selected_ports") == False: 
+                localMessage="Error in method [{}] call \n".format(localMethodName)
+                self.__lc_msg(localMessage)
+                return False, "Error in method "+ localMethodName +" call "
+                
+            self.__lc_msg("Step 3 ++++++++++++++++++++++++++")
 
             # Check declared and found instrument type
             declaredOntType = self.__ontType
+            
             callResult = self.get_instrument_id()
+            if self.__check_method_execution("get_instrument_id") == False: 
+                localMessage="Error in method [{}] call \n".format(localMethodName)
+                self.__lc_msg(localMessage)
+                return False, "Error in method "+ localMethodName +" call "
+            
+            self.__lc_msg("Step 4 ++++++++++++++++++++++++++")
+            
             if declaredOntType == self.__ontType: 
                 localMessage="Instrument declared [{}] and found [{}] consistency verified".format(declaredOntType, self.__ontType)
                 self.__lc_msg(localMessage)
@@ -223,12 +315,48 @@ class InstrumentONT(Equipment):
                 localMessage="Instrument declared [{}] but found [{}] please verify DB data for id [{}]".format(declaredOntType, self.__ontType)
                 self.__lc_msg(localMessage)
                 return False, localMessage
+            
+            self.__lc_msg("Step 5 ++++++++++++++++++++++++++")
+            
+            
             callResult = self.init_port_to_socket_map()
+            if self.__check_method_execution("init_port_to_socket_map") == False: 
+                localMessage="Error in method [{}] call \n".format(localMethodName)
+                self.__lc_msg(localMessage)
+                return False, "Error in method "+ localMethodName +" call "
+            
+            self.__lc_msg("Step 6 ++++++++++++++++++++++++++")
+            
             callResult = self.open_port_channel(portId)
+            if self.__check_method_execution("open_port_channel") == False: 
+                localMessage="Error in method [{}] call \n".format(localMethodName)
+                self.__lc_msg(localMessage)
+                return False, "Error in method "+ localMethodName +" call "
+            
+            self.__lc_msg("Step 7 ++++++++++++++++++++++++++")
+            
             callResult = self.get_currently_loaded_app(portId)
+            #if self.__check_method_execution("get_currently_loaded_app") == False: 
+            #    print("Error in method [{}] call \n".format(localMethodName))
+            #    return False, "Error in method "+ localMethodName +" call "
+            
+            self.__lc_msg("Step 8 ++++++++++++++++++++++++++")
+            
             callResult = self.unload_app(portId, myApplication)
             time.sleep(10)
+            
+            self.__lc_msg("Step 9 ++++++++++++++++++++++++++")
+            
             callResult = self.load_app(portId, myApplication)
+            if self.__check_method_execution("load_app") == False: 
+                localMessage="Error in method [{}] call \n".format(localMethodName) 
+                self.__lc_msg(localMessage)
+                return False, "Error in method "+ localMethodName +" call "
+            
+            
+        localMessage=" ####  #### Current callMethodStatus content:  [ {} ] ####".format(self.__calledMethodStatus)
+        self.__lc_msg(localMessage)
+            
         localMessage="[{}]: init_instrument: instrument correctly initialized".format(self.__ontType)
         self.__lc_msg(localMessage)
         return True, localMessage
@@ -546,13 +674,13 @@ class InstrumentONT(Equipment):
     #
     def connect(self):    ### krepo added ###
         """ create a connection and authenticate the user """
-        methodLocalName = self.__lc_current_method_name(True)
+        methodLocalName = self.__lc_current_method_name(embedKrepoInit=True)
         # Ping check
         localResult = self.__is_reachable()
         if not localResult[0]:
             localMessage="ONTXXX [{}]:not reachable. Bye...".format(self.__ontIpAddress)
             self.__lc_msg(localMessage)
-            self.__t_failure(methodLocalName, None, "", localMessage)
+            self.__method_failure(methodLocalName, None, "", localMessage)
             return  localResult
         else:
             localMessage="ONTXXX [{}]:reachable".format(self.__ontIpAddress)
@@ -563,7 +691,7 @@ class InstrumentONT(Equipment):
         if not localResult[0]:
             localMessage="ONTXXX [{}]:telnet session open (port {}) failed. Bye...".format(self.__ontIpAddress, self.__ontTelnetPort)
             self.__lc_msg(localMessage)
-            self.__t_failure(methodLocalName, None, "", localMessage)
+            self.__method_failure(methodLocalName, None, "", localMessage)
             return  localResult
         else:
             localMessage="ONTXXX [{}]:telnet session opened (port {})".format(self.__ontIpAddress, self.__ontTelnetPort)
@@ -574,13 +702,13 @@ class InstrumentONT(Equipment):
         if not localResult[0]:
             localMessage="ONTXXX [{}]:user {} authentication failed. Bye...".format(self.__ontIpAddress, self.__ontUser)
             self.__lc_msg(localMessage)
-            self.__t_failure(methodLocalName, None, "", localMessage)
+            self.__method_failure(methodLocalName, None, "", localMessage)
             return  localResult
         else:
             localMessage="ONTXXX [{}]:user {} authenticated".format(self.__ontIpAddress, self.__ontUser)
             self.__lc_msg(localMessage)
 
-        self.__t_success(methodLocalName, None, localMessage)
+        self.__method_success(methodLocalName, None, localMessage)
         return localResult
 
 
@@ -590,7 +718,7 @@ class InstrumentONT(Equipment):
     #
     def create_session(self, sessionName):       ### krepo added ###
         """ create a new <sessionName> session """
-        methodLocalName = self.__lc_current_method_name(True)
+        methodLocalName = self.__lc_current_method_name(embedKrepoInit=True)
         # create a new session if not exsists and check if done
         #localCommand=":SESM:SES:ASYN {}".format(sessionName)
         localCommand=":SESM:SES {}".format(sessionName)
@@ -604,19 +732,19 @@ class InstrumentONT(Equipment):
             localMessage="Session [{}] created".format(sessionName)
             self.__lc_msg(localMessage)
             self.__sessionName = None
-            self.__t_success(methodLocalName, None, localMessage)
+            self.__method_success(methodLocalName, None, localMessage)
             return True, localMessage
         localMessage="Session [{}] not created (or not present)".format(sessionName)
         self.__lc_msg(localMessage)
         self.__sessionName = sessionName
-        self.__t_failure(methodLocalName, None, "", localMessage)
+        self.__method_failure(methodLocalName, None, "", localMessage)
         return False, localMessage
 
 
 
     def delete_session(self, sessionName):  ### krepo added ###
         """ delete a <sessionName> session if present """
-        methodLocalName = self.__lc_current_method_name(True)
+        methodLocalName = self.__lc_current_method_name(embedKrepoInit=True)
         # check if session is present
         localCommand=":SESM:SES?"
         callResult = self.__send_cmd(localCommand)
@@ -625,7 +753,7 @@ class InstrumentONT(Equipment):
             localMessage="Session [{}] not found: unable to delete it".format(sessionName)
             self.__lc_msg(localMessage)
             self.__sessionName = None
-            self.__t_failure(methodLocalName, None, "", localMessage)
+            self.__method_failure(methodLocalName, None, "", localMessage)
             return False, localMessage
         localMessage="Session [{}] found: delete".format(sessionName)
         self.__lc_msg(localMessage)
@@ -642,11 +770,11 @@ class InstrumentONT(Equipment):
             localMessage="Session [{}] not removed: unable to delete it".format(sessionName)
             self.__lc_msg(localMessage)
             self.__sessionName = None
-            self.__t_failure(methodLocalName, None, "", localMessage)
+            self.__method_failure(methodLocalName, None, "", localMessage)
             return False, localMessage
         localMessage="Session [{}] deleted".format(sessionName)
         self.__lc_msg(localMessage)
-        self.__t_success(methodLocalName, None, localMessage)
+        self.__method_success(methodLocalName, None, localMessage)
         return True, localMessage
 
 
@@ -677,7 +805,7 @@ class InstrumentONT(Equipment):
         """ It Initializes the self.__portToSocketMap dictionary
             to ease the fast socket recovery for each available port
             Return tuple:
-            ('True', '< elf.__portToSocketMap content >') ... if at least one available port found
+            ('True', '< self.__portToSocketMap content >') ... if at least one available port found
             ('False','<empty list>')...no available port found """
         methodLocalName = self.__lc_current_method_name()
         if self.__ontType  == "5xx":
@@ -685,6 +813,7 @@ class InstrumentONT(Equipment):
         else:
             localMessage="Command supported by ONT-5xx only (current test equipment type:[{}]) ".format(self.__ontType)
             self.__lc_msg(localMessage)
+            self.__calledMethodStatus[methodLocalName]= "failed"   
             return False, localMessage
         # port availability check
         callResult = self.get_selected_ports("")
@@ -694,6 +823,7 @@ class InstrumentONT(Equipment):
         if not portAvailableFound:
             localMessage = "No available port found"
             self.__lc_msg(localMessage)
+            self.__calledMethodStatus[methodLocalName]= "failed"   
             return False, localMessage
         portAvailableList = self.__get_result_string(callResult)
         localMessage = "Found ports available :Port Id CSV List Received [{}]".format(portAvailableList)
@@ -709,6 +839,7 @@ class InstrumentONT(Equipment):
         initializedPortsNumber=len(self.__portToSocketMap)
         localMessage = "Added {} ports to Port-Socket map :[{}]".format(initializedPortsNumber, self.__portToSocketMap)
         self.__lc_msg(localMessage)
+        self.__calledMethodStatus[methodLocalName]= "success"   
         return True, localMessage
 
 
@@ -765,12 +896,12 @@ class InstrumentONT(Equipment):
             True , < information string >
             False, < cause of fail (eg: port already selected... >  """
         # basic check input parameter
-        methodLocalName = self.__lc_current_method_name(True)
+        methodLocalName = self.__lc_current_method_name(embedKrepoInit=True)
         portId = self.__recover_port_to_use(portId)
         if portId == "":
             localMessage = "port:[{}] not specified: empty parameter".format(portId)
             self.__lc_msg(localMessage)
-            self.__t_failure(methodLocalName, None, "", localMessage)
+            self.__method_failure(methodLocalName, None, "", localMessage)
             return False, localMessage
         # port availability check
         callResult = self.get_available_ports()
@@ -778,7 +909,7 @@ class InstrumentONT(Equipment):
         if not verifyResult[0]: # False
             localMessage = "Port [{}] not selected: not found in available ports list".format(portId)
             self.__lc_msg(localMessage)
-            self.__t_failure(methodLocalName, None, "", localMessage)
+            self.__method_failure(methodLocalName, None, "", localMessage)
             return False, localMessage
         # ONT command
         localCommand = ":PRTM:SEL {}".format(portId)
@@ -797,9 +928,9 @@ class InstrumentONT(Equipment):
                 break
             time.sleep(self.__ontSleepTimeForRetry)
         if portAllocated == True:
-            self.__t_success(methodLocalName, None, localMessage)
+            self.__method_success(methodLocalName, None, localMessage)
         else:
-            self.__t_failure(methodLocalName, None, "", localMessage)
+            self.__method_failure(methodLocalName, None, "", localMessage)
         return portAllocated, localMessage
 
 
@@ -811,12 +942,12 @@ class InstrumentONT(Equipment):
             True , < information string >
             False, < cause of fail (eg: port already selected... >  """
         # basic check input parameter
-        methodLocalName = self.__lc_current_method_name(True)
+        methodLocalName = self.__lc_current_method_name(embedKrepoInit=True)
         portId = self.__recover_port_to_use(portId)
         if portId == "":
             localMessage = "port:[{}] not specified: empty parameter".format(portId)
             self.__lc_msg(localMessage)
-            self.__t_failure(methodLocalName, None, "", localMessage)
+            self.__method_failure(methodLocalName, None, "", localMessage)
             return False, localMessage
 
         # port status check
@@ -825,7 +956,7 @@ class InstrumentONT(Equipment):
         if verifyResult[0]: # True: port already deselected
             localMessage = "Port [{}] already deselected: not found in available ports list".format(portId)
             self.__lc_msg(localMessage)
-            self.__t_failure(methodLocalName, None, "", localMessage)
+            self.__method_failure(methodLocalName, None, "", localMessage)
             return False, localMessage
 
         # ONT command
@@ -846,9 +977,9 @@ class InstrumentONT(Equipment):
                 break
             time.sleep(self.__ontSleepTimeForRetry)
         if portDeselected == True:
-            self.__t_success(methodLocalName, None, localMessage)
+            self.__method_success(methodLocalName, None, localMessage)
         else:
-            self.__t_failure(methodLocalName, None, "", localMessage)
+            self.__method_failure(methodLocalName, None, "", localMessage)
         return portDeselected, localMessage
 
 
@@ -858,7 +989,8 @@ class InstrumentONT(Equipment):
             True, < ports : the CSV list of the TCP used to remote control the test module >
                   /rack/slotNo/portNo, /rack/slot/portNo,...
             False, <empty list> if there is no suitable port """
-        methodLocalName = self.__lc_current_method_name()
+        #methodLocalName = self.__lc_current_method_name()
+        methodLocalName = self.__lc_current_method_name(embedKrepoInit=True)
         portId = self.__recover_port_to_use(portId)
         print("@@@ PORT ID := [{:s}] @@@".format(portId))
         localCommand=":PRTM:SEL? {}".format(portId)
@@ -867,6 +999,7 @@ class InstrumentONT(Equipment):
         localMessage="{}".format(callResult)
         self.__lc_msg(localMessage)
         if callResult == "" :
+            self.__method_failure(methodLocalName, None, "", localMessage)
             return False, ""
         if callResult == "1" :
             localMessage="ONT ERROR :PRTM:SEL? answers [{}] ".format(callResult)
@@ -876,8 +1009,9 @@ class InstrumentONT(Equipment):
             self.__lc_msg(localMessage)
             time.sleep(20)
             errorCode=self.__get_last_error()
+            self.__method_failure(methodLocalName, None, "", localMessage)
             return False, errorCode
-        #self.__t_success(methodLocalName, None, localMessage)
+        self.__method_success(methodLocalName, None, localMessage)
         return True, localMessage
 
 
@@ -948,6 +1082,7 @@ class InstrumentONT(Equipment):
         callResult = self.wait_ops_completed()
         if not callResult[0]:  # False: operation pending: unable to proceed
             localMessage="Instrument busy: unable to proceed [{}]".format(callResult[1])
+            self.__calledMethodStatus["get_instrument_id"]= "failed"  #
             self.__lc_msg(localMessage)
             return callResult, localMessage
         localCommand="*IDN?"
@@ -956,7 +1091,9 @@ class InstrumentONT(Equipment):
         localMessage="INSTRUMENT ID[{}]".format(callResult)
         self.__lc_msg(localMessage)
         if callResult == "":
+            self.__calledMethodStatus["get_instrument_id"]= "failed"  #
             return False, ""
+        self.__calledMethodStatus["get_instrument_id"]= "success"  #
         return True, callResult
 
 
@@ -977,7 +1114,7 @@ class InstrumentONT(Equipment):
         self.__lc_msg(localMessage)
         if int(ontRawError[0]) == 0:  # 0 as string
             return False ,  callResult
-        #self.__t_success(methodLocalName, None, localMessage)
+        #self.__method_success(methodLocalName, None, localMessage)
         return True, callResult
 
 
@@ -985,7 +1122,7 @@ class InstrumentONT(Equipment):
         """ Provides info about the last error
             True,  < info string about error >  (string format" <code>,"<message>"    )
             False, < 0, "No error" >  (if no error found)  """
-        methodLocalName = self.__lc_current_method_name(True)
+        methodLocalName = self.__lc_current_method_name(embedKrepoInit=True)
         localCommand=":SYST:ERR?"
         rawCallResult = self.__send_cmd(localCommand)
         callResult = self.__remove_dust(rawCallResult[1])
@@ -993,9 +1130,9 @@ class InstrumentONT(Equipment):
         localMessage="LAST INSTRUMENT ERROR [{}] [{}] ".format(ontRawError[0],ontRawError[1])
         self.__lc_msg(localMessage)
         if int(ontRawError[0]) == 0:  # 0 as string
-            self.__t_success(methodLocalName, None, localMessage)
+            self.__method_success(methodLocalName, None, localMessage)
             return False ,  callResult
-        self.__t_success(methodLocalName, None, localMessage)
+        self.__method_success(methodLocalName, None, localMessage)
         return True, callResult
 
 
@@ -1069,8 +1206,10 @@ class InstrumentONT(Equipment):
         if portId == "":
             localMessage = "open_port_channel error: portId  [{}] not valid (empty value)".format(portId)
             self.__lc_msg(localMessage)
+            self.__calledMethodStatus["open_port_channel"]= "failed"   
             return False, localMessage
         callResult = self.__create_port_connection(portId)
+        self.__calledMethodStatus["open_port_channel"]= "success"   
         return True, callResult
 
 
@@ -1100,7 +1239,7 @@ class InstrumentONT(Equipment):
         """ Provides the name of the application currently loaded in <portId> port.
             True,  < application currently loaded (e.g. SdhBert)>
             False, < empty string >  """
-        methodLocalName = self.__lc_current_method_name(True)
+        methodLocalName = self.__lc_current_method_name(embedKrepoInit=True)
         portId = self.__recover_port_to_use(portId)
         localCommand=":INST:CAT?"
         rawCallResult = self.__send_port_cmd(portId, localCommand)
@@ -1110,12 +1249,12 @@ class InstrumentONT(Equipment):
             localMessage="No Application Currently Loaded[{}] PortId[{}]".format(callResult, portId)
             callRetCode = False
             self.__lc_msg(localMessage)
-            self.__t_failure(methodLocalName, None, "", localMessage)
+            self.__method_failure(methodLocalName, None, "", localMessage)
         else:
             localMessage="Currently Loaded Application [{}] PortId[{}] ".format(callResult, portId)
             callRetCode = True
             self.__lc_msg(localMessage)
-            self.__t_success(methodLocalName, None, localMessage)
+            self.__method_success(methodLocalName, None, localMessage)
         return callRetCode, callResult
 
 
@@ -1125,17 +1264,17 @@ class InstrumentONT(Equipment):
             the application results in loaded status.
             True.... application loaded
             False... application load failed   """
-        methodLocalName = self.__lc_current_method_name(True)
+        methodLocalName = self.__lc_current_method_name(embedKrepoInit=True)
         portId = self.__recover_port_to_use(portId)
         if portId == "":
             localMessage = "load_app error: portId  [{}] not valid (empty value)".format(portId)
             self.__lc_msg(localMessage)
-            self.__t_failure(methodLocalName, None, "", localMessage)
+            self.__method_failure(methodLocalName, None, "", localMessage)
             return False, localMessage
         if applicationName == "":
             localMessage = "load_app error: applicationName  [{}] not valid (empty value)".format(applicationName)
             self.__lc_msg(localMessage)
-            self.__t_failure(methodLocalName, None, "", localMessage)
+            self.__method_failure(methodLocalName, None, "", localMessage)
             return False, localMessage
 
         if self.__ontType  == "6xx":
@@ -1145,7 +1284,7 @@ class InstrumentONT(Equipment):
             else:
                 localMessage = "[{}] load_app error: applicationName [{}] not in expected list: [New-Application]".format(self.__ontType, applicationName)
                 self.__lc_msg(localMessage)
-                self.__t_failure(methodLocalName, None, "", localMessage)
+                self.__method_failure(methodLocalName, None, "", localMessage)
                 return False, localMessage
         else:
             if applicationName == "SdhBert"      or \
@@ -1158,7 +1297,7 @@ class InstrumentONT(Equipment):
             else:
                 localMessage = "[{}] load_app error: applicationName [{}] not in expected list: [SdhBert|SonetBert|OTN-G709|OTN-G709-SDH|OTN-G709-SONET]".format(self.__ontType, applicationName)
                 self.__lc_msg(localMessage)
-                self.__t_failure(methodLocalName, None, "", localMessage)
+                self.__method_failure(methodLocalName, None, "", localMessage)
                 return False, localMessage
 
         localCommand=":INST:LOAD \"{}\"".format(applicationName)
@@ -1179,9 +1318,9 @@ class InstrumentONT(Equipment):
             time.sleep(self.__ontSleepTimeForRetry)
         self.__lc_msg(messageFromPort)
         if applicationLoaded == True:
-            self.__t_success(methodLocalName, None, localMessage)
+            self.__method_success(methodLocalName, None, localMessage)
         else:
-            self.__t_failure(methodLocalName, None, "", localMessage)
+            self.__method_failure(methodLocalName, None, "", localMessage)
         return applicationLoaded, callResult
 
 
@@ -1191,17 +1330,17 @@ class InstrumentONT(Equipment):
             the application results really deleted.
             True.... application unloaded
             False... application unload failed   """
-        methodLocalName = self.__lc_current_method_name(True)
+        methodLocalName = self.__lc_current_method_name(embedKrepoInit=True)
         portId = self.__recover_port_to_use(portId)
         if portId == "":
             localMessage = "unload_app error: portId  [{}] not valid (empty value)".format(portId)
             self.__lc_msg(localMessage)
-            self.__t_failure(methodLocalName, None, "", localMessage)
+            self.__method_failure(methodLocalName, None, "", localMessage)
             return False, localMessage
         if applicationName == "":
             localMessage = "unload_app error: applicationName  [{}] not valid (empty value)".format(applicationName)
             self.__lc_msg(localMessage)
-            self.__t_failure(methodLocalName, None, "", localMessage)
+            self.__method_failure(methodLocalName, None, "", localMessage)
             return False, localMessage
         if self.__ontType  == "6xx":
             if applicationName == "New-Application":
@@ -1210,7 +1349,7 @@ class InstrumentONT(Equipment):
             else:
                 localMessage = "load_app error: app name [{}] not in expected list: [New-Application]".format(applicationName)
                 self.__lc_msg(localMessage)
-                self.__t_failure(methodLocalName, None, "", localMessage)
+                self.__method_failure(methodLocalName, None, "", localMessage)
                 return False, localMessage
         else:
             if applicationName == "SdhBert"      or \
@@ -1223,7 +1362,7 @@ class InstrumentONT(Equipment):
             else:
                 localMessage = "unload_app error:  app name  [{}] not in expected list: [SdhBert|SonetBert|OTN-G709|OTN-G709-SDH|OTN-G709-SONET]".format(applicationName)
                 self.__lc_msg(localMessage)
-                self.__t_failure(methodLocalName, None, "", localMessage)
+                self.__method_failure(methodLocalName, None, "", localMessage)
                 return False, localMessage
 
         localCommand=":INST:DEL \"{}\"".format(applicationName)
@@ -1245,9 +1384,9 @@ class InstrumentONT(Equipment):
         time.sleep(10) # safety delay: unload answer finished even if still in progress...
         self.__lc_msg(messageFromPort)
         if applicationUnloaded == True:
-            self.__t_success(methodLocalName, None, localMessage)
+            self.__method_success(methodLocalName, None, localMessage)
         else:
-            self.__t_failure(methodLocalName, None, "", localMessage)
+            self.__method_failure(methodLocalName, None, "", localMessage)
         return applicationUnloaded, callResult
 
 
@@ -1285,7 +1424,7 @@ class InstrumentONT(Equipment):
         currentEditSessionStatus = self.__remove_dust(rawCallResult[1])
         localMessage="Cmd:[{}] Result:[{}]".format(localCommand, currentEditSessionStatus)
         self.__lc_msg(localMessage)
-        #self.__t_success(methodLocalName, None, localMessage)
+        #self.__method_success(methodLocalName, None, localMessage)
         return True, callResult
 
 
@@ -1319,7 +1458,7 @@ class InstrumentONT(Equipment):
         currentEditSessionStatus = self.__remove_dust(rawCallResult[1])
         localMessage="Cmd:[{}] Result:[{}]".format(localCommand, currentEditSessionStatus)
         self.__lc_msg(localMessage)
-        #self.__t_success(methodLocalName, None, localMessage)
+        #self.__method_success(methodLocalName, None, localMessage)
         return True, callResult
 
 
@@ -1393,24 +1532,24 @@ class InstrumentONT(Equipment):
             PHYS_SONW                            10GigE WAN-SONET L1 BERT
             PHYS_SONW_PCS_MAC                    10GigE WAN-SONET L2 L3 Traffic
             """
-        methodLocalName = self.__lc_current_method_name(True)
+        methodLocalName = self.__lc_current_method_name(embedKrepoInit=True)
         portId = self.__recover_port_to_use(portId)
         if self.__ontType  == "6xx":
             pass
         else:
             localMessage="Command supported by ONT-6xx only "
             self.__lc_msg(localMessage)
-            self.__t_failure(methodLocalName, None, "", localMessage)
+            self.__method_failure(methodLocalName, None, "", localMessage)
             return False, localMessage
         if portId == "":
             localMessage = "set_current_signal_structure error: portId  [{}] not valid (empty value)".format(portId)
             self.__lc_msg(localMessage)
-            self.__t_failure(methodLocalName, None, "", localMessage)
+            self.__method_failure(methodLocalName, None, "", localMessage)
             return False, localMessage
         if sigStructType == "":
             localMessage = "set_current_signal_structure error: sigStructType [{}] not valid (empty value)".format(sigStructType)
             self.__lc_msg(localMessage)
-            self.__t_failure(methodLocalName, None, "", localMessage)
+            self.__method_failure(methodLocalName, None, "", localMessage)
             return False, localMessage
 
         # INSERT PRE/POST PROCESSING CHECKS
@@ -1431,7 +1570,7 @@ class InstrumentONT(Equipment):
         # Trying to give a chick to the TestEq to fix :INST:CONF:EDIT:APPL? always OFF issue...
         time.sleep(30)
         self.__lc_msg(localMessage)
-        self.__t_success(methodLocalName, None, localMessage)
+        self.__method_success(methodLocalName, None, localMessage)
         return True, localMessage
 
 
@@ -1442,20 +1581,20 @@ class InstrumentONT(Equipment):
     def start_measurement(self, portId):   # ONT-5xx  Only    ### krepo added ###       
         """ ONT-5XX only
             Starts a measurement.. """
-        methodLocalName = self.__lc_current_method_name(True)
+        methodLocalName = self.__lc_current_method_name(embedKrepoInit=True)
         portId = self.__recover_port_to_use(portId)
         if self.__ontType  == "5xx":
             pass
         else:
             localMessage="start_measurement: Command supported by ONT-5xx only "
             self.__lc_msg(localMessage)
-            self.__t_failure(methodLocalName, None, "", localMessage)
+            self.__method_failure(methodLocalName, None, "", localMessage)
             return False, localMessage
 
         if portId == "":
             localMessage = "start_measurement error: portId  [{}] not valid (empty value)".format(portId)
             self.__lc_msg(localMessage)
-            self.__t_failure(methodLocalName, None, "", localMessage)
+            self.__method_failure(methodLocalName, None, "", localMessage)
             return False, localMessage
         # INSERT PRE/POST PROCESSING CHECKS IF POSSIBLE
         localCommand=":INIT:IMM:ALL"
@@ -1463,26 +1602,26 @@ class InstrumentONT(Equipment):
         callResult = self.__remove_dust(rawCallResult[1])
         localMessage="Cmd:[{}] Result:[{}]".format(localCommand, callResult)
         self.__lc_msg(localMessage)
-        self.__t_success(methodLocalName, None, localMessage)
+        self.__method_success(methodLocalName, None, localMessage)
         return True, callResult
 
 
 
     def halt_measurement(self, portId):   # ONT-5xx  Only    ### krepo added ###       
         """ Halts a running measurement. """
-        methodLocalName = self.__lc_current_method_name(True)
+        methodLocalName = self.__lc_current_method_name(embedKrepoInit=True)
         portId = self.__recover_port_to_use(portId)
         if self.__ontType  == "5xx":
             pass
         else:
             localMessage="{}:Command supported by ONT-5xx only ".format(methodLocalName)
             self.__lc_msg(localMessage)
-            self.__t_failure(methodLocalName, None, "", localMessage)
+            self.__method_failure(methodLocalName, None, "", localMessage)
             return False, localMessage
         if portId == "":
             localMessage = "{} error: portId  [{}] not valid (empty value)".format(methodLocalName,portId)
             self.__lc_msg(localMessage)
-            self.__t_failure(methodLocalName, None, "", localMessage)
+            self.__method_failure(methodLocalName, None, "", localMessage)
             return False, localMessage
         # INSERT PRE/POST PROCESSING CHECKS IF POSSIBLE
         localCommand=":ABOR"
@@ -1490,21 +1629,21 @@ class InstrumentONT(Equipment):
         callResult = self.__remove_dust(rawCallResult[1])
         localMessage="Cmd:[{}] Result:[{}]".format(localCommand, callResult)
         self.__lc_msg(localMessage)
-        self.__t_success(methodLocalName, None, localMessage)
+        self.__method_success(methodLocalName, None, localMessage)
         return True, callResult
 
 
         
     def cli_user_debug_command(self,commandString, portId):   # To give the user the possibility to check commands       
         """ To give the user the possibility to check commands """
-        methodLocalName = self.__lc_current_method_name(True)
+        methodLocalName = self.__lc_current_method_name(embedKrepoInit=True)
         portId = self.__recover_port_to_use(portId)
         localCommand = commandString 
         rawCallResult = self.__send_port_cmd(portId, localCommand)
         callResult = self.__remove_dust(rawCallResult[1])
         localMessage="Cmd:[{}] Result:[{}]".format(localCommand, callResult)
         self.__lc_msg(localMessage)
-        self.__t_success(methodLocalName, None, localMessage)
+        self.__method_success(methodLocalName, None, localMessage)
         return True, callResult
 
 
@@ -1516,19 +1655,19 @@ class InstrumentONT(Equipment):
             Notes: The maximal possible gating time depends on the application
                    and may be shorter than 99 days.
                    Setting the maximal possible gating time is equivalent to 'Continuous'. """
-        methodLocalName = self.__lc_current_method_name(True)
+        methodLocalName = self.__lc_current_method_name(embedKrepoInit=True)
         portId = self.__recover_port_to_use(portId)
         if self.__ontType  == "5xx":
             pass
         else:
             localMessage="{}:Command supported by ONT-5xx only ".format(methodLocalName)
             self.__lc_msg(localMessage)
-            self.__t_failure(methodLocalName, None, "", localMessage)
+            self.__method_failure(methodLocalName, None, "", localMessage)
             return False, localMessage
         if portId == "":
             localMessage = "{} error: portId  [{}] not valid (empty value)".format(methodLocalName,portId)
             self.__lc_msg(localMessage)
-            self.__t_failure(methodLocalName, None, "", localMessage)
+            self.__method_failure(methodLocalName, None, "", localMessage)
             return False, localMessage
         if gatingTime  == "" or \
            gatingTime  == 0:  # get time request
@@ -1537,14 +1676,14 @@ class InstrumentONT(Equipment):
             callResult = self.__remove_dust(rawCallResult[1]).replace(">","")
             localMessage="Get measurement time result:[{}]".format(callResult)
             self.__lc_msg(localMessage)
-            self.__t_success(methodLocalName, None, localMessage)
+            self.__method_success(methodLocalName, None, localMessage)
             return True, callResult
         localCommand=":SENS:SWE:TIME {}".format(gatingTime)
         rawCallResult = self.__send_port_cmd(portId, localCommand)
         callResult = self.__remove_dust(rawCallResult[1]).replace(">","")
         localMessage="Set measurement time result:[{}]".format(callResult)
         self.__lc_msg(localMessage)
-        self.__t_success(methodLocalName, None, localMessage)
+        self.__method_success(methodLocalName, None, localMessage)
         return True, callResult
 
 
@@ -1562,7 +1701,7 @@ class InstrumentONT(Equipment):
             True : command execution ok, return string contains the alarm list (empty if no alarm)
             False: command execution failed, error string for debug purposes
         """
-        methodLocalName = self.__lc_current_method_name(True)
+        methodLocalName = self.__lc_current_method_name(embedKrepoInit=True)
         portId = self.__recover_port_to_use(portId)
         retList = []
         if self.__ontType  == "5xx":
@@ -1572,7 +1711,7 @@ class InstrumentONT(Equipment):
         if portId == "":
             localMessage = "ERROR retrieve_optical_alarms: portId  [{}] not specified".format(portId)
             self.__lc_msg(localMessage)
-            self.__t_failure(methodLocalName, None, "", localMessage)
+            self.__method_failure(methodLocalName, None, "", localMessage)
             return False, localMessage
         localCommand="{}?".format(ONTCmdString)
         rawCallResult = self.__send_port_cmd(portId, localCommand)
@@ -1581,7 +1720,7 @@ class InstrumentONT(Equipment):
         if resultItemsArray[0] == "-1":  # SDH command error
             localMessage = "[{}] ERROR: retrieve_optical_alarms ({}) answers :[{}] ".format(self.__ontType,localCommand,resultItemsArray[0])
             self.__lc_msg(localMessage)
-            self.__t_failure(methodLocalName, None, "", localMessage)
+            self.__method_failure(methodLocalName, None, "", localMessage)
             return False, localMessage
         alarmCodes = resultItemsArray[1]
         if self.__ontType  == "5xx":
@@ -1607,7 +1746,7 @@ class InstrumentONT(Equipment):
                 retList += ["MissingXFPSFP"]
         localMessage="Optical Found Alarms: [{}]".format(retList)
         self.__lc_msg(localMessage)
-        self.__t_success(methodLocalName, None, localMessage)
+        self.__method_success(methodLocalName, None, localMessage)
         return True, retList
 
 
@@ -1667,12 +1806,12 @@ class InstrumentONT(Equipment):
             True : command execution ok, the return string contains the alarm list (empty if no alarm)
             False: command execution failed, error string for debug purposes
         """
-        methodLocalName = self.__lc_current_method_name(True)
+        methodLocalName = self.__lc_current_method_name(embedKrepoInit=True)
         portId = self.__recover_port_to_use(portId)
         if portId == "":
             localMessage = "[{}] ERROR retrieve_ho_alarms: portId  [{}] not specified".format(methodLocalName,portId)
             self.__lc_msg(localMessage)
-            self.__t_failure(methodLocalName, None, "", localMessage)
+            self.__method_failure(methodLocalName, None, "", localMessage)
             return False, localMessage
         retList = []
         if self.__ontType  == "6xx":  # ONT 6xx management
@@ -1683,7 +1822,7 @@ class InstrumentONT(Equipment):
             if resultItemsArray[0] == "-1":  # SDH command error
                 localMessage = "ERROR: retrieve_ho_lo_alarms ({}) answers :[{}] ".format(localCommand,resultItemsArray[0])
                 self.__lc_msg(localMessage)
-                self.__t_failure(methodLocalName, None, "", localMessage)
+                self.__method_failure(methodLocalName, None, "", localMessage)
                 return False, localMessage
             alarmCodes = resultItemsArray[1]
             localMessage="[6xx] Optical alarms retcode: [{}]".format(str(alarmCodes))
@@ -1716,7 +1855,7 @@ class InstrumentONT(Equipment):
             if alarmCodes & 1073741824 :  retList += ["LSS"]
             localMessage="High Order and Lower Order Found Alarms: [{}]".format(retList)
             self.__lc_msg(localMessage)
-            self.__t_success(methodLocalName, None, localMessage)
+            self.__method_success(methodLocalName, None, localMessage)
             return True, retList
         elif self.__ontType  == "5xx":  # ONT 5xx management :
             localCommand=":HST:RX:SDH?"
@@ -1726,7 +1865,7 @@ class InstrumentONT(Equipment):
             if resultItemsArray[0] == "-1":  # SDH command error
                 localMessage = "ERROR: retrieve_ho_alarms ({}) answers :[{}] ".format(localCommand,resultItemsArray[0])
                 self.__lc_msg(localMessage)
-                self.__t_failure(methodLocalName, None, "", localMessage)
+                self.__method_failure(methodLocalName, None, "", localMessage)
                 return False, localMessage
             alarmCodes = resultItemsArray[1]
             alarmCodes=int(float(alarmCodes))
@@ -1749,7 +1888,7 @@ class InstrumentONT(Equipment):
             if resultItemsArray[0] == "-1":  # SDH command errorJust print a message in case of lower order alarms
                 localMessage = "INFO: retrieve_lo_alarms ({}) answers :[{}] skipping LO sdh alarm processing".format(localCommand,resultItemsArray[0])
                 self.__lc_msg(localMessage)
-                #self.__t_failure(methodLocalName, None, "", localMessage)
+                #self.__method_failure(methodLocalName, None, "", localMessage)
                 #return False, localMessage
             else:  # with no errors in lower order alarm retrieve process alarmCodes
                 alarmCodes = resultItemsArray[1]
@@ -1764,12 +1903,12 @@ class InstrumentONT(Equipment):
                 if alarmCodes & 256:          retList += ["LP-PLM"]
             localMessage="Found Alarms: [{}]".format(retList)
             self.__lc_msg(localMessage)
-            self.__t_success(methodLocalName, None, localMessage)
+            self.__method_success(methodLocalName, None, localMessage)
             return True, retList
         else :  # "Instrument not supported" case management :
             localMessage="Instrument [{}] not supported".format(retList)
             self.__lc_msg(localMessage)
-            self.__t_failure(methodLocalName, None, "", localMessage)
+            self.__method_failure(methodLocalName, None, "", localMessage)
             return False, retList
 
 
@@ -1792,7 +1931,7 @@ class InstrumentONT(Equipment):
             True : command execution ok, return string contains the alarm list (empty if no alarm)
             False: command execution failed, error string for debug purposes
         """
-        methodLocalName = self.__lc_current_method_name(True)
+        methodLocalName = self.__lc_current_method_name(embedKrepoInit=True)
         portId = self.__recover_port_to_use(portId)
         retList = []
         if self.__ontType  == "5xx":
@@ -1800,12 +1939,12 @@ class InstrumentONT(Equipment):
         else:
             localMessage="ERROR: Command supported by ONT-5xx only "
             self.__lc_msg(localMessage)
-            self.__t_failure(methodLocalName, None, "", localMessage)
+            self.__method_failure(methodLocalName, None, "", localMessage)
             return False, localMessage
         if portId == "":
             localMessage = "ERROR retrieve_ho_alarms: portId  [{}] not specified".format(portId)
             self.__lc_msg(localMessage)
-            self.__t_failure(methodLocalName, None, "", localMessage)
+            self.__method_failure(methodLocalName, None, "", localMessage)
             return False, localMessage
         localCommand=":HST:RX:SDH?"
         rawCallResult = self.__send_port_cmd(portId, localCommand)
@@ -1814,7 +1953,7 @@ class InstrumentONT(Equipment):
         if resultItemsArray[0] == "-1":  # SDH command error
             localMessage = "ERROR: retrieve_ho_alarms ({}) answers :[{}] ".format(localCommand,resultItemsArray[0])
             self.__lc_msg(localMessage)
-            self.__t_failure(methodLocalName, None, "", localMessage)
+            self.__method_failure(methodLocalName, None, "", localMessage)
             return False, localMessage
         alarmCodes = resultItemsArray[1]
         alarmCodes=int(float(alarmCodes))
@@ -1842,7 +1981,7 @@ class InstrumentONT(Equipment):
              retList += ["HP-PLM"]
         localMessage="High Order Found Alarms: [{}]".format(retList)
         self.__lc_msg(localMessage)
-        self.__t_success(methodLocalName, None, localMessage)
+        self.__method_success(methodLocalName, None, localMessage)
         return True, retList
 
 
@@ -1863,7 +2002,7 @@ class InstrumentONT(Equipment):
             True : command execution ok, return string contains the alarm list (empty if no alarm)
             False: command execution failed, error string for debug purposes
         """
-        methodLocalName = self.__lc_current_method_name(True)
+        methodLocalName = self.__lc_current_method_name(embedKrepoInit=True)
         portId = self.__recover_port_to_use(portId)
         retList = []
         if self.__ontType  == "5xx":
@@ -1871,12 +2010,12 @@ class InstrumentONT(Equipment):
         else:
             localMessage="ERROR: Command supported by ONT-5xx only "
             self.__lc_msg(localMessage)
-            self.__t_failure(methodLocalName, None, "", localMessage)
+            self.__method_failure(methodLocalName, None, "", localMessage)
             return False, localMessage
         if portId == "":
             localMessage = "ERROR retrieve_lo_alarms: portId  [{}] not specified".format(portId)
             self.__lc_msg(localMessage)
-            self.__t_failure(methodLocalName, None, "", localMessage)
+            self.__method_failure(methodLocalName, None, "", localMessage)
             return False, localMessage
         localCommand=":HST:RX:SDH:TRIB?"
         rawCallResult = self.__send_port_cmd(portId, localCommand)
@@ -1885,7 +2024,7 @@ class InstrumentONT(Equipment):
         if resultItemsArray[0] == "-1":  # SDH command error
             localMessage = "ERROR: retrieve_lo_alarms ({}) answers :[{}] ".format(localCommand,resultItemsArray[0])
             self.__lc_msg(localMessage)
-            self.__t_failure(methodLocalName, None, "", localMessage)
+            self.__method_failure(methodLocalName, None, "", localMessage)
             return False, localMessage
         alarmCodes = resultItemsArray[1]
         alarmCodes=int(float(alarmCodes))
@@ -1907,7 +2046,7 @@ class InstrumentONT(Equipment):
              retList += ["LP-PLM"]
         localMessage="Lower Order Found Alarms: [{}]".format(retList)
         self.__lc_msg(localMessage)
-        self.__t_success(methodLocalName, None, localMessage)
+        self.__method_success(methodLocalName, None, localMessage)
         return True, retList
 
 
@@ -1945,7 +2084,7 @@ class InstrumentONT(Equipment):
             True : command execution ok, return string contains the alarm list (empty if no alarm)
             False: command execution failed, error string for debug purposes
         """
-        methodLocalName = self.__lc_current_method_name(True)
+        methodLocalName = self.__lc_current_method_name(embedKrepoInit=True)
         portId = self.__recover_port_to_use(portId)
         retList = []
         if self.__ontType  == "6xx":
@@ -1957,12 +2096,12 @@ class InstrumentONT(Equipment):
             #
             localMessage="ERROR: Command supported by ONT-5xx only "
             self.__lc_msg(localMessage)
-            self.__t_failure(methodLocalName, None, "", localMessage)
+            self.__method_failure(methodLocalName, None, "", localMessage)
             return False, localMessage
         if portId == "":
             localMessage = "ERROR retrieve_ho_lo_alarms: portId  [{}] not specified".format(portId)
             self.__lc_msg(localMessage)
-            self.__t_failure(methodLocalName, None, "", localMessage)
+            self.__method_failure(methodLocalName, None, "", localMessage)
             return False, localMessage
         localCommand="SDH:SEL:CST:ALAR?"
         rawCallResult = self.__send_port_cmd(portId, localCommand)
@@ -1971,7 +2110,7 @@ class InstrumentONT(Equipment):
         if resultItemsArray[0] == "-1":  # SDH command error
             localMessage = "ERROR: retrieve_ho_lo_alarms ({}) answers :[{}] ".format(localCommand,resultItemsArray[0])
             self.__lc_msg(localMessage)
-            self.__t_failure(methodLocalName, None, "", localMessage)
+            self.__method_failure(methodLocalName, None, "", localMessage)
             return False, localMessage
         alarmCodes = resultItemsArray[1]
         localMessage="[6xx] Optical alarms retcode: [{}]".format(str(alarmCodes))
@@ -2004,7 +2143,7 @@ class InstrumentONT(Equipment):
         if alarmCodes & 1073741824 :  retList += ["LSS"]
         localMessage="High Order and Lower Order Found Alarms: [{}]".format(retList)
         self.__lc_msg(localMessage)
-        self.__t_success(methodLocalName, None, localMessage)
+        self.__method_success(methodLocalName, None, localMessage)
         return True, retList
 
 
@@ -2021,7 +2160,7 @@ class InstrumentONT(Equipment):
         localCommand="{} {}".format(ONTCmdString, burstNotAlarmedFramesNumber)
         localCommand="{}?".format(ONTCmdString)
         """
-        methodLocalName = self.__lc_current_method_name(True)
+        methodLocalName = self.__lc_current_method_name(embedKrepoInit=True)
         portId = self.__recover_port_to_use(portId)
         retList = []
         if self.__ontType  == "5xx":
@@ -2031,7 +2170,7 @@ class InstrumentONT(Equipment):
         if portId == "":
             localMessage = "ERROR get_set_laser_status: portId  [{}] not specified".format(portId)
             self.__lc_msg(localMessage)
-            self.__t_failure(methodLocalName, None, "", localMessage)
+            self.__method_failure(methodLocalName, None, "", localMessage)
             return False, localMessage
         laserStatus = laserStatus.upper()
         if laserStatus != "ON"  and \
@@ -2039,13 +2178,13 @@ class InstrumentONT(Equipment):
            laserStatus != "":
             localMessage = "ERROR get_set_laser_status: laserStatus  [{}] not valid [ON|OFF|''(to get status)]".format(laserStatus)
             self.__lc_msg(localMessage)
-            self.__t_failure(methodLocalName, None, "", localMessage)
+            self.__method_failure(methodLocalName, None, "", localMessage)
             return False, localMessage
         if laserStatus == "":  # Get laser status and exit
             localCommand="{}?".format(ONTCmdString)
             rawCallResult = self.__send_port_cmd(portId, localCommand)
             sdhAnswer = self.__remove_dust(rawCallResult[1])
-            self.__t_success(methodLocalName, None, sdhAnswer)
+            self.__method_success(methodLocalName, None, sdhAnswer)
             return True, sdhAnswer
         localCommand="{} {}".format(ONTCmdString, laserStatus)
         rawCallResult = self.__send_port_cmd(portId, localCommand)
@@ -2055,7 +2194,7 @@ class InstrumentONT(Equipment):
         sdhAnswer = self.__remove_dust(rawCallResult[1])
         localMessage="Current Laser Status After set:[{}] ".format(sdhAnswer)
         self.__lc_msg(localMessage)
-        self.__t_success(methodLocalName, None, localMessage)
+        self.__method_success(methodLocalName, None, localMessage)
         return True, sdhAnswer
 
 
@@ -2075,13 +2214,13 @@ class InstrumentONT(Equipment):
         localCommand="{}?".format(ONTCmdString)
 
         """
-        methodLocalName = self.__lc_current_method_name(True)
+        methodLocalName = self.__lc_current_method_name(embedKrepoInit=True)
         portId = self.__recover_port_to_use(portId)
         #retList = []
         if portId == "":
             localMessage = "ERROR get_set_wavelenght: portId  [{}] not specified".format(portId)
             self.__lc_msg(localMessage)
-            self.__t_failure(methodLocalName, None, "", localMessage)
+            self.__method_failure(methodLocalName, None, "", localMessage)
             return False, localMessage
         if self.__ontType  == "5xx":
             ONTCmdString=":OUTP:TEL:LINE:OPT:WLEN"
@@ -2107,13 +2246,13 @@ class InstrumentONT(Equipment):
                waveLenght != "":
                 localMessage = "ERROR get_set_wavelenght: waveLenght  [{}] not valid [W1310|W1550|1310|1550|''(to get status)]".format(waveLenght)
                 self.__lc_msg(localMessage)
-                self.__t_success(methodLocalName, None, localMessage)
+                self.__method_success(methodLocalName, None, localMessage)
                 return False, localMessage
         if waveLenght == "":  # Get laser wavelenght and exit
             localCommand="{}?".format(ONTCmdString)
             rawCallResult = self.__send_port_cmd(portId, localCommand)
             sdhAnswer = self.__remove_dust(rawCallResult[1])
-            self.__t_success(methodLocalName, None, sdhAnswer)
+            self.__method_success(methodLocalName, None, sdhAnswer)
             return True, sdhAnswer
         localCommand="{} {}".format(ONTCmdString, waveLenght)
         rawCallResult = self.__send_port_cmd(portId, localCommand)
@@ -2123,7 +2262,7 @@ class InstrumentONT(Equipment):
         sdhAnswer = self.__remove_dust(rawCallResult[1])
         localMessage="Current Laser wlenght set to [{}]... status After set :[{}] ".format(waveLenght,sdhAnswer)
         self.__lc_msg(localMessage)
-        self.__t_success(methodLocalName, None, localMessage)
+        self.__method_success(methodLocalName, None, localMessage)
         return True, sdhAnswer
 
 
@@ -2200,7 +2339,7 @@ class InstrumentONT(Equipment):
                 True : command execution ok, current read bitRate in result string
                 False: error in command execution, details in error list string
         """
-        methodLocalName = self.__lc_current_method_name(True)
+        methodLocalName = self.__lc_current_method_name(embedKrepoInit=True)
         portId = self.__recover_port_to_use(portId)
         if self.__ontType  == "5xx":
             ONTCmdString=":SENS:DATA:TEL:OPT:RATE"
@@ -2209,7 +2348,7 @@ class InstrumentONT(Equipment):
         if portId == "":
             localMessage = "ERROR get_set_bitRate: portId  [{}] not specified".format(portId)
             self.__lc_msg(localMessage)
-            self.__t_failure(methodLocalName, None, "", localMessage)
+            self.__method_failure(methodLocalName, None, "", localMessage)
             return False, localMessage
         bitRate = bitRate.upper()
         if bitRate != "STM0"  and \
@@ -2220,13 +2359,13 @@ class InstrumentONT(Equipment):
            bitRate != "":
             localMessage = "ERROR get_set_bitRate: bitRate  [{}] not valid [STM0|STM1|STM4|STM16|STM64|''(to get status)]".format(bitRate)
             self.__lc_msg(localMessage)
-            self.__t_failure(methodLocalName, None, "", localMessage)
+            self.__method_failure(methodLocalName, None, "", localMessage)
             return False, localMessage
         if bitRate == "":  # Get laser bitRate and exit
             localCommand="{}?".format(ONTCmdString)
             rawCallResult = self.__send_port_cmd(portId, localCommand)
             sdhAnswer = self.__remove_dust(rawCallResult[1])
-            self.__t_success(methodLocalName, None, sdhAnswer)
+            self.__method_success(methodLocalName, None, sdhAnswer)
             return True, sdhAnswer
         if self.__ontType  == "6xx": # for 6xx we need to use OCs instead of STMs
             localMessage="[6xx]: [{}] translated to [{}]".format(bitRate,self.StmToOc[bitRate])
@@ -2242,11 +2381,11 @@ class InstrumentONT(Equipment):
         if sdhAnswer != rxBitRateRequired:
             localMessage="Set RX bitRate mismatch required [{}] but set [{}] ".format(rxBitRateRequired,sdhAnswer)
             self.__lc_msg(localMessage)
-            self.__t_failure(methodLocalName, None, "", localMessage)
+            self.__method_failure(methodLocalName, None, "", localMessage)
             return False, sdhAnswer
         localMessage="Set RX bitRate required=[{}] after set=[{}] ".format(rxBitRateRequired,sdhAnswer)
         self.__lc_msg(localMessage)
-        self.__t_success(methodLocalName, None, localMessage)
+        self.__method_success(methodLocalName, None, localMessage)
         return True, sdhAnswer
 
 
@@ -2260,7 +2399,7 @@ class InstrumentONT(Equipment):
                 True : command execution ok, current reference clock mode in result string
                 False: error in command execution, details in error list string
         """
-        methodLocalName = self.__lc_current_method_name(True)
+        methodLocalName = self.__lc_current_method_name(embedKrepoInit=True)
         portId = self.__recover_port_to_use(portId)
         if self.__ontType  == "5xx":
             ONTCmdString=":SENS:DATA:TEL:RCL:TX:CLOC:SEL"
@@ -2271,7 +2410,7 @@ class InstrumentONT(Equipment):
         if portId == "":
             localMessage = "ERROR get_set_clockMode: portId  [{}] not specified".format(portId)
             self.__lc_msg(localMessage)
-            self.__t_failure(methodLocalName, None, "", localMessage)
+            self.__method_failure(methodLocalName, None, "", localMessage)
             return False, localMessage
         clockMode = clockMode.upper()
         if clockMode != ontSpecificLocalClockParam  and \
@@ -2279,13 +2418,13 @@ class InstrumentONT(Equipment):
            clockMode != "":
             localMessage = "ERROR get_set_clockMode: clockMode  [{}] not valid [{}|RX|''(to get status)]".format( clockMode,ontSpecificLocalClockParam )
             self.__lc_msg(localMessage)
-            self.__t_failure(methodLocalName, None, "", localMessage)
+            self.__method_failure(methodLocalName, None, "", localMessage)
             return False, localMessage
         if clockMode == "":  # Get clockMode and exit
             localCommand="{}?".format(ONTCmdString)
             rawCallResult = self.__send_port_cmd(portId, localCommand)
             sdhAnswer = self.__remove_dust(rawCallResult[1])
-            self.__t_success(methodLocalName, None, sdhAnswer)
+            self.__method_success(methodLocalName, None, sdhAnswer)
             return True, sdhAnswer
         localCommand="{} {}".format(ONTCmdString, clockMode)
         rawCallResult = self.__send_port_cmd(portId, localCommand)
@@ -2295,7 +2434,7 @@ class InstrumentONT(Equipment):
         sdhAnswer = self.__remove_dust(rawCallResult[1])
         localMessage="Current reference clock source after set:[{}] ".format(sdhAnswer)
         self.__lc_msg(localMessage)
-        self.__t_success(methodLocalName, None, localMessage)
+        self.__method_success(methodLocalName, None, localMessage)
         return True, sdhAnswer
 
 
@@ -2309,25 +2448,25 @@ class InstrumentONT(Equipment):
                 True : command execution ok, current read rxChannel in result string
                 False: error in command execution, details in error list string
         """
-        methodLocalName = self.__lc_current_method_name(True)
+        methodLocalName = self.__lc_current_method_name(embedKrepoInit=True)
         portId = self.__recover_port_to_use(portId)
         if self.__ontType  == "5xx":
             pass
         else:
             localMessage="ERROR get_set_rxChannel: Command supported by ONT-5xx only "
             self.__lc_msg(localMessage)
-            self.__t_failure(methodLocalName, None, "", localMessage)
+            self.__method_failure(methodLocalName, None, "", localMessage)
             return False, localMessage
         if portId == "":
             localMessage = "ERROR get_set_rxChannel: rxChannel  [{}] not specified".format(portId)
             self.__lc_msg(localMessage)
-            self.__t_failure(methodLocalName, None, "", localMessage)
+            self.__method_failure(methodLocalName, None, "", localMessage)
             return False, localMessage
         if rxChannel == "":  # Get rxChannel and exit
             localCommand=":SENS:DATA:TEL:SDH:PATH1:CHAN?"
             rawCallResult = self.__send_port_cmd(portId, localCommand)
             sdhAnswer = self.__remove_dust(rawCallResult[1])
-            self.__t_success(methodLocalName, None, sdhAnswer)
+            self.__method_success(methodLocalName, None, sdhAnswer)
             return True, sdhAnswer
         rxChannelRequired=rxChannel
         channelNumber=int(float(rxChannel))
@@ -2335,7 +2474,7 @@ class InstrumentONT(Equipment):
            channelNumber > 192 :
             localMessage = "ERROR get_set_rxChannel: rxChannel  [{}] not in range (1-192)''(to get status)]".format(str(channelNumber))
             self.__lc_msg(localMessage)
-            self.__t_failure(methodLocalName, None, "", localMessage)
+            self.__method_failure(methodLocalName, None, "", localMessage)
             return False, localMessage
         localCommand=":SENS:DATA:TEL:SDH:PATH1:CHAN {}".format(rxChannel)
         rawCallResult = self.__send_port_cmd(portId, localCommand)
@@ -2346,11 +2485,11 @@ class InstrumentONT(Equipment):
         if sdhAnswer != rxChannelRequired:
             localMessage="Set RX channel mismatch required [{}] but set [{}] ".format(rxChannelRequired,sdhAnswer)
             self.__lc_msg(localMessage)
-            self.__t_failure(methodLocalName, None, "", localMessage)
+            self.__method_failure(methodLocalName, None, "", localMessage)
             return False, sdhAnswer
         localMessage="Set RX channel after set:[{}] ".format(sdhAnswer)
         self.__lc_msg(localMessage)
-        self.__t_success(methodLocalName, None, localMessage)
+        self.__method_success(methodLocalName, None, localMessage)
         return True, sdhAnswer
 
 
@@ -2370,13 +2509,13 @@ class InstrumentONT(Equipment):
                 True : command execution ok, current mapping size set in result string
                 False: error in command execution, details in error list string
         """
-        methodLocalName = self.__lc_current_method_name(True)
+        methodLocalName = self.__lc_current_method_name(embedKrepoInit=True)
         portId = self.__recover_port_to_use(portId)
 
         if portId == "":
             localMessage = "ERROR get_set_rx_channel_mapping_size: portId  [{}] not specified".format(portId)
             self.__lc_msg(localMessage)
-            self.__t_failure(methodLocalName, None, "", localMessage)
+            self.__method_failure(methodLocalName, None, "", localMessage)
             return False, localMessage
         if self.__ontType  == "5xx":
             ONTCmdString=":SENS:DATA:TEL:SDH:PATH1:MAPP:SIZE"
@@ -2385,13 +2524,13 @@ class InstrumentONT(Equipment):
             if channelMapping == "VC2" or channelMapping == "VC11":
                 localMessage = "[{}] ERROR get_set_rx_channel_mapping_size: channel Mapping [{}] not supported".format(self.__ontType,channelMapping)
                 self.__lc_msg(localMessage)
-                self.__t_failure(methodLocalName, None, "", localMessage)
+                self.__method_failure(methodLocalName, None, "", localMessage)
                 return False, localMessage
         if channelMapping == "":  # Get channel mapping size and exit
             localCommand="{}?".format(ONTCmdString)
             rawCallResult = self.__send_port_cmd(portId, localCommand)
             sdhAnswer = self.__remove_dust(rawCallResult[1])
-            self.__t_success(methodLocalName, None, sdhAnswer)
+            self.__method_success(methodLocalName, None, sdhAnswer)
             return True, sdhAnswer
         channelMappingSizeRequired=channelMapping
         if self.__ontType  == "5xx":  # original ONT-5xx management
@@ -2403,7 +2542,7 @@ class InstrumentONT(Equipment):
                channelMapping != "VC4_64C" :
                 localMessage = "ERROR get_set_rx_channel_mapping_size: channel Mapping size [{}] not valid [VC12|VC3|VC4|VC4_4C|VC4_16C|VC4_64C|''(to get status)]".format(channelMapping)
                 self.__lc_msg(localMessage)
-                self.__t_failure(methodLocalName, None, "", localMessage)
+                self.__method_failure(methodLocalName, None, "", localMessage)
                 return False, localMessage
             localCommand="{} {}".format(ONTCmdString, channelMapping)
             rawCallResult = self.__send_port_cmd(portId, localCommand)
@@ -2414,11 +2553,11 @@ class InstrumentONT(Equipment):
             if sdhAnswer != channelMappingSizeRequired:
                 localMessage="Set RX channel mapping size mismatch: required [{}] but set [{}] ".format(channelMappingSizeRequired,sdhAnswer)
                 self.__lc_msg(localMessage)
-                self.__t_failure(methodLocalName, None, "", localMessage)
+                self.__method_failure(methodLocalName, None, "", localMessage)
                 return False, sdhAnswer
             localMessage="Current RX channel mapping size after set:[{}] ".format(sdhAnswer)
             self.__lc_msg(localMessage)
-            self.__t_success(methodLocalName, None, sdhAnswer)
+            self.__method_success(methodLocalName, None, sdhAnswer)
             return True, sdhAnswer
         else:  # ONT-6xx management rework
             callResult = self.__get_set_rx_bit_rate(portId,"")
@@ -2438,7 +2577,7 @@ class InstrumentONT(Equipment):
                 else:
                     localMessage="ERROR get_set_rx_channel_mapping_size: channel mapping [{}] not supported by STM1 [{}] rate".format(channelMapping,channelRate)
                     self.__lc_msg(localMessage)
-                    self.__t_failure(methodLocalName, None, "", localMessage)
+                    self.__method_failure(methodLocalName, None, "", localMessage)
                     return False, localMessage
                 mappingString+=primerString
                 for indeXX in range(1,190):
@@ -2458,7 +2597,7 @@ class InstrumentONT(Equipment):
                 else:
                     localMessage="ERROR get_set_rx_channel_mapping_size: channel mapping [{}] not supported by STM4 [{}] rate".format(channelMapping,channelRate)
                     self.__lc_msg(localMessage)
-                    self.__t_failure(methodLocalName, None, "", localMessage)
+                    self.__method_failure(methodLocalName, None, "", localMessage)
                     return False, localMessage
                 mappingString+=primerString
                 for indeXX in range(1,181):
@@ -2487,7 +2626,7 @@ class InstrumentONT(Equipment):
                 else:
                     localMessage="ERROR get_set_rx_channel_mapping_size: channel mapping [{}] not supported by STM16 [{}] rate".format(channelMapping,channelRate)
                     self.__lc_msg(localMessage)
-                    self.__t_failure(methodLocalName, None, "", localMessage)
+                    self.__method_failure(methodLocalName, None, "", localMessage)
                     return False, localMessage
                 mappingString+=primerString
                 for indeXX in range(1,145):
@@ -2512,7 +2651,7 @@ class InstrumentONT(Equipment):
                 else:
                     localMessage="ERROR get_set_rx_channel_mapping_size: channel mapping [{}] not supported by STM64 [{}] rate".format(channelMapping,channelRate)
                     self.__lc_msg(localMessage)
-                    self.__t_failure(methodLocalName, None, "", localMessage)
+                    self.__method_failure(methodLocalName, None, "", localMessage)
                     return False, localMessage
                 mappingString+=primerString
 
@@ -2529,12 +2668,12 @@ class InstrumentONT(Equipment):
             if sdhAnswer != mappingString:
                 localMessage="[{}] Current RX channel mapping [{}] size mismatch wanted:[{}] but current setting is not correct:[{}] ".format(self.__ontType,channelMapping,mappingString,sdhAnswer)
                 self.__lc_msg(localMessage)
-                self.__t_failure(methodLocalName, None, "", localMessage)
+                self.__method_failure(methodLocalName, None, "", localMessage)
                 return False, localMessage
 
             localMessage="[{}] Current RX channel mapping size after setting [{}] is:[{}] ".format(self.__ontType,channelMapping,sdhAnswer)
             self.__lc_msg(localMessage)
-            self.__t_success(methodLocalName, None, localMessage)
+            self.__method_success(methodLocalName, None, localMessage)
             return True, sdhAnswer
 
 
@@ -2548,7 +2687,7 @@ class InstrumentONT(Equipment):
                 True : command execution ok, current read alarmedFramesNumber in result string
                 False: error in command execution, details in error list string
         """
-        methodLocalName = self.__lc_current_method_name(True)
+        methodLocalName = self.__lc_current_method_name(embedKrepoInit=True)
         portId = self.__recover_port_to_use(portId)
         if self.__ontType  == "5xx":
             ONTCmdString=":SOUR:DATA:TEL:ALAR:BURS:ACTI"
@@ -2557,20 +2696,20 @@ class InstrumentONT(Equipment):
         if portId == "":
             localMessage = "ERROR get_set_alarmed_frames_number: portId  [{}] not specified".format(portId)
             self.__lc_msg(localMessage)
-            self.__t_failure(methodLocalName, None, "", localMessage)
+            self.__method_failure(methodLocalName, None, "", localMessage)
             return False, localMessage
         if alarmedFramesNumber == "":  # Get alarmedFramesNumber and exit
             localCommand="{}?".format(ONTCmdString)
             rawCallResult = self.__send_port_cmd(portId, localCommand)
             sdhAnswer = self.__remove_dust(rawCallResult[1])
-            self.__t_success(methodLocalName, None, sdhAnswer)
+            self.__method_success(methodLocalName, None, sdhAnswer)
             return True, sdhAnswer
         alarmedFramesNumberRequired=alarmedFramesNumber
         almFrNum=int(float(alarmedFramesNumber))
         if almFrNum < 1 or  almFrNum > 65536:
             localMessage = "ERROR get_set_alarmed_frames_number: alarmedFramesNumber  [{}] not in range (1-65536) or use ''(to get status)]".format(str(almFrNum))
             self.__lc_msg(localMessage)
-            self.__t_failure(methodLocalName, None, "", localMessage)
+            self.__method_failure(methodLocalName, None, "", localMessage)
             return False, localMessage
         localCommand="{} {}".format(ONTCmdString, alarmedFramesNumber)
         rawCallResult = self.__send_port_cmd(portId, localCommand)
@@ -2581,11 +2720,11 @@ class InstrumentONT(Equipment):
         if sdhAnswer != alarmedFramesNumberRequired:
             localMessage="Set the number of alarmed frames: required [{}] but set [{}]".format(alarmedFramesNumberRequired,sdhAnswer)
             self.__lc_msg(localMessage)
-            self.__t_failure(methodLocalName, None, "", localMessage)
+            self.__method_failure(methodLocalName, None, "", localMessage)
             return False, sdhAnswer
         localMessage="Current number of alarmed frames:[{}]".format(sdhAnswer)
         self.__lc_msg(localMessage)
-        self.__t_success(methodLocalName, None, localMessage)
+        self.__method_success(methodLocalName, None, localMessage)
         return True, sdhAnswer
 
 
@@ -2601,7 +2740,7 @@ class InstrumentONT(Equipment):
         localCommand="{} {}".format(ONTCmdString, burstNotAlarmedFramesNumber)
         localCommand="{}?".format(ONTCmdString)
         """
-        methodLocalName = self.__lc_current_method_name(True)
+        methodLocalName = self.__lc_current_method_name(embedKrepoInit=True)
         portId = self.__recover_port_to_use(portId)
         if self.__ontType  == "5xx":
             ONTCmdString=":SOUR:DATA:TEL:ALAR:BURS:INAC"
@@ -2610,13 +2749,13 @@ class InstrumentONT(Equipment):
         if portId == "":
             localMessage = "ERROR get_set_not_alarmed_frames_number: portId  [{}] not specified".format(portId)
             self.__lc_msg(localMessage)
-            self.__t_failure(methodLocalName, None, "", localMessage)
+            self.__method_failure(methodLocalName, None, "", localMessage)
             return False, localMessage
         if notAlarmedFramesNumber == "":  # Get notAlarmedFramesNumber and exit
             localCommand="{}?".format(ONTCmdString)
             rawCallResult = self.__send_port_cmd(portId, localCommand)
             sdhAnswer = self.__remove_dust(rawCallResult[1])
-            self.__t_success(methodLocalName, None, sdhAnswer)
+            self.__method_success(methodLocalName, None, sdhAnswer)
             return True, sdhAnswer
         notAlarmedFramesNumberRequired=notAlarmedFramesNumber
         notAlmFrNum=int(float(notAlarmedFramesNumber))
@@ -2633,11 +2772,11 @@ class InstrumentONT(Equipment):
         if sdhAnswer != notAlarmedFramesNumberRequired:
             localMessage="Set the number of alarmed frames: required [{}] but set [{}]".format(notAlarmedFramesNumberRequired,sdhAnswer)
             self.__lc_msg(localMessage)
-            self.__t_failure(methodLocalName, None, "", localMessage)
+            self.__method_failure(methodLocalName, None, "", localMessage)
             return False, sdhAnswer
         localMessage="Current number of alarmed frames:[{}]".format(sdhAnswer)
         self.__lc_msg(localMessage)
-        self.__t_success(methodLocalName, None, localMessage)
+        self.__method_success(methodLocalName, None, localMessage)
         return True, sdhAnswer
 
 
@@ -2651,7 +2790,7 @@ class InstrumentONT(Equipment):
                 True : command execution ok, current  alaarm status in result string
                 False: error in command execution, details in error list string
         """
-        methodLocalName = self.__lc_current_method_name(True)
+        methodLocalName = self.__lc_current_method_name(embedKrepoInit=True)
         portId = self.__recover_port_to_use(portId)
         if self.__ontType  == "5xx":
             ONTCmdString=":SOUR:DATA:TEL:ALAR:INS"
@@ -2661,7 +2800,7 @@ class InstrumentONT(Equipment):
         if portId == "":
             localMessage = "ERROR get_set_alarmActivation: portId  [{}] not specified".format(portId)
             self.__lc_msg(localMessage)
-            self.__t_failure(methodLocalName, None, "", localMessage)
+            self.__method_failure(methodLocalName, None, "", localMessage)
             return False, localMessage
         alarmActivation = alarmActivation.upper()
         if alarmActivation != "ON"  and \
@@ -2669,13 +2808,13 @@ class InstrumentONT(Equipment):
            alarmActivation != "":
             localMessage = "ERROR get_set_alarmActivation: alarmActivation  [{}] not valid [ON|OFF|''(to get status)]".format(alarmActivation)
             self.__lc_msg(localMessage)
-            self.__t_failure(methodLocalName, None, "", localMessage)
+            self.__method_failure(methodLocalName, None, "", localMessage)
             return False, localMessage
         if alarmActivation == "":  # Get alarmActivation and exit
             localCommand="{}?".format(ONTCmdString)
             rawCallResult = self.__send_port_cmd(portId, localCommand)
             sdhAnswer = self.__remove_dust(rawCallResult[1])
-            self.__t_success(methodLocalName, None, sdhAnswer)
+            self.__method_success(methodLocalName, None, sdhAnswer)
             return True, sdhAnswer
         localCommand="{} {}".format(ONTCmdString, alarmActivation)
         rawCallResult = self.__send_port_cmd(portId, localCommand)
@@ -2685,11 +2824,11 @@ class InstrumentONT(Equipment):
         if sdhAnswer != alarmActivation:
             localMessage="Alarms insertion status mismatch: required [{}] but set [{}]".format(alarmActivation,sdhAnswer)
             self.__lc_msg(localMessage)
-            self.__t_failure(methodLocalName, None, "", localMessage)
+            self.__method_failure(methodLocalName, None, "", localMessage)
             return False, sdhAnswer
         localMessage="Current alarms insertion status:[{}]".format(sdhAnswer)
         self.__lc_msg(localMessage)
-        self.__t_success(methodLocalName, None, localMessage)
+        self.__method_success(methodLocalName, None, localMessage)
         return True, sdhAnswer
 
 
@@ -2711,7 +2850,7 @@ class InstrumentONT(Equipment):
                 True : command execution ok, current  alarm insertion mode in result string
                 False: error in command execution, details in error list string
         """
-        methodLocalName = self.__lc_current_method_name(True)
+        methodLocalName = self.__lc_current_method_name(embedKrepoInit=True)
         portId = self.__recover_port_to_use(portId)
         if self.__ontType  == "5xx":
             ONTCmdString=":SOUR:DATA:TEL:ALAR:MODE"
@@ -2729,13 +2868,13 @@ class InstrumentONT(Equipment):
            alarmInsertionMode != "":
             localMessage = "ERROR get_set_alarm_insertion_mode: alarmInsertionMode  [{}] not valid [NONE|CONT|BURST_ONCE|BURST_CONT|''(to get status)]".format(alarmInsertionMode)
             self.__lc_msg(localMessage)
-            self.__t_failure(methodLocalName, None, "", localMessage)
+            self.__method_failure(methodLocalName, None, "", localMessage)
             return False, localMessage
         if alarmInsertionMode == "":  # Get alarmInsertionMode and exit
             localCommand="{}?".format(ONTCmdString)
             rawCallResult = self.__send_port_cmd(portId, localCommand)
             sdhAnswer = self.__remove_dust(rawCallResult[1])
-            self.__t_success(methodLocalName, None, sdhAnswer)
+            self.__method_success(methodLocalName, None, sdhAnswer)
             return True, sdhAnswer
         localCommand="{} {}".format(ONTCmdString, alarmInsertionMode)
         rawCallResult = self.__send_port_cmd(portId, localCommand)
@@ -2745,11 +2884,11 @@ class InstrumentONT(Equipment):
         if sdhAnswer != alarmInsertionMode:
             localMessage="Alarms insertion mode mismatch: required [{}] but set [{}]".format(alarmInsertionMode,sdhAnswer)
             self.__lc_msg(localMessage)
-            self.__t_failure(methodLocalName, None, "", localMessage)
+            self.__method_failure(methodLocalName, None, "", localMessage)
             return False, sdhAnswer
         localMessage="Current alarms mode :[{}]".format(sdhAnswer)
         self.__lc_msg(localMessage)
-        self.__t_success(methodLocalName, None, localMessage)
+        self.__method_success(methodLocalName, None, localMessage)
         return True, sdhAnswer
 
 
@@ -2780,12 +2919,12 @@ class InstrumentONT(Equipment):
                 True : command execution ok, current  alarm insertion type in result string
                 False: error in command execution, details in error list string
         """
-        methodLocalName = self.__lc_current_method_name(True)
+        methodLocalName = self.__lc_current_method_name(embedKrepoInit=True)
         portId = self.__recover_port_to_use(portId)
         if portId == "":
             localMessage = "ERROR get_set_alarm_insertion_type: portId  [{}] not specified".format(portId)
             self.__lc_msg(localMessage)
-            self.__t_failure(methodLocalName, None, "", localMessage)
+            self.__method_failure(methodLocalName, None, "", localMessage)
             return False, localMessage
         alarmInsertionType = alarmInsertionType.upper()
         if self.__ontType  == "5xx":
@@ -2812,7 +2951,7 @@ class InstrumentONT(Equipment):
                alarmInsertionType != "":
                 localMessage = "[5xx] ERROR get_set_alarm_insertion_type: alarmInsertionType  [{}] not valid [LOS|LOF|RSTIM|MSAIS|MSRDI|AUAIS|HPRDI|AULOP|HPUNEQ|HPTIM|HPPLM|TULOM|TUAIS|LPRDI|LPRFI|TULOP|LPTIM|LPPLM|LPUNEQ|''(to get status)]".format(alarmInsertionType)
                 self.__lc_msg(localMessage)
-                self.__t_failure(methodLocalName, None, "", localMessage)
+                self.__method_failure(methodLocalName, None, "", localMessage)
                 return False, localMessage
         else:
             ONTCmdString=":SOUR:DATA:TEL:SDH:ALAR:TYPE"
@@ -2832,14 +2971,14 @@ class InstrumentONT(Equipment):
                 alarmInsertionType != "":
                 localMessage = "[6xx] ERROR get_set_alarm_insertion_type: alarmInsertionType  [{}] not valid [LOF|RSTIM|MSAIS|MSRDI|AUAIS|AULOP|HPUNEQ|HPTIM|HPPLM|HPRDI|HPRDIC|HPRDIS|HPRDIP|''(to get status)]".format(alarmInsertionType)
                 self.__lc_msg(localMessage)
-                self.__t_failure(methodLocalName, None, "", localMessage)
+                self.__method_failure(methodLocalName, None, "", localMessage)
                 return False, localMessage
 
         if alarmInsertionType == "":  # Get alarmInsertionType and exit
             localCommand="{}?".format(ONTCmdString)
             rawCallResult = self.__send_port_cmd(portId, localCommand)
             sdhAnswer = self.__remove_dust(rawCallResult[1])
-            self.__t_success(methodLocalName, None, sdhAnswer)
+            self.__method_success(methodLocalName, None, sdhAnswer)
             return True, sdhAnswer
         localCommand="{} {}".format(ONTCmdString, alarmInsertionType)
         rawCallResult = self.__send_port_cmd(portId, localCommand)
@@ -2849,11 +2988,11 @@ class InstrumentONT(Equipment):
         if sdhAnswer != alarmInsertionType:
             localMessage="Alarms insertion type mismatch: required [{}] but set [{}]".format(alarmInsertionType,sdhAnswer)
             self.__lc_msg(localMessage)
-            self.__t_failure(methodLocalName, None, "", localMessage)
+            self.__method_failure(methodLocalName, None, "", localMessage)
             return False, sdhAnswer
         localMessage="Current alarms type :[{}]".format(sdhAnswer)
         self.__lc_msg(localMessage)
-        self.__t_success(methodLocalName, None, localMessage)
+        self.__method_success(methodLocalName, None, localMessage)
         return True, sdhAnswer
 
 
@@ -2867,7 +3006,7 @@ class InstrumentONT(Equipment):
                 True : command execution ok, current read burstAlarmedFramesNumber in result string
                 False: error in command execution, details in error list string
         """
-        methodLocalName = self.__lc_current_method_name(True)
+        methodLocalName = self.__lc_current_method_name(embedKrepoInit=True)
         portId = self.__recover_port_to_use(portId)
         if self.__ontType  == "5xx":
             ONTCmdString=":SOUR:DATA:TEL:ERR:BURS:ACTI"
@@ -2876,20 +3015,20 @@ class InstrumentONT(Equipment):
         if portId == "":
             localMessage = "ERROR get_set_num_alarmed_burst_frames: portId  [{}] not specified".format(portId)
             self.__lc_msg(localMessage)
-            self.__t_failure(methodLocalName, None, "", localMessage)
+            self.__method_failure(methodLocalName, None, "", localMessage)
             return False, localMessage
         if burstAlarmedFramesNumber == "":  # Get burstAlarmedFramesNumber and exit
             localCommand="{}?".format(ONTCmdString)
             rawCallResult = self.__send_port_cmd(portId, localCommand)
             sdhAnswer = self.__remove_dust(rawCallResult[1])
-            self.__t_success(methodLocalName, None, sdhAnswer)
+            self.__method_success(methodLocalName, None, sdhAnswer)
             return True, sdhAnswer
         burstAlarmedFramesNumberRequired=burstAlarmedFramesNumber
         notAlmFrNum=int(float(burstAlarmedFramesNumber))
         if notAlmFrNum < 1 or  notAlmFrNum > 65536:
             localMessage = "ERROR get_set_num_alarmed_burst_frames: burstAlarmedFramesNumber [{}] not in range (1-65536) or use ''(to get status)]".format(str(notAlmFrNum))
             self.__lc_msg(localMessage)
-            self.__t_failure(methodLocalName, None, "", localMessage)
+            self.__method_failure(methodLocalName, None, "", localMessage)
             return False, localMessage
         localCommand="{} {}".format(ONTCmdString, burstAlarmedFramesNumber)
         rawCallResult = self.__send_port_cmd(portId, localCommand)
@@ -2900,11 +3039,11 @@ class InstrumentONT(Equipment):
         if sdhAnswer != burstAlarmedFramesNumberRequired:
             localMessage="Set the number of alarmed burst frames: required [{}] but set [{}]".format(burstAlarmedFramesNumberRequired,sdhAnswer)
             self.__lc_msg(localMessage)
-            self.__t_failure(methodLocalName, None, "", localMessage)
+            self.__method_failure(methodLocalName, None, "", localMessage)
             return False, sdhAnswer
         localMessage="Current number of alarmed burst frames:[{}]".format(sdhAnswer)
         self.__lc_msg(localMessage)
-        self.__t_success(methodLocalName, None, localMessage)
+        self.__method_success(methodLocalName, None, localMessage)
         return True, sdhAnswer
 
 
@@ -2918,7 +3057,7 @@ class InstrumentONT(Equipment):
                 True : command execution ok, current read burstNotAlarmedFramesNumber in result string
                 False: error in command execution, details in error list string
         """
-        methodLocalName = self.__lc_current_method_name(True)
+        methodLocalName = self.__lc_current_method_name(embedKrepoInit=True)
         portId = self.__recover_port_to_use(portId)
         if self.__ontType  == "5xx":
             ONTCmdString=":SOUR:DATA:TEL:ERR:BURS:INAC"
@@ -2927,20 +3066,20 @@ class InstrumentONT(Equipment):
         if portId == "":
             localMessage = "ERROR get_set_num_not_alarmed_burst_frames: portId  [{}] not specified".format(portId)
             self.__lc_msg(localMessage)
-            self.__t_failure(methodLocalName, None, "", localMessage)
+            self.__method_failure(methodLocalName, None, "", localMessage)
             return False, localMessage
         if burstNotAlarmedFramesNumber == "":  # Get burstNotAlarmedFramesNumber and exit
             localCommand="{}?".format(ONTCmdString)
             rawCallResult = self.__send_port_cmd(portId, localCommand)
             sdhAnswer = self.__remove_dust(rawCallResult[1])
-            self.__t_success(methodLocalName, None, sdhAnswer)
+            self.__method_success(methodLocalName, None, sdhAnswer)
             return True, sdhAnswer
         burstNotAlarmedFramesNumberRequired=burstNotAlarmedFramesNumber
         notAlmFrNum=int(float(burstNotAlarmedFramesNumber))
         if notAlmFrNum < 0 or  notAlmFrNum > 65536:
             localMessage = "ERROR get_set_num_not_alarmed_burst_frames: burstNotAlarmedFramesNumber [{}] not in range (0-65536) or use ''(to get status)]".format(str(notAlmFrNum))
             self.__lc_msg(localMessage)
-            self.__t_failure(methodLocalName, None, "", localMessage)
+            self.__method_failure(methodLocalName, None, "", localMessage)
             return False, localMessage
         localCommand="{} {}".format(ONTCmdString, burstNotAlarmedFramesNumber)
         rawCallResult = self.__send_port_cmd(portId, localCommand)
@@ -2951,11 +3090,11 @@ class InstrumentONT(Equipment):
         if sdhAnswer != burstNotAlarmedFramesNumberRequired:
             localMessage="Set the number of not alarmed burst frames: required [{}] but set [{}]".format(burstNotAlarmedFramesNumberRequired,sdhAnswer)
             self.__lc_msg(localMessage)
-            self.__t_failure(methodLocalName, None, "", localMessage)
+            self.__method_failure(methodLocalName, None, "", localMessage)
             return False, sdhAnswer
         localMessage="Current number of not alarmed burst frames:[{}]".format(sdhAnswer)
         self.__lc_msg(localMessage)
-        self.__t_success(methodLocalName, None, localMessage)
+        self.__method_success(methodLocalName, None, localMessage)
         return True, sdhAnswer
 
 
@@ -2969,7 +3108,7 @@ class InstrumentONT(Equipment):
                 True : command execution ok, current  alaarm status in result string
                 False: error in command execution, details in error list string
         """
-        methodLocalName = self.__lc_current_method_name(True)
+        methodLocalName = self.__lc_current_method_name(embedKrepoInit=True)
         portId = self.__recover_port_to_use(portId)
         if self.__ontType  == "5xx":
             ONTCmdString=":SOUR:DATA:TEL:ERR:INS"  # ONT original command string put here
@@ -2978,7 +3117,7 @@ class InstrumentONT(Equipment):
         if portId == "":
             localMessage = "ERROR get_set_error_activation: portId  [{}] not specified".format(portId)
             self.__lc_msg(localMessage)
-            self.__t_failure(methodLocalName, None, "", localMessage)
+            self.__method_failure(methodLocalName, None, "", localMessage)
             return False, localMessage
         errorActivation = errorActivation.upper()
         if errorActivation != "ON"  and \
@@ -2986,13 +3125,13 @@ class InstrumentONT(Equipment):
            errorActivation != "":
             localMessage = "ERROR get_set_error_activation: errorActivation  [{}] not valid [ON|OFF|''(to get status)]".format(errorActivation)
             self.__lc_msg(localMessage)
-            self.__t_failure(methodLocalName, None, "", localMessage)
+            self.__method_failure(methodLocalName, None, "", localMessage)
             return False, localMessage
         if errorActivation == "":  # Get errorActivation and exit
             localCommand="{}?".format(ONTCmdString)
             rawCallResult = self.__send_port_cmd(portId, localCommand)
             sdhAnswer = self.__remove_dust(rawCallResult[1])
-            self.__t_success(methodLocalName, None, sdhAnswer)
+            self.__method_success(methodLocalName, None, sdhAnswer)
             return True, sdhAnswer
         localCommand="{} {}".format(ONTCmdString, errorActivation)
         rawCallResult = self.__send_port_cmd(portId, localCommand)
@@ -3002,11 +3141,11 @@ class InstrumentONT(Equipment):
         if sdhAnswer != errorActivation:
             localMessage="Error insertion status mismatch: required [{}] but set [{}]".format(errorActivation,sdhAnswer)
             self.__lc_msg(localMessage)
-            self.__t_failure(methodLocalName, None, "", localMessage)
+            self.__method_failure(methodLocalName, None, "", localMessage)
             return False, sdhAnswer
         localMessage="Current error insertion status:[{}]".format(sdhAnswer)
         self.__lc_msg(localMessage)
-        self.__t_success(methodLocalName, None, localMessage)
+        self.__method_success(methodLocalName, None, localMessage)
         return True, sdhAnswer
 
 
@@ -3038,7 +3177,7 @@ class InstrumentONT(Equipment):
                 True : command execution ok, current  error insertion mode in result string
                 False: error in command execution, details in error list string
        """
-        methodLocalName = self.__lc_current_method_name(True)
+        methodLocalName = self.__lc_current_method_name(embedKrepoInit=True)
         portId = self.__recover_port_to_use(portId)
         if self.__ontType  == "5xx":
             ONTCmdString=":SOUR:DATA:TEL:ERR:MODE"
@@ -3047,10 +3186,10 @@ class InstrumentONT(Equipment):
         if portId == "":
             localMessage = "ERROR get_set_error_insertion_mode: portId  [{}] not specified".format(portId)
             self.__lc_msg(localMessage)
-            self.__t_failure(methodLocalName, None, "", localMessage)
+            self.__method_failure(methodLocalName, None, "", localMessage)
             return False, localMessage
         errorInsertionMode = errorInsertionMode.upper()
-        if errorInsertionMode != "NONE"  and \
+        if errorInsertionMode != "NONE" and \
            errorInsertionMode != "ONCE" and \
            errorInsertionMode != "RATE" and \
            errorInsertionMode != "BURST_ONCE" and \
@@ -3060,13 +3199,13 @@ class InstrumentONT(Equipment):
            errorInsertionMode != "":
             localMessage = "ERROR get_set_error_insertion_mode: errorInsertionMode  [{}] not valid [NONE|ONCE|RATE|BURST_ONCE|BURST_CONT|RATE_BURST_ONCE|RATE_BURST_CONT|''(to get status)]".format(errorInsertionMode)
             self.__lc_msg(localMessage)
-            self.__t_failure(methodLocalName, None, "", localMessage)
+            self.__method_failure(methodLocalName, None, "", localMessage)
             return False, localMessage
         if errorInsertionMode == "":  # Get errorInsertionMode and exit
             localCommand="{}?".format(ONTCmdString)
             rawCallResult = self.__send_port_cmd(portId, localCommand)
             sdhAnswer = self.__remove_dust(rawCallResult[1])
-            self.__t_success(methodLocalName, None, sdhAnswer)
+            self.__method_success(methodLocalName, None, sdhAnswer)
             return True, sdhAnswer
         localCommand="{} {}".format(ONTCmdString, errorInsertionMode)
         rawCallResult = self.__send_port_cmd(portId, localCommand)
@@ -3076,11 +3215,11 @@ class InstrumentONT(Equipment):
         if sdhAnswer != errorInsertionMode:
             localMessage="Alarms insertion mode mismatch: required [{}] but set[{}]".format(errorInsertionMode,sdhAnswer)
             self.__lc_msg(localMessage)
-            self.__t_failure(methodLocalName, None, "", localMessage)
+            self.__method_failure(methodLocalName, None, "", localMessage)
             return False, sdhAnswer
         localMessage="Current alarms mode :[{}]".format(sdhAnswer)
         self.__lc_msg(localMessage)
-        self.__t_success(methodLocalName, None, localMessage)
+        self.__method_success(methodLocalName, None, localMessage)
         return True, sdhAnswer
 
 
@@ -3094,7 +3233,7 @@ class InstrumentONT(Equipment):
                 True : command execution ok, current read errorRate in result string
                 False: error in command execution, details in error list string
         """
-        methodLocalName = self.__lc_current_method_name(True)
+        methodLocalName = self.__lc_current_method_name(embedKrepoInit=True)
         portId = self.__recover_port_to_use(portId)
         if self.__ontType  == "5xx":
             ONTCmdString=":SOUR:DATA:TEL:ERR:RATE"
@@ -3103,13 +3242,13 @@ class InstrumentONT(Equipment):
         if portId == "":
             localMessage = "ERROR get_set_error_rate: portId  [{}] not specified".format(portId)
             self.__lc_msg(localMessage)
-            self.__t_failure(methodLocalName, None, "", localMessage)
+            self.__method_failure(methodLocalName, None, "", localMessage)
             return False, localMessage
         if errorRate == "":  # Get errorRate and exit
             localCommand="{}?".format(ONTCmdString)
             rawCallResult = self.__send_port_cmd(portId, localCommand)
             sdhAnswer = self.__remove_dust(rawCallResult[1])
-            self.__t_success(methodLocalName, None, sdhAnswer)
+            self.__method_success(methodLocalName, None, sdhAnswer)
             return True, sdhAnswer
         errorRateRequired=errorRate
         #myErrorRate=float(errorRate)
@@ -3133,7 +3272,7 @@ class InstrumentONT(Equipment):
         #    return False, sdhAnswer
         localMessage="Current number of alarmed burst frames:[{}]".format(sdhAnswer)
         self.__lc_msg(localMessage)
-        self.__t_success(methodLocalName, None, localMessage)
+        self.__method_success(methodLocalName, None, localMessage)
         return True, sdhAnswer
 
 
@@ -3155,12 +3294,12 @@ class InstrumentONT(Equipment):
                 True : command execution ok, current  alarm insertion type in result string
                 False: error in command execution, details in error list string
         """
-        methodLocalName = self.__lc_current_method_name(True)
+        methodLocalName = self.__lc_current_method_name(embedKrepoInit=True)
         portId = self.__recover_port_to_use(portId)
         if portId == "":
             localMessage = "ERROR get_set_error_insertion_type: portId  [{}] not specified".format(portId)
             self.__lc_msg(localMessage)
-            self.__t_failure(methodLocalName, None, "", localMessage)
+            self.__method_failure(methodLocalName, None, "", localMessage)
             return False, localMessage
         errorInsertionType = errorInsertionType.upper()
         if self.__ontType  == "5xx":
@@ -3178,7 +3317,7 @@ class InstrumentONT(Equipment):
                errorInsertionType != "":
                 localMessage = "[5xx] ERROR get_set_error_insertion_type: errorInsertionType  [{}] not valid [LOGIC|RAND|FAS|RSBIP|MSBIP|MSREI|HPBIP|HPREI|LPBIP|LPREI|''(to get status)]".format(errorInsertionType)
                 self.__lc_msg(localMessage)
-                self.__t_failure(methodLocalName, None, "", localMessage)
+                self.__method_failure(methodLocalName, None, "", localMessage)
                 return False, localMessage
         else:
             ONTCmdString=":SOUR:DATA:TEL:SDH:ERR:TYPE"
@@ -3192,14 +3331,14 @@ class InstrumentONT(Equipment):
                errorInsertionType != "":
                 localMessage = "[6xx] ERROR get_set_error_insertion_type: errorInsertionType  [{}] not valid [RAND|FAS|RSBIP|MSBIP|MSREI|HPBIP|HPREI|''(to get status)]".format(errorInsertionType)
                 self.__lc_msg(localMessage)
-                self.__t_failure(methodLocalName, None, "", localMessage)
+                self.__method_failure(methodLocalName, None, "", localMessage)
                 return False, localMessage
 
         if errorInsertionType == "":  # Get errorInsertionType and exit
             localCommand="{}?".format(ONTCmdString)
             rawCallResult = self.__send_port_cmd(portId, localCommand)
             sdhAnswer = self.__remove_dust(rawCallResult[1])
-            self.__t_success(methodLocalName, None, localMessage)
+            self.__method_success(methodLocalName, None, localMessage)
             return True, sdhAnswer
         localCommand="{} {}".format(ONTCmdString, errorInsertionType)
         rawCallResult = self.__send_port_cmd(portId, localCommand)
@@ -3209,11 +3348,11 @@ class InstrumentONT(Equipment):
         if sdhAnswer != errorInsertionType:
             localMessage="Errors insertion type mismatch: required [{}] but set [{}]".format(errorInsertionType,sdhAnswer)
             self.__lc_msg(localMessage)
-            self.__t_failure(methodLocalName, None, "", localMessage)
+            self.__method_failure(methodLocalName, None, "", localMessage)
             return False, sdhAnswer
         localMessage="Current alarms type :[{}]".format(sdhAnswer)
         self.__lc_msg(localMessage)
-        self.__t_success(methodLocalName, None, localMessage)
+        self.__method_success(methodLocalName, None, localMessage)
         return True, sdhAnswer
 
 
@@ -3230,7 +3369,7 @@ class InstrumentONT(Equipment):
                 True : command execution ok, current read bitRate in result string
                 False: error in command execution, details in error list string
         """
-        methodLocalName = self.__lc_current_method_name(True)
+        methodLocalName = self.__lc_current_method_name(embedKrepoInit=True)
         portId = self.__recover_port_to_use(portId)
         if self.__ontType  == "5xx":
             ONTCmdString=":SOUR:DATA:TEL:OPT:RATE"
@@ -3239,7 +3378,7 @@ class InstrumentONT(Equipment):
         if portId == "":
             localMessage = "ERROR get_set_tx_bit_rate: portId  [{}] not specified".format(portId)
             self.__lc_msg(localMessage)
-            self.__t_failure(methodLocalName, None, "", localMessage)
+            self.__method_failure(methodLocalName, None, "", localMessage)
             return False, localMessage
         bitRate = bitRate.upper()
         if bitRate != "STM0"  and \
@@ -3250,13 +3389,13 @@ class InstrumentONT(Equipment):
            bitRate != "":
             localMessage = "ERROR get_set_tx_bit_rate: bitRate  [{}] not valid [STM0|STM1|STM4|STM16|STM64|''(to get status)]".format(bitRate)
             self.__lc_msg(localMessage)
-            self.__t_failure(methodLocalName, None, "", localMessage)
+            self.__method_failure(methodLocalName, None, "", localMessage)
             return False, localMessage
         if bitRate == "":  # Get laser bitRate and exit
             localCommand="{}?".format(ONTCmdString)
             rawCallResult = self.__send_port_cmd(portId, localCommand)
             sdhAnswer = self.__remove_dust(rawCallResult[1])
-            self.__t_success(methodLocalName, None, sdhAnswer)
+            self.__method_success(methodLocalName, None, sdhAnswer)
             return True, sdhAnswer
         if self.__ontType  != "5xx": # for 6xx we need to use OCs instead of STMs
             localMessage="[6xx]: [{}] translated to [{}]".format(bitRate,self.StmToOc[bitRate])
@@ -3272,11 +3411,11 @@ class InstrumentONT(Equipment):
         if sdhAnswer != txBitRateRequired:
             localMessage="Set TX bitRate mismatch required [{}] but set [{}] ".format(txBitRateRequired,sdhAnswer)
             self.__lc_msg(localMessage)
-            self.__t_failure(methodLocalName, None, "", localMessage)
+            self.__method_failure(methodLocalName, None, "", localMessage)
             return False, sdhAnswer
         localMessage="Set TX bitRate required=[{}] after set=[{}] ".format(txBitRateRequired,sdhAnswer)
         self.__lc_msg(localMessage)
-        self.__t_success(methodLocalName, None, localMessage)
+        self.__method_success(methodLocalName, None, localMessage)
         return True, sdhAnswer
 
 
@@ -3290,7 +3429,7 @@ class InstrumentONT(Equipment):
                 True : command execution ok, current read txChannel in result string
                 False: error in command execution, details in error list string
         """
-        methodLocalName = self.__lc_current_method_name(True)
+        methodLocalName = self.__lc_current_method_name(embedKrepoInit=True)
         portId = self.__recover_port_to_use(portId)
         ONTCmdString=":SOUR:DATA:TEL:SDH:PATH1:CHAN"  # ONT original command string put here
         if self.__ontType  == "5xx":
@@ -3298,25 +3437,25 @@ class InstrumentONT(Equipment):
         else:
             localMessage="ERROR get_set_tx_measure_channel: Command supported by ONT-5xx only "
             self.__lc_msg(localMessage)
-            self.__t_failure(methodLocalName, None, "", localMessage)
+            self.__method_failure(methodLocalName, None, "", localMessage)
             return False, localMessage
         if portId == "":
             localMessage = "ERROR get_set_tx_measure_channel: txChannel  [{}] not specified".format(portId)
             self.__lc_msg(localMessage)
-            self.__t_failure(methodLocalName, None, "", localMessage)
+            self.__method_failure(methodLocalName, None, "", localMessage)
             return False, localMessage
         if txChannel == "":  # Get txChannel and exit
             localCommand="{}?".format(ONTCmdString)
             rawCallResult = self.__send_port_cmd(portId, localCommand)
             sdhAnswer = self.__remove_dust(rawCallResult[1])
-            self.__t_success(methodLocalName, None, sdhAnswer)
+            self.__method_success(methodLocalName, None, sdhAnswer)
             return True, sdhAnswer
         txChannelRequired=txChannel
         channelNumber=int(float(txChannel))
         if channelNumber < 1 or channelNumber > 192 :
             localMessage = "ERROR get_set_tx_measure_channel: txChannel  [{}] not in range (1-192)''(to get status)]".format(str(channelNumber))
             self.__lc_msg(localMessage)
-            self.__t_failure(methodLocalName, None, "", localMessage)
+            self.__method_failure(methodLocalName, None, "", localMessage)
             return False, localMessage
         localCommand="{} {}".format(ONTCmdString, txChannel)
         rawCallResult = self.__send_port_cmd(portId, localCommand)
@@ -3327,11 +3466,11 @@ class InstrumentONT(Equipment):
         if sdhAnswer != txChannelRequired:
             localMessage="Set TX measure channel mismatch required [{}] but set [{}] ".format(txChannelRequired,sdhAnswer)
             self.__lc_msg(localMessage)
-            self.__t_failure(methodLocalName, None, "", localMessage)
+            self.__method_failure(methodLocalName, None, "", localMessage)
             return False, sdhAnswer
         localMessage="Set TX measure channel after set:[{}] ".format(sdhAnswer)
         self.__lc_msg(localMessage)
-        self.__t_success(methodLocalName, None, localMessage)
+        self.__method_success(methodLocalName, None, localMessage)
         return True, sdhAnswer
 
 
@@ -3351,7 +3490,7 @@ class InstrumentONT(Equipment):
                 True : command execution ok, current mapping size set in result string
                 False: error in command execution, details in error list string
         """
-        methodLocalName = self.__lc_current_method_name(True)
+        methodLocalName = self.__lc_current_method_name(embedKrepoInit=True)
         portId = self.__recover_port_to_use(portId)
         if portId == "":
             localMessage = "ERROR get_set_tx_channel_mapping_size: portId  [{}] not specified".format(portId)
@@ -3364,14 +3503,14 @@ class InstrumentONT(Equipment):
             if channelMapping == "VC2":
                 localMessage = "[{}] ERROR get_set_tx_channel_mapping_size: channel Mapping [{}] not supported".format(self.__ontType,channelMapping)
                 self.__lc_msg(localMessage)
-                self.__t_failure(methodLocalName, None, "", localMessage)
+                self.__method_failure(methodLocalName, None, "", localMessage)
                 return False, localMessage
 
         if channelMapping == "":  # Get channel mapping size and exit
             localCommand="{}?".format(ONTCmdString)
             rawCallResult = self.__send_port_cmd(portId, localCommand)
             sdhAnswer = self.__remove_dust(rawCallResult[1])
-            self.__t_success(methodLocalName, None, sdhAnswer)
+            self.__method_success(methodLocalName, None, sdhAnswer)
             return True, sdhAnswer
         if channelMapping != "VC11"   and \
            channelMapping != "VC12"   and \
@@ -3383,7 +3522,7 @@ class InstrumentONT(Equipment):
            channelMapping != "VC4_64C" :
             localMessage = "ERROR get_set_tx_channel_mapping_size: channel Mapping size [{}] not valid [VC11|VC12|VC2|VC3|VC4|VC4_4C|VC4_16C|VC4_64C|''(to get status)]".format(channelMapping)
             self.__lc_msg(localMessage)
-            self.__t_failure(methodLocalName, None, "", localMessage)
+            self.__method_failure(methodLocalName, None, "", localMessage)
             return False, localMessage
 
         if self.__ontType  == "6xx": # for 6xx we need to use AUs instead of VCs
@@ -3401,11 +3540,11 @@ class InstrumentONT(Equipment):
         if sdhAnswer != channelMappingSizeRequired:
             localMessage="Set TX channel mapping size mismatch: required [{}] but set [{}] ".format(channelMappingSizeRequired,sdhAnswer)
             self.__lc_msg(localMessage)
-            self.__t_failure(methodLocalName, None, "", localMessage)
+            self.__method_failure(methodLocalName, None, "", localMessage)
             return False, sdhAnswer
         localMessage="Current TX channel mapping size after [{}]set:[{}] ".format(channelMapping,sdhAnswer)
         self.__lc_msg(localMessage)
-        self.__t_success(methodLocalName, None, localMessage)
+        self.__method_success(methodLocalName, None, localMessage)
         return True, sdhAnswer
 
 
@@ -3421,7 +3560,7 @@ class InstrumentONT(Equipment):
                 True : command execution ok, current read txLoChannel in result string
                 False: error in command execution, details in error list string
         """
-        methodLocalName = self.__lc_current_method_name(True)
+        methodLocalName = self.__lc_current_method_name(embedKrepoInit=True)
         portId = self.__recover_port_to_use(portId)
         if self.__ontType  == "5xx":
             ONTCmdString=":SOUR:DATA:TEL:SDH:TRIB:PATH1:CHAN"
@@ -3430,13 +3569,13 @@ class InstrumentONT(Equipment):
         if portId == "":
             localMessage = "ERROR get_set_tx_lo_measure_channel: txLoChannel  [{}] not specified".format(portId)
             self.__lc_msg(localMessage)
-            self.__t_failure(methodLocalName, None, "", localMessage)
+            self.__method_failure(methodLocalName, None, "", localMessage)
             return False, localMessage
         if txLoChannel == "":  # Get txLoChannel and exit
             localCommand="{}?".format(ONTCmdString)
             rawCallResult = self.__send_port_cmd(portId, localCommand)
             sdhAnswer = self.__remove_dust(rawCallResult[1])
-            self.__t_success(methodLocalName, None, sdhAnswer)
+            self.__method_success(methodLocalName, None, sdhAnswer)
             return True, sdhAnswer
         txLoChannelRequired=txLoChannel
         #self.__lc_msg(txLoChannel)
@@ -3447,7 +3586,7 @@ class InstrumentONT(Equipment):
                loChannelNumber > 84 :
                 localMessage = "ERROR get_set_tx_lo_measure_channel: txLoChannel  [{}] not in range (1-84) or use ''(to get status)]".format(str(loChannelNumber))
                 self.__lc_msg(localMessage)
-                self.__t_failure(methodLocalName, None, "", localMessage)
+                self.__method_failure(methodLocalName, None, "", localMessage)
                 return False, localMessage
         else:  # wrap string inside "" as the cmd required it...
             txLoChannel="\"{}\"".format(txLoChannel)
@@ -3462,11 +3601,11 @@ class InstrumentONT(Equipment):
         if sdhAnswer != txLoChannelRequired:
             localMessage="Set Lower Order TX channel mismatch: required [{}] but set [{}] ".format(txLoChannelRequired,sdhAnswer)
             self.__lc_msg(localMessage)
-            self.__t_failure(methodLocalName, None, "", localMessage)
+            self.__method_failure(methodLocalName, None, "", localMessage)
             return False, sdhAnswer
         localMessage="Current Lower Order TX channel after set:[{}] ".format(sdhAnswer)
         self.__lc_msg(localMessage)
-        self.__t_success(methodLocalName, None, localMessage)
+        self.__method_success(methodLocalName, None, localMessage)
         return True, sdhAnswer
 
 
@@ -3483,7 +3622,7 @@ class InstrumentONT(Equipment):
                 True : command execution ok, current read rxLoChannel in result string
                 False: error in command execution, details in error list string
         """
-        methodLocalName = self.__lc_current_method_name(True)
+        methodLocalName = self.__lc_current_method_name(embedKrepoInit=True)
         portId = self.__recover_port_to_use(portId)
         if self.__ontType  == "5xx":
             ONTCmdString=":SENS:DATA:TEL:SDH:TRIB:PATH1:CHAN"
@@ -3492,13 +3631,13 @@ class InstrumentONT(Equipment):
         if portId == "":
             localMessage = "ERROR get_set_rxLoChannel: rxLoChannel  [{}] not specified".format(portId)
             self.__lc_msg(localMessage)
-            self.__t_failure(methodLocalName, None, "", localMessage)
+            self.__method_failure(methodLocalName, None, "", localMessage)
             return False, localMessage
         if rxLoChannel == "":  # Get rxLoChannel and exit
             localCommand="{}?".format(ONTCmdString)
             rawCallResult = self.__send_port_cmd(portId, localCommand)
             sdhAnswer = self.__remove_dust(rawCallResult[1])
-            self.__t_success(methodLocalName, None, sdhAnswer)
+            self.__method_success(methodLocalName, None, sdhAnswer)
             return True, sdhAnswer
         rxLoChannelRequired=rxLoChannel
         if self.__ontType  == "5xx":
@@ -3507,7 +3646,7 @@ class InstrumentONT(Equipment):
                loChannelNumber > 84 :
                 localMessage = "ERROR get_set_rxLoChannel: rxLoChannel  [{}] not in range (1-84) or use ''(to get status)]".format(str(loChannelNumber))
                 self.__lc_msg(localMessage)
-                self.__t_failure(methodLocalName, None, "", localMessage)
+                self.__method_failure(methodLocalName, None, "", localMessage)
                 return False, localMessage
         else:  # wrap string inside "" as the cmd required it...
             rxLoChannel="\"{}\"".format(rxLoChannel)
@@ -3522,11 +3661,11 @@ class InstrumentONT(Equipment):
         if sdhAnswer != rxLoChannelRequired:
             localMessage="Set Lower Order RX channel mismatch: required [{}] but set [{}] ".format(rxLoChannelRequired ,sdhAnswer)
             self.__lc_msg(localMessage)
-            self.__t_failure(methodLocalName, None, "", localMessage)
+            self.__method_failure(methodLocalName, None, "", localMessage)
             return False, sdhAnswer
         localMessage="Current Lower Order RX channel after set:[{}] ".format(sdhAnswer)
         self.__lc_msg(localMessage)
-        self.__t_success(methodLocalName, None, localMessage)
+        self.__method_success(methodLocalName, None, localMessage)
         return True, sdhAnswer
 
 
@@ -3540,20 +3679,20 @@ class InstrumentONT(Equipment):
                 True : command execution ok, current  alaarm status in result string
                 False: error in command execution, details in error list string
         """
-        methodLocalName = self.__lc_current_method_name(True)
+        methodLocalName = self.__lc_current_method_name(embedKrepoInit=True)
         portId = self.__recover_port_to_use(portId)
         if self.__ontType  == "6xx":
             ONTCmdString=":SOUR:DATA:TEL:SDH:BCH:MODE"
         else:
             localMessage="Command supported by ONT-6xx only (current test equipment type:[{}]) ".format(self.__ontType)
             self.__lc_msg(localMessage)
-            self.__t_failure(methodLocalName, None, "", localMessage)
+            self.__method_failure(methodLocalName, None, "", localMessage)
             return False, localMessage
 
         if portId == "":
             localMessage = "ERROR get_set_background_channels_fill_mode: portId  [{}] not specified".format(portId)
             self.__lc_msg(localMessage)
-            self.__t_failure(methodLocalName, None, "", localMessage)
+            self.__method_failure(methodLocalName, None, "", localMessage)
             return False, localMessage
         backgroundMode = backgroundMode.upper()
         if backgroundMode != "COPY"  and \
@@ -3561,13 +3700,13 @@ class InstrumentONT(Equipment):
            backgroundMode != "":
             localMessage = "ERROR get_set_background_channels_fill_mode: backgroundMode  [{}] not valid [COPY|FIX|''(to get status)]".format(backgroundMode)
             self.__lc_msg(localMessage)
-            self.__t_failure(methodLocalName, None, "", localMessage)
+            self.__method_failure(methodLocalName, None, "", localMessage)
             return False, localMessage
         if backgroundMode == "":  # Get backgroundMode and exit
             localCommand="{}?".format(ONTCmdString)
             rawCallResult = self.__send_port_cmd(portId, localCommand)
             sdhAnswer = self.__remove_dust(rawCallResult[1])
-            self.__t_success(methodLocalName, None, sdhAnswer)
+            self.__method_success(methodLocalName, None, sdhAnswer)
             return True, sdhAnswer
         localCommand="{} {}".format(ONTCmdString, backgroundMode)
         rawCallResult = self.__send_port_cmd(portId, localCommand)
@@ -3577,11 +3716,11 @@ class InstrumentONT(Equipment):
         if sdhAnswer != backgroundMode:
             localMessage="Background mode selection mismatch: required [{}] but set [{}]".format(backgroundMode,sdhAnswer)
             self.__lc_msg(localMessage)
-            self.__t_failure(methodLocalName, None, "", localMessage)
+            self.__method_failure(methodLocalName, None, "", localMessage)
             return False, sdhAnswer
         localMessage="Current background mode selection:[{}]".format(sdhAnswer)
         self.__lc_msg(localMessage)
-        self.__t_success(methodLocalName, None, localMessage)
+        self.__method_success(methodLocalName, None, localMessage)
         return True, sdhAnswer
 
 
@@ -3596,19 +3735,19 @@ class InstrumentONT(Equipment):
                 True : command execution ok, current  alaarm status in result string
                 False: error in command execution, details in error list string
         """
-        methodLocalName = self.__lc_current_method_name(True)
+        methodLocalName = self.__lc_current_method_name(embedKrepoInit=True)
         portId = self.__recover_port_to_use(portId)
         if self.__ontType  == "6xx":
             ONTCmdString=":SOUR:DATA:TEL:SDH:BCH:PATH:J1TR:MODE"
         else:
             localMessage="Command supported by ONT-6xx only (current test equipment type:[{}]) ".format(self.__ontType)
             self.__lc_msg(localMessage)
-            self.__t_failure(methodLocalName, None, "", localMessage)
+            self.__method_failure(methodLocalName, None, "", localMessage)
             return False, localMessage
         if portId == "":
             localMessage = "ERROR get_set_tx_au_path_J1_trace_mode: portId  [{}] not specified".format(portId)
             self.__lc_msg(localMessage)
-            self.__t_failure(methodLocalName, None, "", localMessage)
+            self.__method_failure(methodLocalName, None, "", localMessage)
             return False, localMessage
         sequenceInJ1Byte = sequenceInJ1Byte.upper()
         if sequenceInJ1Byte != "OFF"  and \
@@ -3617,13 +3756,13 @@ class InstrumentONT(Equipment):
            sequenceInJ1Byte != "":
             localMessage = "ERROR get_set_tx_au_path_J1_trace_mode: sequenceInJ1Byte  [{}] not valid [OFF|TRC16|TRC64|''(to get status)]".format(sequenceInJ1Byte)
             self.__lc_msg(localMessage)
-            self.__t_failure(methodLocalName, None, "", localMessage)
+            self.__method_failure(methodLocalName, None, "", localMessage)
             return False, localMessage
         if sequenceInJ1Byte == "":  # Get sequenceInJ1Byte and exit
             localCommand="{}?".format(ONTCmdString)
             rawCallResult = self.__send_port_cmd(portId, localCommand)
             sdhAnswer = self.__remove_dust(rawCallResult[1])
-            self.__t_success(methodLocalName, None, sdhAnswer)
+            self.__method_success(methodLocalName, None, sdhAnswer)
             return True, sdhAnswer
         localCommand="{} {}".format(ONTCmdString, sequenceInJ1Byte)
         rawCallResult = self.__send_port_cmd(portId, localCommand)
@@ -3633,11 +3772,11 @@ class InstrumentONT(Equipment):
         if sdhAnswer != sequenceInJ1Byte:
             localMessage="Tx AU Path J1 Trace Mode mismatch: required [{}] but set [{}]".format(sequenceInJ1Byte,sdhAnswer)
             self.__lc_msg(localMessage)
-            self.__t_failure(methodLocalName, None, "", localMessage)
+            self.__method_failure(methodLocalName, None, "", localMessage)
             return False, sdhAnswer
         localMessage="Tx AU Path J1 Trace Mode selection:[{}]".format(sdhAnswer)
         self.__lc_msg(localMessage)
-        self.__t_success(methodLocalName, None, localMessage)
+        self.__method_success(methodLocalName, None, localMessage)
         return True, sdhAnswer
 
 
@@ -3654,20 +3793,20 @@ class InstrumentONT(Equipment):
                 True : command execution ok, current  alaarm status in result string
                 False: error in command execution, details in error list string
         """
-        methodLocalName = self.__lc_current_method_name(True)
+        methodLocalName = self.__lc_current_method_name(embedKrepoInit=True)
         portId = self.__recover_port_to_use(portId)
         if self.__ontType  == "6xx":
             ONTCmdString=":SENS:DATA:TEL:SDH:PATH:SEL:J1TR:MODE"
         else:
             localMessage="Command supported by ONT-6xx only (current test equipment type:[{}]) ".format(self.__ontType)
             self.__lc_msg(localMessage)
-            self.__t_failure(methodLocalName, None, "", localMessage)
+            self.__method_failure(methodLocalName, None, "", localMessage)
             return False, localMessage
 
         if portId == "":
             localMessage = "ERROR get_set_au_path_trace_rx_channel: portId  [{}] not specified".format(portId)
             self.__lc_msg(localMessage)
-            self.__t_failure(methodLocalName, None, "", localMessage)
+            self.__method_failure(methodLocalName, None, "", localMessage)
             return False, localMessage
         auPathTraceMode = auPathTraceMode.upper()
         if auPathTraceMode != "OFF"  and \
@@ -3678,13 +3817,13 @@ class InstrumentONT(Equipment):
            auPathTraceMode != "":
             localMessage = "ERROR get_set_au_path_trace_rx_channel: auPathTraceMode  [{}] not valid [OFF|AUTO16|AUTO64|TRC16|TRC64|''(to get status)]".format(auPathTraceMode)
             self.__lc_msg(localMessage)
-            self.__t_failure(methodLocalName, None, "", localMessage)
+            self.__method_failure(methodLocalName, None, "", localMessage)
             return False, localMessage
         if auPathTraceMode == "":  # Get auPathTraceMode and exit
             localCommand="{}?".format(ONTCmdString)
             rawCallResult = self.__send_port_cmd(portId, localCommand)
             sdhAnswer = self.__remove_dust(rawCallResult[1])
-            self.__t_success(methodLocalName, None, sdhAnswer)
+            self.__method_success(methodLocalName, None, sdhAnswer)
             return True, sdhAnswer
         localCommand="{} {}".format(ONTCmdString, auPathTraceMode)
         rawCallResult = self.__send_port_cmd(portId, localCommand)
@@ -3694,11 +3833,11 @@ class InstrumentONT(Equipment):
         if sdhAnswer != auPathTraceMode:
             localMessage="Rx AU Path Trace Mode mismatch: required [{}] but set [{}]".format(auPathTraceMode,sdhAnswer)
             self.__lc_msg(localMessage)
-            self.__t_failure(methodLocalName, None, "", localMessage)
+            self.__method_failure(methodLocalName, None, "", localMessage)
             return False, sdhAnswer
         localMessage="Rx AU Path Trace Mode selection:[{}]".format(sdhAnswer)
         self.__lc_msg(localMessage)
-        self.__t_success(methodLocalName, None, localMessage)
+        self.__method_success(methodLocalName, None, localMessage)
         return True, sdhAnswer
 
 
@@ -3715,20 +3854,20 @@ class InstrumentONT(Equipment):
                 True : command execution ok, current  alaarm status in result string
                 False: error in command execution, details in error list string
         """
-        methodLocalName = self.__lc_current_method_name(True)
+        methodLocalName = self.__lc_current_method_name(embedKrepoInit=True)
         portId = self.__recover_port_to_use(portId)
         if self.__ontType  == "6xx":
             ONTCmdString=":SOUR:DATA:TEL:SDH:PATH:SEL:J1TR:MODE"
         else:
             localMessage="Command supported by ONT-6xx only (current test equipment type:[{}]) ".format(self.__ontType)
             self.__lc_msg(localMessage)
-            self.__t_failure(methodLocalName, None, "", localMessage)
+            self.__method_failure(methodLocalName, None, "", localMessage)
             return False, localMessage
 
         if portId == "":
             localMessage = "ERROR get_set_au_path_trace_tx_channel: portId  [{}] not specified".format(portId)
             self.__lc_msg(localMessage)
-            self.__t_failure(methodLocalName, None, "", localMessage)
+            self.__method_failure(methodLocalName, None, "", localMessage)
             return False, localMessage
         auPathTraceMode = auPathTraceMode.upper()
         if auPathTraceMode != "OFF"  and \
@@ -3739,13 +3878,13 @@ class InstrumentONT(Equipment):
            auPathTraceMode != "":
             localMessage = "ERROR get_set_au_path_trace_tx_channel: auPathTraceMode  [{}] not valid [OFF|AUTO16|AUTO64|TRC16|TRC64|''(to get status)]".format(auPathTraceMode)
             self.__lc_msg(localMessage)
-            self.__t_failure(methodLocalName, None, "", localMessage)
+            self.__method_failure(methodLocalName, None, "", localMessage)
             return False, localMessage
         if auPathTraceMode == "":  # Get auPathTraceMode and exit
             localCommand="{}?".format(ONTCmdString)
             rawCallResult = self.__send_port_cmd(portId, localCommand)
             sdhAnswer = self.__remove_dust(rawCallResult[1])
-            self.__t_success(methodLocalName, None, sdhAnswer)
+            self.__method_success(methodLocalName, None, sdhAnswer)
             return True, sdhAnswer
         localCommand="{} {}".format(ONTCmdString, auPathTraceMode)
         rawCallResult = self.__send_port_cmd(portId, localCommand)
@@ -3755,11 +3894,11 @@ class InstrumentONT(Equipment):
         if sdhAnswer != auPathTraceMode:
             localMessage="Tx AU Path Trace Mode mismatch: required [{}] but set [{}]".format(auPathTraceMode,sdhAnswer)
             self.__lc_msg(localMessage)
-            self.__t_failure(methodLocalName, None, "", localMessage)
+            self.__method_failure(methodLocalName, None, "", localMessage)
             return False, sdhAnswer
         localMessage="Tx AU Path Trace Mode selection:[{}]".format(sdhAnswer)
         self.__lc_msg(localMessage)
-        self.__t_success(methodLocalName, None, localMessage)
+        self.__method_success(methodLocalName, None, localMessage)
         return True, sdhAnswer
 
 
@@ -3772,26 +3911,26 @@ class InstrumentONT(Equipment):
                 True : command execution ok, current  alaarm status in result string
                 False: error in command execution, details in error list string
         """
-        methodLocalName = self.__lc_current_method_name(True)
+        methodLocalName = self.__lc_current_method_name(embedKrepoInit=True)
         portId = self.__recover_port_to_use(portId)
         if portId == "":
             localMessage = "ERROR get_set_au_path_trace_rx_TR16_string: portId  [{}] not specified".format(portId)
             self.__lc_msg(localMessage)
-            self.__t_failure(methodLocalName, None, "", localMessage)
+            self.__method_failure(methodLocalName, None, "", localMessage)
             return False, localMessage
         if self.__ontType  == "6xx":
             ONTCmdString=":SENS:DATA:TEL:SDH:PATH:SEL:J1TR:REF:TR16:BLOC"
         else:
             localMessage="Command supported by ONT-6xx only (current test equipment type:[{}]) ".format(self.__ontType)
             self.__lc_msg(localMessage)
-            self.__t_failure(methodLocalName, None, "", localMessage)
+            self.__method_failure(methodLocalName, None, "", localMessage)
             return False, localMessage
         if expectedString == "":  # Get auPathTraceMode and exit
             localCommand="{}?".format(ONTCmdString)
             rawCallResult = self.__send_port_cmd(portId, localCommand)
             sdhAnswer = self.__remove_dust(rawCallResult[1])
             plainTextAnswer = self.__TR16_to_string(sdhAnswer)
-            self.__t_success(methodLocalName, None, plainTextAnswer)
+            self.__method_success(methodLocalName, None, plainTextAnswer)
             return True, plainTextAnswer
         asciiCsvString=self.__string_to_TR16(expectedString) # this is the format used in set and get
         localCommand="{} {}".format(ONTCmdString, asciiCsvString)
@@ -3804,11 +3943,11 @@ class InstrumentONT(Equipment):
         if sdhAnswer != asciiCsvString:
             localMessage="Rx expected TR16J1 String: required [{}] but set [{}]".format(expectedString,plainTextAnswer)
             self.__lc_msg(localMessage)
-            self.__t_failure(methodLocalName, None, "", localMessage)
+            self.__method_failure(methodLocalName, None, "", localMessage)
             return False, plainTextAnswer
         localMessage="Rx expected TR16J1 String specified:[{}]".format(plainTextAnswer)
         self.__lc_msg(localMessage)
-        self.__t_success(methodLocalName, None, localMessage)
+        self.__method_success(methodLocalName, None, localMessage)
         return True, plainTextAnswer
 
 
@@ -3821,26 +3960,26 @@ class InstrumentONT(Equipment):
                 True : command execution ok, current  alaarm status in result string
                 False: error in command execution, details in error list string
         """
-        methodLocalName = self.__lc_current_method_name(True)
+        methodLocalName = self.__lc_current_method_name(embedKrepoInit=True)
         portId = self.__recover_port_to_use(portId)
         if portId == "":
             localMessage = "ERROR get_set_au_path_trace_tx_TR16_string: portId  [{}] not specified".format(portId)
             self.__lc_msg(localMessage)
-            self.__t_failure(methodLocalName, None, "", localMessage)
+            self.__method_failure(methodLocalName, None, "", localMessage)
             return False, localMessage
         if self.__ontType  == "6xx":
             ONTCmdString=":SOUR:DATA:TEL:SDH:PATH:SEL:J1TR:TR16:BLOC"
         else:
             localMessage="Command supported by ONT-6xx only (current test equipment type:[{}]) ".format(self.__ontType)
             self.__lc_msg(localMessage)
-            self.__t_failure(methodLocalName, None, "", localMessage)
+            self.__method_failure(methodLocalName, None, "", localMessage)
             return False, localMessage
         if tr16String == "":  # Get auPathTraceMode and exit
             localCommand="{}?".format(ONTCmdString)
             rawCallResult = self.__send_port_cmd(portId, localCommand)
             sdhAnswer = self.__remove_dust(rawCallResult[1])
             plainTextAnswer = self.__TR16_to_string(sdhAnswer)
-            self.__t_success(methodLocalName, None, plainTextAnswer)
+            self.__method_success(methodLocalName, None, plainTextAnswer)
             return True, plainTextAnswer
         asciiCsvString=self.__string_to_TR16(tr16String) # this is the format used in set and get
         localCommand="{} {}".format(ONTCmdString, asciiCsvString)
@@ -3853,11 +3992,11 @@ class InstrumentONT(Equipment):
         if sdhAnswer != asciiCsvString:
             localMessage="Tx TR16 J1 Send String required [{}] but set [{}]".format(tr16String,plainTextAnswer)
             self.__lc_msg(localMessage)
-            self.__t_failure(methodLocalName, None, plainTextAnswer, localMessage)
+            self.__method_failure(methodLocalName, None, plainTextAnswer, localMessage)
             return False, localMessage
         localMessage="Tx TR16 J1 Send String specified:[{}]".format(plainTextAnswer)
         self.__lc_msg(localMessage)
-        self.__t_success(methodLocalName, None, plainTextAnswer)
+        self.__method_success(methodLocalName, None, plainTextAnswer)
         return True, plainTextAnswer
 
 
