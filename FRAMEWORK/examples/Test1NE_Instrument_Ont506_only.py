@@ -119,18 +119,13 @@ class Test(TestCase):
         #input("\n\npress enter to continue...\n")
         callResult = ONT5xx.retrieve_optical_alarms("P1")
         print("ONT5xx.retrieve_optical_alarms result: [{}]".format(callResult))
-        input("\n\npress enter to continue...\n")
+        #input("\n\npress enter to continue...\n")
         callResult = ONT5xx.retrieve_optical_alarms("P1")
         print("ONT5xx.retrieve_optical_alarms result: [{}]".format(callResult))
-        input("\n\npress enter to continue...\n")
-       
-        
+        #input("\n\npress enter to continue...\n")
         callResult = ONT5xx.retrieve_sdh_alarms("P1")
         print("ONT5xx.retrieve_optical_alarms result: [{}]".format(callResult))
         #input("\n\npress enter to continue...\n")
-
-        
-        
         #usercommand=input("\n\nInsert RAW command for check\n")
         #callResult = ONT5xx.cli_user_debug_command(usercommand,"P1")
         #print("ONT5xx.cli_user_debug_command result: [{}]".format(callResult))
