@@ -96,6 +96,8 @@ class Test(TestCase):
         '''
         test Body Section implementation
         insert Main body code for your test below
+        Try this test with the following command:
+        ./Test1NE_Instrument_Ont506_only.py --testSet    --testBody  --testClean    
         '''
         print("\n\n\n\n\nTESTING ONT5xx SECTION START *************************************")
         #input("press enter to continue...\n")
@@ -119,18 +121,13 @@ class Test(TestCase):
         #input("\n\npress enter to continue...\n")
         callResult = ONT5xx.retrieve_optical_alarms("P1")
         print("ONT5xx.retrieve_optical_alarms result: [{}]".format(callResult))
-        input("\n\npress enter to continue...\n")
+        #input("\n\npress enter to continue...\n")
         callResult = ONT5xx.retrieve_optical_alarms("P1")
         print("ONT5xx.retrieve_optical_alarms result: [{}]".format(callResult))
-        input("\n\npress enter to continue...\n")
-       
-        
+        #input("\n\npress enter to continue...\n")
         callResult = ONT5xx.retrieve_sdh_alarms("P1")
         print("ONT5xx.retrieve_optical_alarms result: [{}]".format(callResult))
         #input("\n\npress enter to continue...\n")
-
-        
-        
         #usercommand=input("\n\nInsert RAW command for check\n")
         #callResult = ONT5xx.cli_user_debug_command(usercommand,"P1")
         #print("ONT5xx.cli_user_debug_command result: [{}]".format(callResult))
