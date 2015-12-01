@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 """
 ###############################################################################
-# MODULE: tl1_facility.py
+# MODULE: facility_tl1.py
 #
 # AUTHOR: C.Ghelfi
 # DATE  : 23/11/2015

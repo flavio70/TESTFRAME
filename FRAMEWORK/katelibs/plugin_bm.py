@@ -40,20 +40,24 @@ class TunnelSSH():
         try:
             self.__ssh.connect(self.__flc_ip, username='root', password='alcatel', timeout=10)
         except Exception as eee:
-            self.__trc_inf("TunnelSSH: init error for '{:s}' - connect - ({s})".format(self.__flc_ip, eee))
+            self.__trc_err("TunnelSSH: init error for '{:s}' - connect - ({})".format(self.__flc_ip, eee))
             self.__ssh = None
             return
 
         self.__chan = self.__ssh.invoke_shell()
 
-        self.__trc_inf("TunnelSSH for {} initiated".format(self.__card_ip))
+        self.__trc_dbg("TunnelSSH for {} initiated".format(self.__card_ip))
 
 
     def clean_up(self):
         """ Closing Tunnel
         """
-        self.__ssh.close()
-        self.__trc_inf("Tunnel to {} closed.".format(self.__card_ip))
+        try:
+            self.__ssh.close()
+        except Exception as eee:
+            self.__trc_err("Error in closing ssh tunnel - {}".format(eee))
+
+        self.__trc_dbg("Tunnel to {} closed.".format(self.__card_ip))
 
 
     def send_and_capture_bm_cmd(self, cmd_bm):
@@ -64,7 +68,7 @@ class TunnelSSH():
 
         cmd = "bm {:s}".format(cmd_bm)
 
-        self.__trc_inf("SENDING BM COMMAND")
+        self.__trc_dbg("SENDING BM COMMAND")
 
         res = self.__write(cmd, "SLC> ")
         if res == (False, None):
@@ -73,7 +77,7 @@ class TunnelSSH():
         # Message capturing
         msg = res[1].replace(r"\r\n","\n")
         msg = "\n".join(msg.splitlines()[:-1])
-        self.__trc_inf(msg)
+        self.__trc_dbg(msg)
 
         return True, msg
 
@@ -83,9 +87,10 @@ class TunnelSSH():
         """
         cmd = "telnet {:s} {:d}".format(self.__card_ip, self.__card_port)
 
-        self.__trc_inf("SETUP TUNNEL TO SLC")
+        self.__trc_dbg("SETUP TUNNEL TO SLC")
 
         res = self.__write(cmd, "Shell for SLC Machine Model data")
+
         if res == (False, None):
             return res  # Timeout Detected
 
@@ -94,22 +99,25 @@ class TunnelSSH():
     def __write(self, string_to_send, string_to_expect):
         """ INTERNAL USAGE
         """
-        self.__trc_inf("to [{}] : send [{}], expect [{}]".format(self.__card_ip,
+        self.__trc_dbg("to [{}] : send [{}], expect [{}]".format(self.__card_ip,
                                                                  string_to_send,
                                                                  string_to_expect))
+        try:
+            self.__chan.settimeout(3)
+            self.__chan.send(string_to_send + '\n\r')
 
-        self.__chan.settimeout(3)
-        self.__chan.send(string_to_send + '\n\r')
-
-        while not self.__chan.recv_ready():
-            time.sleep(1)
+            while not self.__chan.recv_ready():
+                time.sleep(1)
+        except Exception as eee:
+            self.__trc_err("Error using ssh tunnel for {} - {}".format(self.__flc_ip, eee))
+            return False, None
 
         buff = ''
         while True:
             try:
                 resp_b = self.__chan.recv(9999)
             except:
-                self.__trc_inf("TIMEOUT DETECTED")
+                self.__trc_dbg("TIMEOUT DETECTED")
                 return False, None
 
             resp_a = str(resp_b)
@@ -117,8 +125,15 @@ class TunnelSSH():
             buff += resp_a
 
             if resp_a.find(string_to_expect) != -1:
-                self.__trc_inf("EXPECT VALUE DETECTED")
+                self.__trc_dbg("EXPECT VALUE DETECTED")
                 return True, buff
+
+
+    def __trc_dbg(self, msg, level=None):
+        """ INTERNAL USAGE
+        """
+        if self.__ktrc is not None:
+            self.__ktrc.k_tracer_debug(msg, level)
 
 
     def __trc_inf(self, msg, level=None):
@@ -158,17 +173,20 @@ class Plugin1850BM():
         self.__ktrc     = ktrc
         self.__eqpt_ref = eRef
 
-        self.__tunnel = {}
-        self.__active = None
+        self.__tunnel   = {}
+        self.__active   = None
+        self.__relaxed  = False # False: force check for active SLC
 
         self.__tunnel[10] = TunnelSSH(self.__flc_ip, 10, self.SLC_BM_PORT, ktrc=self.__ktrc)
         self.__tunnel[11] = TunnelSSH(self.__flc_ip, 11, self.SLC_BM_PORT, ktrc=self.__ktrc)
+
+        self.__trc_inf("Plugin BM available")
 
 
     def clean_up(self):
         """ TODO
         """
-        self.__trc_inf("CLEAN UP")
+        self.__trc_dbg("CLEAN UP")
         self.__tunnel[11].clean_up()
         self.__tunnel[10].clean_up()
         self.__tunnel[11] = None
@@ -181,9 +199,15 @@ class Plugin1850BM():
             Otherwise, a (True, command_output) is returned
             Note: shell command sent via BM doesn't collect output
         """
-        if self.get_active_slc() is None:
-            self.__trc_err("BOTH SLC ARE UNAVAILABLE")
-            return False, None
+        if self.__active is None:
+            if self.get_active_slc() is None:
+                self.__trc_err("BOTH SLC ARE UNAVAILABLE")
+                return False, None
+        else:
+            if not self.__relaxed:
+                if self.get_active_slc() is None:
+                    self.__trc_err("BOTH SLC ARE UNAVAILABLE")
+                    return False, None
 
         res = self.__tunnel[self.__active].send_and_capture_bm_cmd(cmd)
         return res
@@ -193,7 +217,7 @@ class Plugin1850BM():
         """ Get slot number of Active SLC.
             If both SLC are unavailable, a None is returned
         """
-        self.__trc_inf("\nGET ACTIVE SLC...")
+        self.__trc_dbg("\nGET ACTIVE SLC...")
 
         if self.__active is None:
             slc_list = [10,11]
@@ -204,33 +228,40 @@ class Plugin1850BM():
                 slc_list = [11,10]
 
         for slc in slc_list:
-            self.__trc_inf("\nTRYING TO REACH SLC 100.0.1.{:d}".format(slc))
+            self.__trc_dbg("\nTRYING TO REACH SLC 100.0.1.{:d}".format(slc))
             res = self.__tunnel[slc].send_and_capture_bm_cmd("matrix")
             if res != (False, None):
                 if res[1].find("scSTATUS.local_controller  = KS_OPERATIVE_ACTIVE") != -1:
-                    self.__trc_inf("SLC 100.0.1.{:d} ACTIVE".format(slc))
+                    self.__trc_dbg("SLC 100.0.1.{:d} ACTIVE".format(slc))
                     self.__active = slc
                     return slc
                 else:
-                    self.__trc_inf("SLC 100.0.1.{:d} AVAILABLE BUT NOT ACTIVE".format(slc))
+                    self.__trc_dbg("SLC 100.0.1.{:d} AVAILABLE BUT NOT ACTIVE".format(slc))
             else:
-                self.__trc_inf("SLC 100.0.1.{:d} NOT REACHABLE".format(slc))
+                self.__trc_dbg("SLC 100.0.1.{:d} NOT REACHABLE".format(slc))
 
-        self.__trc_inf("\nBOTH SLC ARE NOT AVAILABLE.\n")
+        self.__trc_dbg("\nBOTH SLC ARE NOT AVAILABLE.\n")
         self.__active = None
         return None
 
 
-    def read_remote_inventory(self, slot):
+    def read_remote_inventory(self, slot, relaxed=False):
         """ Read Remote Inventory data for a card on required slot
             Return Value: <card_name, signature> or <None,None> in case of error
         """
+
+        card_name = None
+        signature = ""
+
+        if relaxed:
+            self.__relaxed = True
+
         res = self.send_command("read ri {:d}".format(slot))
 
-        if res[0]:
-            card_name = None
-            signature = ""
+        if relaxed:
+            self.__relaxed = False
 
+        if res[0]:
             for row in res[1].splitlines():
                 pos = row.find("Card is ")
                 if pos != -1:
@@ -254,7 +285,7 @@ class Plugin1850BM():
         result = { }
 
         for slot in range(slot_limit):
-            info = self.read_remote_inventory(slot + 1)
+            info = self.read_remote_inventory(slot + 1, relaxed=True)
             if info != (None, None):
                 result[slot+1] = info
 
@@ -270,6 +301,13 @@ class Plugin1850BM():
         cmd = ": reboot".format(slot)
         res = self.__tunnel[slot].send_and_capture_bm_cmd(cmd)
         return res
+
+
+    def __trc_dbg(self, msg, level=None):
+        """ INTERNAL USAGE
+        """
+        if self.__ktrc is not None:
+            self.__ktrc.k_tracer_debug(msg, level)
 
 
     def __trc_inf(self, msg, level=None):

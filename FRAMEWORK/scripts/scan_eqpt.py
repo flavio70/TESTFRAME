@@ -45,3 +45,4 @@ if __name__ == "__main__":
                     bm = Plugin1850BM(eIP)
                     reminv = bm.read_complete_remote_inventory()
                     print("{:20s} : {}".format(eIP, reminv))
+                    bm.clean_up()

@@ -15,7 +15,7 @@ import threading
 import time
 import os
 
-from katelibs.tl1_facility import TL1message
+from katelibs.facility_tl1 import TL1message
 
 
 
@@ -69,6 +69,8 @@ class Plugin1850TL1():
         self.__thread.daemon = False
         self.__thread.start()
 
+        self.__trc_inf("Plugin BM available")
+
 
     def get_last_outcome(self):
         """ Return the latest TL1 command output (multi-line string)
@@ -118,7 +120,7 @@ class Plugin1850TL1():
                 result = False
                 break
 
-        self.__trc_inf("DEBUG: result := {:s} - errmsg := [{:s}]\n".format(str(result), error_msg))
+        self.__trc_dbg("DEBUG: result := {:s} - errmsg := [{:s}]\n".format(str(result), error_msg))
 
         if result:
             self.__t_success(cmd, None, self.get_last_outcome())
@@ -172,7 +174,7 @@ class Plugin1850TL1():
                 error_msg = "No AID found on TL1 response"
                 result = False
 
-        self.__trc_inf("DEBUG: result := {:s} - errmsg := [{:s}]\n".format(str(result), error_msg))
+        self.__trc_dbg("DEBUG: result := {:s} - errmsg := [{:s}]\n".format(str(result), error_msg))
 
         if result:
             self.__t_success(cmd, None, self.get_last_outcome())
@@ -188,9 +190,9 @@ class Plugin1850TL1():
         self.__last_cmd = cmd   # added for internal running invocation
 
         if channel == "CMD":
-            self.__trc_inf("sending [{:s}]".format(cmd))
+            self.__trc_dbg("sending [{:s}]".format(cmd))
         else:
-            self.__trc_inf("sending [{:s}] (EVENT INTERFACE)".format(cmd))
+            self.__trc_dbg("sending [{:s}] (EVENT INTERFACE)".format(cmd))
 
         tl1_verb = cmd.replace(";", "").split(":")[0].lower().replace("\r", "").replace("\n", "")
 
@@ -335,17 +337,17 @@ class Plugin1850TL1():
         is_connected = False
 
         if channel == "CMD":
-            self.__trc_inf("(re)CONNECTING TL1...")
+            self.__trc_dbg("(re)CONNECTING TL1...")
 
             while int(time.time()) <= self.__time_mark:
                 try:
                     self.__if_cmd = telnetlib.Telnet(self.__the_ip, self.__the_port, 5)
-                    self.__trc_inf("... TL1 INTERFACE for commands ready.")
+                    self.__trc_dbg("... TL1 INTERFACE for commands ready.")
                     is_connected = True
                     break
                 except Exception as eee:
-                    self.__trc_inf("TL1: error connecting CMD channel - {:s}".format(str(eee)))
-                    self.__trc_inf("... retrying in 1s ...")
+                    self.__trc_dbg("TL1: error connecting CMD channel - {:s}".format(str(eee)))
+                    self.__trc_dbg("... retrying in 1s ...")
                     time.sleep(1)
 
             if not is_connected:
@@ -354,17 +356,17 @@ class Plugin1850TL1():
             return self.__if_cmd
 
         else:
-            self.__trc_inf("(re)CONNECTING TL1 (Event channel)...")
+            self.__trc_dbg("(re)CONNECTING TL1 (Event channel)...")
 
             while int(time.time()) <= self.__time_mark:
                 try:
                     self.__if_eve = telnetlib.Telnet(self.__the_ip, self.__the_port, 5)
-                    self.__trc_inf("... TL1 INTERFACE for events ready.")
+                    self.__trc_dbg("... TL1 INTERFACE for events ready.")
                     is_connected = True
                     break
                 except Exception as eee:
-                    self.__trc_inf("TL1: error connecting EVE channel - {:s}".format(str(eee)))
-                    self.__trc_inf("... retrying in 1s ...")
+                    self.__trc_dbg("TL1: error connecting EVE channel - {:s}".format(str(eee)))
+                    self.__trc_dbg("... retrying in 1s ...")
                     time.sleep(1)
 
             if not is_connected:
@@ -512,6 +514,13 @@ class Plugin1850TL1():
         """
         if self.__krepo:
             self.__krepo.add_skipped(self.__eqpt_ref, title, e_time, out_text, err_text, skip_text)
+
+
+    def __trc_dbg(self, msg, level=None):
+        """ INTERNAL USAGE
+        """
+        if self.__ktrc is not None:
+            self.__ktrc.k_tracer_debug(msg, level)
 
 
     def __trc_inf(self, msg, level=None):
