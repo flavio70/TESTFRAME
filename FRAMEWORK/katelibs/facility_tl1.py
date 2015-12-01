@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 """
 ###############################################################################
-# MODULE: tl1_facility.py
+# MODULE: facility_tl1.py
 #
 # AUTHOR: C.Ghelfi
 # DATE  : 23/11/2015
@@ -21,7 +21,7 @@ class TL1check():
     def __init__(self):
         """ Constructor for a TL1 Scanner
         """
-        self.__aids     = []    # List of AID (could be conains Regular Expression)
+        self.__aids     = []    # List of AID (could be contains Regular Expression)
         self.__filters  = {}    # Dictionary of <ATTR,VALUE> couple to search on a TL1 Message
         self.__conds    = {}    # Dictionary of <PST,SST> conditions to search on a TL1 Message
 
@@ -50,13 +50,65 @@ class TL1check():
                 self.__filters.pop(attr)
 
 
-    def evaluate_aid(self, aid):
+    def add_aid(self, aid):
+        """ Insert an AID filter.
+        """
+        self.__aids.append(aid)
+
+
+    def res_aid(self, aid=None):
+        """ Remove a specified AID from list. A None for aid cause list cleanup
+        """
+        if aid is None:
+            self.__aids = []
+        else:
+            self.__aids.remove(aid)
+
+
+    def evaluate_msg(self, msg):
+        """ Perform a filter check on supplied TL1 encoded message
+            A tuple <True/False, result_list> is returned.
+            If any condition has been match on TL1 Message, a True is returned.
+            Moreover a list of match conditions (almost one element) is returned
+        """
+        result = False
+
+        res_list = []
+
+        # TL1 complete command scenario
+        if msg.get_cmd_status() == (True, 'COMPLD'):
+            for aid in msg.get_cmd_aid_list():
+                if self.__evaluate_aid(aid):
+                    for attr_val in msg.get_cmd_attr_values(aid):
+                        res = self.__evaluate_attr_val(attr_val)
+                        if res[0]:
+                            result = True
+                            res_list.append("{:s}:{:s}".format(aid, res[1]))
+            return result,res_list
+
+        print("UNMANAGED SCENARIO")
+        return False,None
+
+
+    def __evaluate_aid(self, aid):
+        """ INTERNAL USAGE
+        """
+        print("verifico {}".format(aid))
         if len(self.__aids) == 0:
+            print("lista vuota - OK")
             return True
-        pass
+
+        if aid in self.__aids:
+            print("elemento preciso trovato - OK")
+            return True
+
+        print("NON TROVATO")
+        return False
 
 
-    def evaluate_attr_val(self, attr_val):
+    def __evaluate_attr_val(self, attr_val):
+        """ INTERNAL USAGE
+        """
         the_attr = attr_val.split('=')[0]
         the_val  = attr_val.split('=')[1]
 
@@ -69,29 +121,13 @@ class TL1check():
         return False, ""
 
 
-    def evaluate_msg(self, msg):
-        result = False
-
-        res_list = []
-
-        # TL1 complete command scenario
-        if msg.get_cmd_status() == (True, 'COMPLD'):
-            for aid in msg.get_cmd_aid_list():
-                if self.evaluate_aid(aid):
-                    for attr_val in msg.get_cmd_attr_values(aid):
-                        res = self.evaluate_attr_val(attr_val)
-                        if res[0]:
-                            result = True
-                            res_list.append("{:s}:{:s}".format(aid, res[1]))
-            return result,res_list
-
-        print("UNMANAGED SCENARIO")
-        return False,res_list
-
-
     def debug(self):
+        """ INTERNAL USAGE
+        """
         print("filters    : {}".format(self.__filters))
         print("conditions : {}".format(self.__conds))
+
+
 
 
 class TL1message():
