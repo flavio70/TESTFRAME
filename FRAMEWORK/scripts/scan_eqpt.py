@@ -25,6 +25,17 @@ def is_reachable(ip):
     return (os.system(cmd) == 0)
 
 
+def write_info(ip, reminv):
+    if reminv.len() == 0:
+        return
+
+    print("#" * 80)
+    print(ip)
+    for the_key in sorted(reminv, key=reminv.get, reverse=False):
+        card_name = reminv[the_key][0]
+        signature = reminv[the_key][1]
+        print("\t{:2}: {:16s} [{}]".format(the_key, card_name, signature))
+
 if __name__ == "__main__":
 
     #parser = argparse.ArgumentParser()
@@ -44,5 +55,5 @@ if __name__ == "__main__":
                 if is_reachable(eIP):
                     bm = Plugin1850BM(eIP)
                     reminv = bm.read_complete_remote_inventory()
-                    print("{:20s} : {}".format(eIP, reminv))
+                    write_info(eIP, reminv)
                     bm.clean_up()
