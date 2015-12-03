@@ -982,7 +982,7 @@ class InstrumentONT(Equipment):
         callResult = self.get_available_ports()
         verifyResult = self.__verify_presence_in_csv_format_answer(callResult, portId)
         if verifyResult[0]: # True: port already deselected
-            localMessage = "Port [{}] already deselected: not found in available ports list".format(portId)
+            localMessage = "Port [{}] already deselected: found in available ports list".format(portId)
             self.__lc_msg(localMessage)
             self.__method_failure(methodLocalName, None, "", localMessage)
             return False, localMessage
