@@ -2184,9 +2184,6 @@ class InstrumentONT(Equipment):
             ( "True|False" , "< Laser Status / error list>)
             True : command execution ok, current laser status [ON|OFF]
             False: command execution failed, error string for debug purposes
-        ONTCmdString=":SOUR:DATA:TEL:ERR:MODE"  # ONT original command string put here
-        localCommand="{} {}".format(ONTCmdString, burstNotAlarmedFramesNumber)
-        localCommand="{}?".format(ONTCmdString)
         """
         methodLocalName = self.__lc_current_method_name(embedKrepoInit=True)
         portId = self.__recover_port_to_use(portId)
@@ -2235,11 +2232,6 @@ class InstrumentONT(Equipment):
             Return tuple: ( "True|False" , "< result/error list>)
                 True : command execution ok, current read wavelenght in result string
                 False: error in command execution, details in error list string
-
-
-        ONTCmdString=":SOUR:DATA:TEL:ERR:MODE"  # ONT original command string put here
-        localCommand="{} {}".format(ONTCmdString, burstNotAlarmedFramesNumber)
-        localCommand="{}?".format(ONTCmdString)
 
         """
         methodLocalName = self.__lc_current_method_name(embedKrepoInit=True)
@@ -2764,9 +2756,6 @@ class InstrumentONT(Equipment):
              Return tuple: ( "True|False" , "< result/error list>)
                 True : command execution ok, current read notAlarmedFramesNumber in result string
                 False: error in command execution, details in error list string
-        ONTCmdString=":SOUR:DATA:TEL:ERR:MODE"  # ONT original command string put here
-        localCommand="{} {}".format(ONTCmdString, burstNotAlarmedFramesNumber)
-        localCommand="{}?".format(ONTCmdString)
         """
         methodLocalName = self.__lc_current_method_name(embedKrepoInit=True)
         portId = self.__recover_port_to_use(portId)
@@ -2815,7 +2804,7 @@ class InstrumentONT(Equipment):
                 ON   Enable Alarms
                 OFF  Disable Alarms
             Return tuple: ( "True|False" , "< result/error list>)
-                True : command execution ok, current  alaarm status in result string
+                True : command execution ok, current  alarm status in result string
                 False: error in command execution, details in error list string
         """
         methodLocalName = self.__lc_current_method_name(embedKrepoInit=True)
@@ -3133,7 +3122,7 @@ class InstrumentONT(Equipment):
                 ON   Activate Error Insertion
                 OFF  Deactivate Error Insertion
             Return tuple: ( "True|False" , "< result/error list>)
-                True : command execution ok, current  alaarm status in result string
+                True : command execution ok, current  alarm status in result string
                 False: error in command execution, details in error list string
         """
         methodLocalName = self.__lc_current_method_name(embedKrepoInit=True)
@@ -3704,7 +3693,7 @@ class InstrumentONT(Equipment):
                 COPY   Mapping size of background is equivalent to foreground chhannel
                 FIX    User defined backgroud
             Return tuple: ( "True|False" , "< result/error list>)
-                True : command execution ok, current  alaarm status in result string
+                True : command execution ok, current  alarm status in result string
                 False: error in command execution, details in error list string
         """
         methodLocalName = self.__lc_current_method_name(embedKrepoInit=True)
@@ -3760,7 +3749,7 @@ class InstrumentONT(Equipment):
                 TRC16  A 16 byte long sequence is sent in J1 byte
                 TRC64  A 64 byte long sequence is sent in J1 byte
             Return tuple: ( "True|False" , "< result/error list>)
-                True : command execution ok, current  alaarm status in result string
+                True : command execution ok, current  alarm status in result string
                 False: error in command execution, details in error list string
         """
         methodLocalName = self.__lc_current_method_name(embedKrepoInit=True)
@@ -3818,7 +3807,7 @@ class InstrumentONT(Equipment):
                 TRC16   A 16 byte long sequence is expected in J1 byte
                 TRC64   A 64 byte long sequence is expected in J1 byte
             Return tuple: ( "True|False" , "< result/error list>)
-                True : command execution ok, current  alaarm status in result string
+                True : command execution ok, current  alarm status in result string
                 False: error in command execution, details in error list string
         """
         methodLocalName = self.__lc_current_method_name(embedKrepoInit=True)
@@ -3879,7 +3868,7 @@ class InstrumentONT(Equipment):
                 TRC16   A 16 byte long sequence is sent in J1 byte
                 TRC64   A 64 byte long sequence is sent in J1 byte
             Return tuple: ( "True|False" , "< result/error list>)
-                True : command execution ok, current  alaarm status in result string
+                True : command execution ok, current  alarm status in result string
                 False: error in command execution, details in error list string
         """
         methodLocalName = self.__lc_current_method_name(embedKrepoInit=True)
@@ -3936,7 +3925,7 @@ class InstrumentONT(Equipment):
             Get or Set the 15-char string in J1 byte for RX channel:
                 expectedString: "string"|empty string to read current value
             Return tuple: ( "True|False" , "< result/error list>)
-                True : command execution ok, current  alaarm status in result string
+                True : command execution ok, current  alarm status in result string
                 False: error in command execution, details in error list string
         """
         methodLocalName = self.__lc_current_method_name(embedKrepoInit=True)
@@ -3985,7 +3974,7 @@ class InstrumentONT(Equipment):
             Get or Set the 15-char string in J1 byte for TX channel:
                 tr16String: "string"|empty string to read current value
             Return tuple: ( "True|False" , "< result/error list>)
-                True : command execution ok, current  alaarm status in result string
+                True : command execution ok, current  alarm status in result string
                 False: error in command execution, details in error list string
         """
         methodLocalName = self.__lc_current_method_name(embedKrepoInit=True)
