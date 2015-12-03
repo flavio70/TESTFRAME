@@ -166,14 +166,15 @@ class Kunit:
         self.__st = datetime.datetime.now()
 
 
-    def start_tps_block(self, tps_area, tps_name):
+    def start_tps_block(self, dut_id, tps_area, tps_name):
         '''
         Start an official block containg all code related to aspecific TPS (Test Procedure)
         calling this function into testcase object will generate a specific XML report file for each TPSName provided
         '''
 
-        file_name = "{:s}/{:s}.{:s}_{:s}.XML".format(self.__dir,
+        file_name = "{:s}/{:s}.[{:s}]_{:s}_{:s}.XML".format(self.__dir,
                                                      os.path.splitext(os.path.splitext(self.__clnm[self.master_file_name])[0])[0],
+                                                     dut_id,
                                                      tps_area,
                                                      tps_name)
 
@@ -183,13 +184,14 @@ class Kunit:
         self.frame_open(file_name)
 
 
-    def stop_tps_block(self, tps_area, tps_name):
+    def stop_tps_block(self, dut_id, tps_area, tps_name):
         '''
         Stop the block containing the code related to the specific TPS (test Procedure)
         This function will terminate the specific XML report file related to TPSName test id
         '''
-        file_name = "{:s}/{:s}.{:s}_{:s}.XML".format(self.__dir,
+        file_name = "{:s}/{:s}.[{:s}]_{:s}_{:s}.XML".format(self.__dir,
                                                      os.path.splitext(os.path.splitext(self.__clnm[self.master_file_name])[0])[0],
+                                                     dut_id,
                                                      tps_area,
                                                      tps_name)
         self.frame_close(file_name)
