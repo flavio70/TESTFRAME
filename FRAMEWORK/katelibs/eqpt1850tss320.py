@@ -37,6 +37,7 @@ class Eqpt1850TSS320(Equipment):
         self.tl1        = None          # TL1 plugin (used to send TL1 command to equipment)
         self.cli        = None          # CLI plugin (used to send CLI command to equipment)
         self.bm         = None          # BM  plugin (used to send BM command to equipment)
+        self.id         = None          # 1850 Database ID
         # Private members:
         self.__kenv     = kenv          # Kate Environment
         self.__krepo    = kenv.krepo    # result report (Kunit class instance)
@@ -50,6 +51,8 @@ class Eqpt1850TSS320(Equipment):
 
         super().__init__(label, self.__prs.get_id(label))
 
+        self.id = self.get_id()
+        
         self.__get_eqpt_info_from_db(self.__prs.get_id(label))
 
         flc1ser = self.__ser.get_val(1)

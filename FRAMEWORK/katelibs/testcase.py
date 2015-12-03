@@ -128,20 +128,20 @@ class TestCase(object):
         self.dut_cleanup() if args.DUTClean else self.skip_section('DUT Cleanup')
 
 
-    def start_tps_block(self, tps_area, tps_name):
+    def start_tps_block(self, dut_id, tps_area, tps_name):
         '''
         Start an official block containg all code related to aspecific TPS (Test Procedure)
         calling this function into testcase object will generate a specific XML report file for each TPSName provided
         '''
-        self.kenvironment.krepo.start_tps_block(tps_area, tps_name)
+        self.kenvironment.krepo.start_tps_block(dut_id, tps_area, tps_name)
 
 
-    def stop_tps_block(self, tps_area, tps_name):
+    def stop_tps_block(self, dut_id, tps_area, tps_name):
         """ 
         Stop the block containing the code related to the specific TPS (test Procedure)
         This function will terminate the specific XML report file related to TPSName test id
         """ 
-        self.kenvironment.krepo.stop_tps_block(tps_area, tps_name)
+        self.kenvironment.krepo.stop_tps_block(dut_id, tps_area, tps_name)
 
 
     def trc_inf(self, msg):

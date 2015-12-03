@@ -24,6 +24,13 @@ class Equipment:
         self.__type   = "unknown"
 
 
+    
+    def get_id(self):
+       """ Get Equipment Id
+       """
+       return str(self.__id)
+        
+    
     def set_label(self, the_label):
         """ Initialize equipment name
             the_label : equipment name
