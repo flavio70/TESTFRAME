@@ -85,8 +85,8 @@ class Test(TestCase):
         test Setup Section implementation
         insert general SetUp code for your test below
         '''
-        self.start_tps_block("EM", "1-2-3")
-        NE1.tl1.do("ACT-USER::admin:::Alcatel1;")
+        #self.start_tps_block("EM", "1-2-3")
+        #NE1.tl1.do("ACT-USER::admin:::Alcatel1;")
 
 
     def test_body(self):
@@ -94,8 +94,9 @@ class Test(TestCase):
         test Body Section implementation
         insert Main body code for your test below
         '''
-        NE1.tl1.do("RTRV-ASAP-PROF::ASAPEQPT-0;")
-        self.trc_inf(NE1.tl1.get_last_outcome())
+
+        #NE1.tl1.do("RTRV-ASAP-PROF::ASAPEQPT-0;")
+        #self.trc_inf(NE1.tl1.get_last_outcome())
 
     def test_cleanup(self):
         '''

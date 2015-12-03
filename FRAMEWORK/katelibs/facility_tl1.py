@@ -93,16 +93,12 @@ class TL1check():
     def __evaluate_aid(self, aid):
         """ INTERNAL USAGE
         """
-        print("verifico {}".format(aid))
         if len(self.__aids) == 0:
-            print("lista vuota - OK")
             return True
 
         if aid in self.__aids:
-            print("elemento preciso trovato - OK")
             return True
 
-        print("NON TROVATO")
         return False
 
 
@@ -124,6 +120,7 @@ class TL1check():
     def debug(self):
         """ INTERNAL USAGE
         """
+        print("aid list   : {}".format(self.__aids))
         print("filters    : {}".format(self.__filters))
         print("conditions : {}".format(self.__conds))
 
