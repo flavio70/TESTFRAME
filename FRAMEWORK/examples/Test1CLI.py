@@ -23,7 +23,7 @@ TestCase template for K@TE test developers
 
 from katelibs.testcase          import TestCase
 from katelibs.eqpt1850tss320    import Eqpt1850TSS320
-#from katelibs.instrumentONT     import InstrumentONT
+from katelibs.instrumentONT     import InstrumentONT
 #from katelibs.instrumentIXIA     import InstrumentIXIA
 #from katelibs.instrumentSPIRENT  import InstrumentSPIRENT
 from katelibs.swp1850tss320     import SWP1850TSS
@@ -86,6 +86,7 @@ class Test(TestCase):
         '''
         self.kenvironment.krepo.start_tps_block("EM", "1-2-3")
         NE1.tl1.do("ACT-USER::admin:::Alcatel1;")
+        NE1.cli.connect()
 
 
     def test_body(self):
@@ -94,12 +95,10 @@ class Test(TestCase):
         insert Main body code for your test below
         '''
 
-        NE1.cli.do("interface show", policy="COMPLD")
+        NE1.cli.do("interface show", policy="COMPLD", condition=".. message: not found interface\n", timeout=10)
 
-        if NE1.cli.get_last_cmd_status() == "SUCCESS":
-            self.trc_inf("[\n{:s}\n]".format(NE1.cli.get_last_outcome()))
-        else:
-            self.trc_inf("[\nCommand: {:s}\nResult:  {:s}\n]".format(NE1.cli.get_last_cmd(), NE1.cli.get_last_cmd_status()))
+        NE1.cli.do_until("interface show", condition=".. message: not found interface\n", timeout=10)
+
 
     def test_cleanup(self):
         '''
@@ -114,7 +113,6 @@ class Test(TestCase):
         insert DUT CleanUp code for your test below
         '''
         print('@DUT CleanUP')
-        NE1.clean_up()
         self.kenvironment.krepo.stop_tps_block("EM", "1-2-3")
 
 
