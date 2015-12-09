@@ -1,0 +1,28 @@
+{
+    "NE1"   :   [
+                    [   "TYPE"  , "1850TSS320"      ],
+                    [   "ID"    , "1005"            ],
+                    [   "BOARD1", "LOA10G-1-1-36"   ]
+                ],
+
+    "ONT1"  :   [
+                    [   "TYPE"  , "ONT506"          ],
+                    [   "ID"    , "50"              ],
+                    [   "USER"  , "Automation"      ],
+                    [   "PWD"   , "la_sua_pwd"      ],
+                    [   "APPL"  , "SdhBert"         ],
+                    [   "P1"    , "/0/1/1"          ],
+                    [   "P2"    , "/0/2/1"          ],
+                    [   "P3"    , "/0/3/1"          ]
+                ],
+
+    "ONT2"  :   [
+                    [   "TYPE"  , "ONT601"          ],
+                    [   "ID"    , "51"              ],
+                    [   "USER"  , "New-Application" ],
+                    [   "PWD"   , "la_sua_pwd"      ],
+                    [   "APPL"  , "SdhBert"         ],
+                    [   "Port1" , "/0/1/1"          ],
+                    [   "Port2" , "/0/4/1"          ]
+                ]
+}
