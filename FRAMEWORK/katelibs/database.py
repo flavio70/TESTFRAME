@@ -101,6 +101,14 @@ def set_RunTime_status(ID,field_value):
 		kprint_fail(str(eee))
 		return
 
+def set_RunTime_job_iteration(ID,field_value):
+	try:	
+		localtab  = TRuntime
+		rowg = localtab.objects.filter(id_run=ID).update(job_iteration=field_value)
+	except Exception as eee:
+		kprint_fail(str(eee))
+		return
+
 def new_RunTime_entry(jobname, buildnum, jksowner, newstatus):
 	try:	
 		newEntry = TRuntime(job_name=jobname, job_iteration=buildnum, owner=jksowner, status=newstatus, errcount=0, runcount=0)
