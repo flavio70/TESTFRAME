@@ -100,6 +100,7 @@ class Test(TestCase):
         #NE1.tl1.do("RTRV-TU3::MVC4TU3-1-1-1&&-64-1&&-3;")
         self.trc_inf(NE1.tl1.get_last_outcome())
 
+
     def test_cleanup(self):
         '''
         test Cleanup Section implementation
