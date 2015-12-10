@@ -79,21 +79,22 @@ def guaranted_flow(args):
 		#setting runtime entry to running 
 		if args.DBMode : 
 			set_RunTime_status(args.KateRunId, 'RUNNING')
+			set_RunTime_job_iteration(args.KateRunId, args.jobBuildN)
 		else:
 			args.KateRunId = new_RunTime_entry(args.jobName, args.jobBuildN, args.UserId, 'RUNNING')
 			print ('new RunId : ' + str(args.KateRunId))
 
-			with open(args.inputSuite) as f:
-				for line in f:
-					run_count +=1
-					_a=os.system(line)
+		with open(args.inputSuite) as f:
+			for line in f:
+				run_count +=1
+				_a=os.system(line)
+				#time.sleep(60)
+				if _a != 0:
+					err_count +=1 
+					set_RunTime_status(args.KateRunId, 'FAILING')
+					set_RunTime_errCount(args.KateRunId, err_count)
 					#time.sleep(60)
-					if _a != 0:
-						err_count +=1 
-						set_RunTime_status(args.KateRunId, 'FAILING')
-						set_RunTime_errCount(args.KateRunId, err_count)
-						#time.sleep(60)
-					set_RunTime_runCount(args.KateRunId, run_count)
+				set_RunTime_runCount(args.KateRunId, run_count)
 		set_RunTime_status(args.KateRunId, 'FAILED') if err_count > 0 else set_RunTime_status(args.KateRunId, 'COMPLETED')
 		#unlock_eqpt_nodes(eqpt_list)
 		print('End of execution')
@@ -118,9 +119,9 @@ def main():
 	parser.add_argument("inputSuite", help="The suite test file to be processed")
 	parser.add_argument("jobName", help="Jenkins Job Name", nargs='?', default='Local')
 	parser.add_argument("jobBuildN", help="Jenkins Job Build Number", nargs='?', default=0)
-	parser.add_argument("UserId", help="K@TE UserId", nargs='?', default='Local')
-	parser.add_argument("policy", help="K@TE suite policy", nargs='?', choices=['GUA','BE'], default='GUA')
 	parser.add_argument("KateRunId", help="K@TE istance ID (filled automatically by K@TE interface)", nargs='?', default=None)
+	parser.add_argument("--UserId", help="K@TE UserId", nargs='?', default='Local')
+	parser.add_argument("--policy", help="K@TE suite policy", nargs='?', choices=['GUA','BE'], default='GUA')
 	
 	args = parser.parse_args()
 	print(args)
