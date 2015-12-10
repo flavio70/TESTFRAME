@@ -549,25 +549,25 @@ class InstrumentONT(Equipment):
 
 
     def __send_cmd(self, command):
-         if command == "":
-             localMessage = "__send_cmd error: command string [{}] empty".format(command)
-             self.__lc_msg(localMessage)
-             return False, localMessage
-         if not   self.__telnetConnection:
-             localMessage = "__send_cmd error: telnet connection [{}] not valid".format(self.__telnetConnection)
-             self.__lc_msg(localMessage)
-             return False, localMessage
-         localCmd="{:s}\n".format(command).encode()
-         self.__telnetConnection.write(localCmd)
-         result=self.__telnetConnection.expect(self.__telnetExpectedPrompt, 2)
-         if result:
-             localMessage = "Ont command OK"
-             self.__lc_msg(localMessage)
-             return True, str(result[2], 'utf-8')
-         else:
-             localMessage = "Ont command ERROR"
-             self.__lc_msg(localMessage)
-             return False, localMessage
+        if command == "":
+            localMessage = "__send_cmd error: command string [{}] empty".format(command)
+            self.__lc_msg(localMessage)
+            return False, localMessage
+        if not   self.__telnetConnection:
+            localMessage = "__send_cmd error: telnet connection [{}] not valid".format(self.__telnetConnection)
+            self.__lc_msg(localMessage)
+            return False, localMessage
+        localCmd="{:s}\n".format(command).encode()
+        self.__telnetConnection.write(localCmd)
+        result=self.__telnetConnection.expect(self.__telnetExpectedPrompt, 2)
+        if result:
+            localMessage = "Ont command OK"
+            self.__lc_msg(localMessage)
+            return True, str(result[2], 'utf-8')
+        else:
+            localMessage = "Ont command ERROR"
+            self.__lc_msg(localMessage)
+            return False, localMessage
 
 
 
@@ -1986,27 +1986,27 @@ class InstrumentONT(Equipment):
         alarmCodes = resultItemsArray[1]
         alarmCodes=int(float(alarmCodes))
         if alarmCodes & 4:
-             retList += ["OOF"]
+            retList += ["OOF"]
         if alarmCodes & 8:
-             retList += ["LOF"]
+            retList += ["LOF"]
         if alarmCodes & 16:
-             retList += ["MS-AIS"]
+            retList += ["MS-AIS"]
         if alarmCodes & 32:
-             retList += ["MS-RDI"]
+            retList += ["MS-RDI"]
         if alarmCodes & 128:
-             retList += ["AU-AIS"]
+            retList += ["AU-AIS"]
         if alarmCodes & 256:
-             retList += ["HP-RDI"]
+            retList += ["HP-RDI"]
         if alarmCodes & 4096:
-             retList += ["AU-LOP"]
+            retList += ["AU-LOP"]
         if alarmCodes & 8192:
-             retList += ["HP-UNEQ"]
+            retList += ["HP-UNEQ"]
         if alarmCodes & 16384:
-             retList += ["RS-TIM"]
+            retList += ["RS-TIM"]
         if alarmCodes & 32768:
-             retList += ["HP-TIM"]
+            retList += ["HP-TIM"]
         if alarmCodes & 65536: #if alarmCodes & 65535:
-             retList += ["HP-PLM"]
+            retList += ["HP-PLM"]
         localMessage="High Order Found Alarms: [{}]".format(retList)
         self.__lc_msg(localMessage)
         self.__method_success(methodLocalName, None, localMessage)
@@ -2057,21 +2057,21 @@ class InstrumentONT(Equipment):
         alarmCodes = resultItemsArray[1]
         alarmCodes=int(float(alarmCodes))
         if alarmCodes & 1:
-             retList += ["TU-AIS"]
+            retList += ["TU-AIS"]
         if alarmCodes & 2:
-             retList += ["LP-RDI"]
+            retList += ["LP-RDI"]
         if alarmCodes & 4:
-             retList += ["TU-LOP"]
+            retList += ["TU-LOP"]
         if alarmCodes & 8:
-             retList += ["LP-UNEQ"]
+            retList += ["LP-UNEQ"]
         if alarmCodes & 16:
-             retList += ["TU-LOM"]
+            retList += ["TU-LOM"]
         if alarmCodes & 32:
-             retList += ["LP-RFI"]
+            retList += ["LP-RFI"]
         if alarmCodes & 128:
-             retList += ["LP-TIM"]
+            retList += ["LP-TIM"]
         if alarmCodes & 256:
-             retList += ["LP-PLM"]
+            retList += ["LP-PLM"]
         localMessage="Lower Order Found Alarms: [{}]".format(retList)
         self.__lc_msg(localMessage)
         self.__method_success(methodLocalName, None, localMessage)
@@ -2589,11 +2589,11 @@ class InstrumentONT(Equipment):
                 localMessage="STM1 Rate result NOW[{}]".format(channelRate)
                 self.__lc_msg(localMessage)
                 if channelMapping == "VC12":
-                   primerString=",41002,41002,41002"
+                    primerString=",41002,41002,41002"
                 elif channelMapping == "VC3":
-                   primerString=",41048,41048,41048"
+                    primerString=",41048,41048,41048"
                 elif channelMapping == "VC4":
-                   primerString=",40003,1,1"
+                    primerString=",40003,1,1"
                 else:
                     localMessage="ERROR get_set_rx_channel_mapping_size: channel mapping [{}] not supported by STM1 [{}] rate".format(channelMapping,channelRate)
                     self.__lc_msg(localMessage)
@@ -2607,13 +2607,13 @@ class InstrumentONT(Equipment):
                 localMessage="STM4 Rate result NOW[{}]".format(channelRate)
                 self.__lc_msg(localMessage)
                 if channelMapping == "VC12":
-                   primerString=",41002,41002,41002,41002,41002,41002,41002,41002,41002,41002,41002,41002"
+                    primerString=",41002,41002,41002,41002,41002,41002,41002,41002,41002,41002,41002,41002"
                 elif channelMapping == "VC3":
-                   primerString=",41048,41048,41048,41048,41048,41048,41048,41048,41048,41048,41048,41048"
+                    primerString=",41048,41048,41048,41048,41048,41048,41048,41048,41048,41048,41048,41048"
                 elif channelMapping == "VC4":
-                   primerString=",40003,1,1,40003,1,1,40003,1,1,40003,1,1"
+                    primerString=",40003,1,1,40003,1,1,40003,1,1,40003,1,1"
                 elif channelMapping == "VC4_4C":
-                   primerString=",40012,1,1,1,1,1,1,1,1,1,1,1"
+                    primerString=",40012,1,1,1,1,1,1,1,1,1,1,1"
                 else:
                     localMessage="ERROR get_set_rx_channel_mapping_size: channel mapping [{}] not supported by STM4 [{}] rate".format(channelMapping,channelRate)
                     self.__lc_msg(localMessage)
@@ -2629,20 +2629,20 @@ class InstrumentONT(Equipment):
                 primerString=""
                 if channelMapping == "VC12":
                     for indeXX in range(1,49):
-                       primerString +=",41002"
+                        primerString +=",41002"
                 elif channelMapping == "VC3":
                     for indeXX in range(1,49):
-                       primerString +=",41048"
+                        primerString +=",41048"
                 elif channelMapping == "VC4":
                     for indeXX in range(1,17):
-                       primerString +=",40003,1,1"
+                        primerString +=",40003,1,1"
                 elif channelMapping == "VC4_4C":
                     for indeXX in range(1,5):
-                       primerString +=",40012,1,1,1,1,1,1,1,1,1,1,1"
+                        primerString +=",40012,1,1,1,1,1,1,1,1,1,1,1"
                 elif channelMapping == "VC4_16C":
                     primerString+=",40048"
                     for indeXX in range(1,48):
-                       primerString +=",1"
+                        primerString +=",1"
                 else:
                     localMessage="ERROR get_set_rx_channel_mapping_size: channel mapping [{}] not supported by STM16 [{}] rate".format(channelMapping,channelRate)
                     self.__lc_msg(localMessage)
@@ -3013,14 +3013,13 @@ class InstrumentONT(Equipment):
         return True, sdhAnswer
 
 
-
-    def get_set_num_alarmed_burst_frames(self, portId, burstAlarmedFramesNumber=""):   # ONT-5xx  ONT-6xx   ### krepo added ###      
+    def get_set_num_errored_burst_frames(self, portId, burstErroredFramesNumber=""):   # ONT-5xx  ONT-6xx   ### krepo added ###      
         """ ONT-5xx  ONT-6xx
             Get or Set number of frames, in which error insertion is active:
-            is the duration of error insertion is burstAlarmedFramesNumber frames.
+            is the duration of error insertion is burstErroredFramesNumber frames.
                 1...65536
              Return tuple: ( "True|False" , "< result/error list>)
-                True : command execution ok, current read burstAlarmedFramesNumber in result string
+                True : command execution ok, current read burstErroredFramesNumber in result string
                 False: error in command execution, details in error list string
         """
         methodLocalName = self.__lc_current_method_name(embedKrepoInit=True)
@@ -3030,48 +3029,47 @@ class InstrumentONT(Equipment):
         else:
             ONTCmdString=":SOUR:DATA:TEL:SDH:ERR:BURS:ACTI"
         if portId == "":
-            localMessage = "ERROR get_set_num_alarmed_burst_frames: portId  [{}] not specified".format(portId)
+            localMessage = "ERROR get_set_num_errored_burst_frames: portId  [{}] not specified".format(portId)
             self.__lc_msg(localMessage)
             self.__method_failure(methodLocalName, None, "", localMessage)
             return False, localMessage
-        if burstAlarmedFramesNumber == "":  # Get burstAlarmedFramesNumber and exit
+        if burstErroredFramesNumber == "":  # Get burstErroredFramesNumber and exit
             localCommand="{}?".format(ONTCmdString)
             rawCallResult = self.__send_port_cmd(portId, localCommand)
             sdhAnswer = self.__remove_dust(rawCallResult[1])
             self.__method_success(methodLocalName, None, sdhAnswer)
             return True, sdhAnswer
-        burstAlarmedFramesNumberRequired=burstAlarmedFramesNumber
-        notAlmFrNum=int(float(burstAlarmedFramesNumber))
+        burstErroredFramesNumberRequired=burstErroredFramesNumber
+        notAlmFrNum=int(float(burstErroredFramesNumber))
         if notAlmFrNum < 1 or  notAlmFrNum > 65536:
-            localMessage = "ERROR get_set_num_alarmed_burst_frames: burstAlarmedFramesNumber [{}] not in range (1-65536) or use ''(to get status)]".format(str(notAlmFrNum))
+            localMessage = "ERROR get_set_num_errored_burst_frames: burstErroredFramesNumber [{}] not in range (1-65536) or use ''(to get status)]".format(str(notAlmFrNum))
             self.__lc_msg(localMessage)
             self.__method_failure(methodLocalName, None, "", localMessage)
             return False, localMessage
-        localCommand="{} {}".format(ONTCmdString, burstAlarmedFramesNumber)
+        localCommand="{} {}".format(ONTCmdString, burstErroredFramesNumber)
         rawCallResult = self.__send_port_cmd(portId, localCommand)
         sdhAnswer = self.__remove_dust(rawCallResult[1])
         localCommand="{}?".format(ONTCmdString)
         rawCallResult = self.__send_port_cmd(portId, localCommand)
         sdhAnswer = self.__remove_dust(rawCallResult[1])
-        if sdhAnswer != burstAlarmedFramesNumberRequired:
-            localMessage="Set the number of alarmed burst frames: required [{}] but set [{}]".format(burstAlarmedFramesNumberRequired,sdhAnswer)
+        if sdhAnswer != burstErroredFramesNumberRequired:
+            localMessage="Set the number of errored burst frames: required [{}] but set [{}]".format(burstErroredFramesNumberRequired,sdhAnswer)
             self.__lc_msg(localMessage)
             self.__method_failure(methodLocalName, None, "", localMessage)
             return False, sdhAnswer
-        localMessage="Current number of alarmed burst frames:[{}]".format(sdhAnswer)
+        localMessage="Current number of errored burst frames:[{}]".format(sdhAnswer)
         self.__lc_msg(localMessage)
         self.__method_success(methodLocalName, None, localMessage)
         return True, sdhAnswer
 
 
-
-    def get_set_num_not_alarmed_burst_frames(self, portId, burstNotAlarmedFramesNumber=""):   # ONT-5xx  ONT-6xx   ### krepo added ###       
+    def get_set_num_not_errored_burst_frames(self, portId, burstNotErroredFramesNumber=""):   # ONT-5xx  ONT-6xx   ### krepo added ###       
         """ ONT-5xx  ONT-6xx
             Get or Set number of frames, in which error insertion is inactive:
-            is the duration of inactive error insertion is burstNotAlarmedFramesNumber frames.
+            is the duration of inactive error insertion is burstNotErroredFramesNumber frames.
                 0...65536
              Return tuple: ( "True|False" , "< result/error list>)
-                True : command execution ok, current read burstNotAlarmedFramesNumber in result string
+                True : command execution ok, current read burstNotErroredFramesNumber in result string
                 False: error in command execution, details in error list string
         """
         methodLocalName = self.__lc_current_method_name(embedKrepoInit=True)
@@ -3081,35 +3079,35 @@ class InstrumentONT(Equipment):
         else:
             ONTCmdString=":SOUR:DATA:TEL:SDH:ERR:BURS:INAC"
         if portId == "":
-            localMessage = "ERROR get_set_num_not_alarmed_burst_frames: portId  [{}] not specified".format(portId)
+            localMessage = "ERROR get_set_num_not_errored_burst_frames: portId  [{}] not specified".format(portId)
             self.__lc_msg(localMessage)
             self.__method_failure(methodLocalName, None, "", localMessage)
             return False, localMessage
-        if burstNotAlarmedFramesNumber == "":  # Get burstNotAlarmedFramesNumber and exit
+        if burstNotErroredFramesNumber == "":  # Get burstNotErroredFramesNumber and exit
             localCommand="{}?".format(ONTCmdString)
             rawCallResult = self.__send_port_cmd(portId, localCommand)
             sdhAnswer = self.__remove_dust(rawCallResult[1])
             self.__method_success(methodLocalName, None, sdhAnswer)
             return True, sdhAnswer
-        burstNotAlarmedFramesNumberRequired=burstNotAlarmedFramesNumber
-        notAlmFrNum=int(float(burstNotAlarmedFramesNumber))
+        burstNotErroredFramesNumberRequired=burstNotErroredFramesNumber
+        notAlmFrNum=int(float(burstNotErroredFramesNumber))
         if notAlmFrNum < 0 or  notAlmFrNum > 65536:
-            localMessage = "ERROR get_set_num_not_alarmed_burst_frames: burstNotAlarmedFramesNumber [{}] not in range (0-65536) or use ''(to get status)]".format(str(notAlmFrNum))
+            localMessage = "ERROR get_set_num_not_errored_burst_frames: burstNotErroredFramesNumber [{}] not in range (0-65536) or use ''(to get status)]".format(str(notAlmFrNum))
             self.__lc_msg(localMessage)
             self.__method_failure(methodLocalName, None, "", localMessage)
             return False, localMessage
-        localCommand="{} {}".format(ONTCmdString, burstNotAlarmedFramesNumber)
+        localCommand="{} {}".format(ONTCmdString, burstNotErroredFramesNumber)
         rawCallResult = self.__send_port_cmd(portId, localCommand)
         sdhAnswer = self.__remove_dust(rawCallResult[1])
         localCommand="{}?".format(ONTCmdString)
         rawCallResult = self.__send_port_cmd(portId, localCommand)
         sdhAnswer = self.__remove_dust(rawCallResult[1])
-        if sdhAnswer != burstNotAlarmedFramesNumberRequired:
-            localMessage="Set the number of not alarmed burst frames: required [{}] but set [{}]".format(burstNotAlarmedFramesNumberRequired,sdhAnswer)
+        if sdhAnswer != burstNotErroredFramesNumberRequired:
+            localMessage="Set the number of not errored burst frames: required [{}] but set [{}]".format(burstNotErroredFramesNumberRequired,sdhAnswer)
             self.__lc_msg(localMessage)
             self.__method_failure(methodLocalName, None, "", localMessage)
             return False, sdhAnswer
-        localMessage="Current number of not alarmed burst frames:[{}]".format(sdhAnswer)
+        localMessage="Current number of not errored burst frames:[{}]".format(sdhAnswer)
         self.__lc_msg(localMessage)
         self.__method_success(methodLocalName, None, localMessage)
         return True, sdhAnswer
@@ -4263,12 +4261,12 @@ if __name__ == "__main__xxx":   #now skip this part
     #print("tester.get_set_alarm_insertion_mode result: [{}]".format(callResult))
     #callResult = tester.get_set_alarm_insertion_type(portId1,"")
     #print("tester.get_set_alarm_insertion_type result: [{}]".format(callResult))
-    #callResult = tester.get_set_num_alarmed_burst_frames(portId1,"7")
-    #print("tester.get_set_num_alarmed_burst_frames result: [{}]".format(callResult))
-    #callResult = tester.get_set_num_not_alarmed_burst_frames(portId1,"")
-    #print("tester.get_set_num_not_alarmed_burst_frames result: [{}]".format(callResult))
-    #callResult = tester.get_set_num_not_alarmed_burst_frames(portId1,"300")
-    #print("tester.get_set_num_not_alarmed_burst_frames result: [{}]".format(callResult))
+    #callResult = tester.get_set_num_errored_burst_frames(portId1,"7")
+    #print("tester.get_set_num_errored_burst_frames result: [{}]".format(callResult))
+    #callResult = tester.get_set_num_not_errored_burst_frames(portId1,"")
+    #print("tester.get_set_num_not_errored_burst_frames result: [{}]".format(callResult))
+    #callResult = tester.get_set_num_not_errored_burst_frames(portId1,"300")
+    #print("tester.get_set_num_not_errored_burst_frames result: [{}]".format(callResult))
     #callResult = tester.get_set_error_activation(portId1,"ON")
     #print("tester.get_set_error_activation result: [{}]".format(callResult))
     #callResult = tester.get_set_error_insertion_mode(portId1,"ONCE")
@@ -4439,14 +4437,14 @@ if __name__ == "__main__xxx":
     #print("tester.get_set_alarm_activation result: [{}]".format(callResult))
     #callResult = tester.get_set_alarm_activation(portId1,"ON")
     #print("tester.get_set_alarm_activation result: [{}]".format(callResult))
-    #callResult = tester.get_set_num_alarmed_burst_frames(portId1,"7")
-    #print("tester.get_set_num_alarmed_burst_frames result: [{}]".format(callResult))
-    #callResult = tester.get_set_num_alarmed_burst_frames(portId1,"")
-    #print("tester.get_set_num_alarmed_burst_frames result: [{}]".format(callResult))
-    #callResult = tester.get_set_num_not_alarmed_burst_frames(portId1,"")
-    #print("tester.get_set_num_not_alarmed_burst_frames result: [{}]".format(callResult))
-    #callResult = tester.get_set_num_not_alarmed_burst_frames(portId1,"300")
-    #print("tester.get_set_num_not_alarmed_burst_frames result: [{}]".format(callResult))
+    #callResult = tester.get_set_num_errored_burst_frames(portId1,"7")
+    #print("tester.get_set_num_errored_burst_frames result: [{}]".format(callResult))
+    #callResult = tester.get_set_num_errored_burst_frames(portId1,"")
+    #print("tester.get_set_num_errored_burst_frames result: [{}]".format(callResult))
+    #callResult = tester.get_set_num_not_errored_burst_frames(portId1,"")
+    #print("tester.get_set_num_not_errored_burst_frames result: [{}]".format(callResult))
+    #callResult = tester.get_set_num_not_errored_burst_frames(portId1,"300")
+    #print("tester.get_set_num_not_errored_burst_frames result: [{}]".format(callResult))
     # not working
     #callResult = tester.get_set_rx_channel_mapping_size(portId1,"VC11")
     #print("tester.get_set_rx_channel_mapping_size result: [{}]".format(callResult))
