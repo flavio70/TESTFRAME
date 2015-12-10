@@ -95,8 +95,11 @@ class Test(TestCase):
         insert Main body code for your test below
         '''
 
-        #NE1.tl1.do("RTRV-ASAP-PROF::ASAPEQPT-0;")
-        #self.trc_inf(NE1.tl1.get_last_outcome())
+        NE1.tl1.do("ACT-USER::admin:::Alcatel1;")
+        NE1.tl1.do("RTRV-PTF::MVC4-1-1-36-1&&-64::::PTFTYPE=MODVC4,PTFRATE=VC4;")
+        #NE1.tl1.do("RTRV-TU3::MVC4TU3-1-1-1&&-64-1&&-3;")
+        self.trc_inf(NE1.tl1.get_last_outcome())
+
 
     def test_cleanup(self):
         '''

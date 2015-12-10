@@ -15,7 +15,8 @@ import threading
 import time
 import os
 
-from katelibs.facility_tl1 import TL1message
+from katelibs.kexception    import KFrameException
+from katelibs.facility_tl1  import TL1message
 
 
 
@@ -118,6 +119,7 @@ class Plugin1850TL1():
                 error_msg = "TIMEOUT ({:d}s) DETECTED ON SENDING '{:s}'".format(timeout, cmd)
                 self.__trc_error(error_msg)
                 result = False
+                raise KFrameException(error_msg)
                 break
 
         self.__trc_dbg("DEBUG: result := {:s} - errmsg := [{:s}]\n".format(str(result), error_msg))
@@ -200,12 +202,14 @@ class Plugin1850TL1():
         if self.__read_all(channel) == False:
             self.__trc_error("error [1] sending TL1 command [{:s}]".format(cmd))
             self.__last_output = "TIMEOUT DETECTED ON TL1 INTERFACE"
+            raise KFrameException(self.__last_output)
             return False
 
         # Sending command to interface
         if self.__write(channel, cmd) == False:
             self.__trc_error("error [2] sending TL1 command [{:s}]".format(cmd))
             self.__last_output = "TIMEOUT DETECTED ON TL1 INTERFACE"
+            raise KFrameException(self.__last_output)
             return False
 
 
@@ -223,6 +227,7 @@ class Plugin1850TL1():
                 if result_list == ([],[],[]):
                     self.__trc_error("error [3] sending TL1 command [{:s}]".format(cmd))
                     self.__last_output = "TIMEOUT DETECTED ON TL1 INTERFACE"
+                    raise KFrameException(self.__last_output)
                     return False
 
                 msg_tmp = str(result_list[2], 'utf-8')
@@ -241,7 +246,8 @@ class Plugin1850TL1():
                         keepalive_count = keepalive_count + 1
                         if keepalive_count == keepalive_count_max:
                             self.__trc_error("error [4] sending TL1 command [{:s}]".format(cmd))
-                            self.__last_output = "MAXIMUM KEEPALINE ON TL1 RESPONSE REACHED"
+                            self.__last_output = "MAXIMUM KEEPALIVE ON TL1 RESPONSE REACHED"
+                            raise KFrameException(self.__last_output)
                             return False
                         continue
 
@@ -251,6 +257,7 @@ class Plugin1850TL1():
                             if tl1_response.count(";") > 1:
                                 self.__trc_error("error [5] sending TL1 command [{:s}]".format(cmd))
                                 self.__last_output = "INVALID TL1 TERMINATION"
+                                raise KFrameException(self.__last_output)
                                 return False
                         if tl1_response.strip() == ";":
                             continue
@@ -352,6 +359,7 @@ class Plugin1850TL1():
 
             if not is_connected:
                 self.__trc_error("TL1: Timeout on connection")
+                raise KFrameException("TL1: Timeout on connection")
 
             return self.__if_cmd
 
@@ -371,6 +379,7 @@ class Plugin1850TL1():
 
             if not is_connected:
                 self.__trc_error("TL1: Timeout on connection")
+                raise KFrameException("TL1: Timeout on connection")
 
             return self.__if_eve
 
@@ -383,6 +392,7 @@ class Plugin1850TL1():
         except Exception as eee:
             msg = "Error in disconnection - {:s}".format(str(eee))
             self.__trc_error(msg)
+            raise KFrameException(msg)
 
         self.__if_eve = None
 
@@ -391,6 +401,7 @@ class Plugin1850TL1():
         except Exception as eee:
             msg = "Error in disconnection - {:s}".format(str(eee))
             self.__trc_error(msg)
+            raise KFrameException(msg)
 
         self.__if_cmd = None
 

@@ -79,8 +79,8 @@ class TL1check():
         if msg.get_cmd_status() == (True, 'COMPLD'):
             for aid in msg.get_cmd_aid_list():
                 if self.__evaluate_aid(aid):
-                    for attr_val in msg.get_cmd_attr_values(aid):
-                        res = self.__evaluate_attr_val(attr_val)
+                    for attr,val in msg.get_cmd_attr_values(aid).items():
+                        res = self.__evaluate_attr_val(attr, val)
                         if res[0]:
                             result = True
                             res_list.append("{:s}:{:s}".format(aid, res[1]))
@@ -93,24 +93,20 @@ class TL1check():
     def __evaluate_aid(self, aid):
         """ INTERNAL USAGE
         """
-        print("verifico {}".format(aid))
         if len(self.__aids) == 0:
-            print("lista vuota - OK")
             return True
 
         if aid in self.__aids:
-            print("elemento preciso trovato - OK")
             return True
 
-        print("NON TROVATO")
         return False
 
 
-    def __evaluate_attr_val(self, attr_val):
+    def __evaluate_attr_val(self, the_attr, the_val):
         """ INTERNAL USAGE
         """
-        the_attr = attr_val.split('=')[0]
-        the_val  = attr_val.split('=')[1]
+        #the_attr = attr_val.split('=')[0]
+        #the_val  = attr_val.split('=')[1]
 
         for attr, values in self.__filters.items():
             if attr == the_attr:
@@ -124,6 +120,7 @@ class TL1check():
     def debug(self):
         """ INTERNAL USAGE
         """
+        print("aid list   : {}".format(self.__aids))
         print("filters    : {}".format(self.__filters))
         print("conditions : {}".format(self.__conds))
 
@@ -148,30 +145,29 @@ class TL1message():
                 'R_STATUS'  : COMPLD / DELAY / DENY / PRTL / RTRV
                 'R_BODY_OK' : Body Section(Only for successfull command response)
                               list of 1 or more items - Dictionary:
-                                 aid : AID of element (key for dictionary)
-                                     'VALUES' : sequence ATTR=Value
+                                 aid : AID or index of element (key for dictionary)
+                                     'VAL_REF': sequence ATTR=Value
+                                     'VAL_POS': positional value list
                                      'STATE'  : Primary and Secondary state
                 'R_BODY_KO' : Body Section (Only for failure command response)
                                list of two string response specification
             - only for Spontaneous Messages:
                 'S_VMM'     : Verb and modifiers
-                'S_BODY'    : dictionary
+                'S_AID'     : AID for event
+                'S_BODY'    : Text of event
         """
 
         self.__m_plain = tl1_msg    # Plain ascii TL1 Message Response
-        self.__m_coded = {}         # Coded Tl1 Message Response (dictionary)
+        self.__m_coded = None       # Coded Tl1 Message Response (dictionary)
         self.__m_event = None       # True is the message is a Spontaneous Message
 
         if tl1_msg is not None  and  tl1_msg != "":
-            self.encode()
+            self.__encode()
 
 
-    def encode(self):
-        """ Decompose an ASCII TL1 Message response to structured format
+    def __encode_event(self):
+        """ INTERNAL USAGE
         """
-        self.__m_event = False
-        self.__m_coded = {}
-
         f_header = True
         f_ident  = True
         f_block  = True
@@ -189,45 +185,101 @@ class TL1message():
 
             if f_ident:
                 words = line.split()
-                self.__m_event = ( words[0] == '*C' or
-                                   words[0] == '**' or
-                                   words[0] == '*'  or
-                                   words[0] == 'A'  )
+                check_event = ( words[0] == '*C' or
+                                words[0] == '**' or
+                                words[0] == '*'  or
+                                words[0] == 'A'  )
+                if not check_event:
+                    print("MESSAGGIO MALFORMATO")
+                    return
 
                 self.__m_coded['C_CODE'] = words[0]
                 self.__m_coded['C_TAG']  = words[1]
-
-                if self.__m_event:
-                    self.__m_coded['S_VMM'] = words[2:]
-                else:
-                    self.__m_coded['R_STATUS']  = words[2]
-                    self.__m_coded['R_BODY_OK'] = {}
-                    self.__m_coded['R_BODY_KO'] = []
-                    self.__m_coded['R_ERROR']   = ""
-
+                self.__m_coded['S_VMM']  = words[2:]
                 f_ident = False
                 continue
 
             if f_block:
-                if self.__m_event:
-                    # Event Response
-                    words = line.strip().replace('"', '').split(':')
-                    self.__m_coded['EVE_AID']  = words[0]
-                    self.__m_coded['EVE_TEXT'] = words[1]
-                    f_block = False
+                # Event Response
+                words = line.strip().replace('"', '').split(':')
+                self.__m_coded['S_AID']  = words[0]
+                self.__m_coded['S_BODY'] = words[1].split(',')
+                f_block = False
+                continue
+
+            if line == ';':
+                # TERMINATOR found - closing encoding
+                break
+
+
+    def __encode_response_std(self):
+        """ INTERNAL USAGE
+        """
+        f_header = True
+        f_ident  = True
+        f_block  = True
+
+        f_skip_n = 0
+
+        for line in self.__m_plain.split('\n'):
+            if f_skip_n > 0:
+                # Skip one or more lines
+                f_skip_n = f_skip_n - 1
+                continue
+
+            if f_header:
+                if line.strip() == "":
                     continue
 
+                self.__m_coded['C_SID']  = " ".join(line.split()[:-2]).replace('"', '')
+                self.__m_coded['C_DATE'] = line.split()[-2]
+                self.__m_coded['C_TIME'] = line.split()[-1]
+                f_header = False
+                continue
+
+            if f_ident:
+                words = line.split()
+                check_event = ( words[0] == '*C' or
+                                words[0] == '**' or
+                                words[0] == '*'  or
+                                words[0] == 'A'  )
+                if check_event:
+                    print("MESSAGGIO MALFORMATO")
+                    return
+
+                self.__m_coded['C_CODE']    = words[0]
+                self.__m_coded['C_TAG']     = words[1]
+                self.__m_coded['R_STATUS']  = words[2]
+                self.__m_coded['R_BODY_OK'] = {}
+                self.__m_coded['R_BODY_KO'] = []
+                self.__m_coded['R_ERROR']   = ""
+                f_ident = False
+                continue
+
+            if f_block:
                 # Command Response
                 stripped_line = line.strip()
+                if stripped_line == '>':
+                    f_skip_n = 2    # Long response - skip next 2 lines
+                    continue
                 if ( stripped_line.find('/*') != -1                                     and
                      stripped_line.find("[{:s}]".format(self.__m_coded['C_TAG'])) != -1 and
                      stripped_line.find('*/') != -1                                     ):
-                    # REMARK found - closing capture
+                    # REMARK found - closing encoding
+                    tmp = stripped_line.replace("/* ","")
+                    tmp = tmp[:tmp.find(":")]
+                    self.__m_coded['R_BODY_CMD'] = tmp
                     break
                 if self.__m_coded['R_STATUS'] == "COMPLD":
                     words = stripped_line.replace('"', '').split(':')
                     row = {}
-                    row[ words[0] ] = {'VALUES' : words[2], 'STATE' : words[3]}
+
+                    attr_val_list = {}
+                    for elem in words[2].split(','):
+                        attr_val_list[elem.split('=')[0]] = elem.split('=')[1]
+
+                    row[ words[0] ] = {'VAL_REF' : attr_val_list, 'STATE' : words[3]}
+
                     self.__m_coded['R_BODY_OK'].update(row)
                 elif self.__m_coded['R_STATUS'] == "DENY":
                     if len(stripped_line) == 4:
@@ -239,8 +291,138 @@ class TL1message():
                 continue
 
             if line == ';':
-                # TERMINATOR found - closing capture
+                # TERMINATOR found - closing encoding
                 break
+
+
+    def __encode_response_asap_prof(self):
+        """ INTERNAL USAGE
+        """
+        f_header = True
+        f_ident  = True
+        f_block  = True
+
+        f_skip_n = 0
+
+        counter = 1
+
+        for line in self.__m_plain.split('\n'):
+            if f_skip_n > 0:
+                # Skip one or more lines
+                f_skip_n = f_skip_n - 1
+                continue
+
+            if f_header:
+                if line.strip() == "":
+                    continue
+
+                self.__m_coded['C_SID']  = " ".join(line.split()[:-2]).replace('"', '')
+                self.__m_coded['C_DATE'] = line.split()[-2]
+                self.__m_coded['C_TIME'] = line.split()[-1]
+                f_header = False
+                continue
+
+            if f_ident:
+                words = line.split()
+                check_event = ( words[0] == '*C' or
+                                words[0] == '**' or
+                                words[0] == '*'  or
+                                words[0] == 'A'  )
+                if check_event:
+                    print("MESSAGGIO MALFORMATO")
+                    return
+
+                self.__m_coded['C_CODE']    = words[0]
+                self.__m_coded['C_TAG']     = words[1]
+                self.__m_coded['R_STATUS']  = words[2]
+                self.__m_coded['R_BODY_OK'] = {}
+                self.__m_coded['R_BODY_KO'] = []
+                self.__m_coded['R_ERROR']   = ""
+                f_ident = False
+                continue
+
+            if f_block:
+                # Command Response
+                stripped_line = line.strip()
+                if stripped_line == '>':
+                    f_skip_n = 2    # Long response - skip next 2 lines
+                    continue
+                if ( stripped_line.find('/*') != -1                                     and
+                     stripped_line.find("[{:s}]".format(self.__m_coded['C_TAG'])) != -1 and
+                     stripped_line.find('*/') != -1                                     ):
+                    # REMARK found - closing encoding
+                    tmp = stripped_line.replace("/* ","")
+                    tmp = tmp[:tmp.find(":")]
+                    self.__m_coded['R_BODY_CMD'] = tmp
+                    break
+                if self.__m_coded['R_STATUS'] == "COMPLD":
+                    words = stripped_line.replace('"', '').split(':')
+                    row = {}
+                    if words[0] != "":
+                        attr_val_list = {}
+                        for elem in words[2].split(','):
+                            attr_val_list[elem.split('=')[0]] = elem.split('=')[1]
+                        row[ words[0] ] = {'VAL_REF' : attr_val_list}
+                    else:
+                        row[ str(counter) ] = {'VAL_POS' : words[2].split(',')}
+                        counter = counter + 1
+                    self.__m_coded['R_BODY_OK'].update(row)
+                elif self.__m_coded['R_STATUS'] == "DENY":
+                    if len(stripped_line) == 4:
+                        self.__m_coded['R_ERROR'] = stripped_line
+                    else:
+                        self.__m_coded['R_BODY_KO'].append(stripped_line)
+                else:
+                    print("[{:s}] NON ANCORA GESTITO".format(self.__m_coded['R_STATUS']))
+                continue
+
+            if line == ';':
+                # TERMINATOR found - closing encoding
+                break
+
+
+    def __encode(self):
+        """ INTERNAL USAGE
+            Decompose an ASCII TL1 Message response to structured format
+        """
+        is_event = False
+        is_response_std = False
+        is_response_asap_prof = False
+
+        for line in self.__m_plain.split('\n'):
+            if line.strip() == "":
+                continue
+
+            marker = line.split()[0]
+
+            if marker == "M":
+                if self.__m_plain.find("RTRV-ASAP-PROF") != -1:
+                    is_response_asap_prof = True
+                else:
+                    is_response_std = True
+                self.__m_event = False
+                break
+
+            if marker == '*C' or marker == '**' or marker == '*' or marker == 'A':
+                is_event = True
+                self.__m_event = True
+                break
+
+        self.__m_coded = {}     # Reset internal coded message
+
+        if is_response_std:
+            self.__encode_response_std()
+            return
+
+        if is_response_asap_prof:
+            self.__encode_response_asap_prof()
+            return
+
+        if is_event:
+            self.__encode_event()
+            return
+
+        print("UNMANAGED MESSAGE TYPE")
 
 
     def decode(self, codec="ASCII"):
@@ -251,7 +433,7 @@ class TL1message():
         if   codec == "ASCII":
             pass
         elif codec == "JSON":
-            new_msg = json.dumps(self.__m_coded, indent=4, sort_keys=True)
+            new_msg = json.dumps(self.__m_coded, indent=4, sort_keys=True, separators=(',',' : '))
         else:
             print("Codec not managed")
 
@@ -320,12 +502,16 @@ class TL1message():
         if the_elem is None:
             return None, None
 
-        return the_elem['STATE'].split(',')
+        try:
+            return the_elem['STATE'].split(',')
+        except Exception as eee:
+            return None, None
 
 
     def get_cmd_attr_value(self, aid, attr):
         """ Return the value for specified attribute and AID
             None if wrong parameters are supplied
+            Only for <ATTR,VALUE> response list
         """
         if self.__m_event:
             return None
@@ -333,10 +519,10 @@ class TL1message():
         if self.get_cmd_status() != (True, "COMPLD"):
             return None
 
-        for  i  in  self.__m_coded['R_BODY_OK'].get(aid)['VALUES'].split(','):
-            the_attr, the_value = i.split('=')
-            if the_attr == attr:
-                return the_value
+        try:
+            return self.__m_coded['R_BODY_OK'].get(aid)['VAL_REF'][attr]
+        except Exception as eee:
+            return None
 
         return None
 
@@ -344,6 +530,7 @@ class TL1message():
     def get_cmd_attr_values(self, aid):
         """ Return the <attr,value> list for specified AID
             None if wrong parameters are supplied
+            Only for <ATTR,VALUE> response list
         """
         if self.__m_event:
             return None
@@ -351,7 +538,44 @@ class TL1message():
         if self.get_cmd_status() != (True, "COMPLD"):
             return None
 
-        return self.__m_coded['R_BODY_OK'].get(aid)['VALUES'].split(',')
+        try:
+            return self.__m_coded['R_BODY_OK'].get(aid)['VAL_REF']
+        except Exception as eee:
+            return None
+
+
+    def get_cmd_positional_value(self, aid, pos):
+        """ Return the value for specified positional attribute and AID
+            None if wrong parameters are supplied
+            Only for Positional response list
+        """
+        if self.__m_event:
+            return None
+
+        if self.get_cmd_status() != (True, "COMPLD"):
+            return None
+
+        try:
+            return self.__m_coded['R_BODY_OK'].get(aid)['VAL_POS'][pos]
+        except Exception as eee:
+            return None
+
+
+    def get_cmd_positional_values(self, aid):
+        """ Return the value for specified positional attribute and AID
+            None if wrong parameters are supplied
+            Only for Positional response list
+        """
+        if self.__m_event:
+            return None
+
+        if self.get_cmd_status() != (True, "COMPLD"):
+            return None
+
+        try:
+            return self.__m_coded['R_BODY_OK'].get(aid)['VAL_POS']
+        except Exception as eee:
+            return None
 
 
     def get_cmd_error_frame(self):
@@ -414,68 +638,6 @@ M  792 DENY
 
     msg5 = """
 
-   "nodeA - .TDM.EM_TEST.RtrvEqptALL" 15-10-15 21:47:33
-M  963 COMPLD
-   "SHELF-1-1::PROVISIONEDTYPE=UNVRSL320,ACTUALTYPE=UNVRSL320,AINSMODE=NOWAIT,SHELFNUM=1,SHELFROLE=MAIN,ALMPROF=LBL-ASAPEQPT-SYSDFLT,REGION=ETSI,PROVMODE=MANEQ-AUTOFC:IS"
-   "EC320-1-1-1::PROVISIONEDTYPE=EC320,ACTUALTYPE=UNKNOWN,AINSMODE=NOWAIT,ALMPROF=LBL-ASAPEQPT-SYSDFLT,REGION=ETSI,PROVMODE=MANEQ-AUTOFC:OOS-AU,WRK&FLT"
-   "MDL-1-1-2::AUTOPROV=OFF:OOS-AUMA,UAS&UEQ"
-   "MDL-1-1-3::AUTOPROV=OFF:OOS-AUMA,UAS&UEQ"
-   "MDL-1-1-4::AUTOPROV=OFF:OOS-AUMA,UAS&UEQ"
-   "MDL-1-1-5::AUTOPROV=OFF:OOS-AUMA,UAS&UEQ"
-   "MDL-1-1-6::AUTOPROV=OFF:OOS-AUMA,UAS&UEQ"
-   "MDL-1-1-7::AUTOPROV=OFF:OOS-AUMA,UAS&UEQ"
-   "MDL-1-1-8::AUTOPROV=OFF:OOS-AUMA,UAS&UEQ"
-   "MDL-1-1-9::AUTOPROV=OFF:OOS-AUMA,UAS&UEQ"
-   "MT320-1-1-10::PROVISIONEDTYPE=MT320,ACTUALTYPE=UNKNOWN,AINSMODE=NOWAIT,ALMPROF=LBL-ASAPEQPT-SYSDFLT,REGION=ETSI,PROVMODE=MANEQ-AUTOFC:OOS-AU,WRK&UEQ"
-   "MT320-1-1-11::PROVISIONEDTYPE=MT320,ACTUALTYPE=UNKNOWN,AINSMODE=NOWAIT,ALMPROF=LBL-ASAPEQPT-SYSDFLT,REGION=ETSI,PROVMODE=MANEQ-AUTOFC:OOS-AU,STBYH&UEQ"
-   "MDL-1-1-12::AUTOPROV=OFF:OOS-AUMA,UAS&UEQ"
-   "MDL-1-1-13::AUTOPROV=OFF:OOS-AUMA,UAS&UEQ"
-   "MDL-1-1-14::AUTOPROV=OFF:OOS-AUMA,UAS&UEQ"
-   "MDL-1-1-15::AUTOPROV=OFF:OOS-AUMA,UAS&UEQ"
-   "MDL-1-1-16::AUTOPROV=OFF:OOS-AUMA,UAS&UEQ"
-   "MDL-1-1-17::AUTOPROV=OFF:OOS-AUMA,UAS&UEQ"
-   "PP1GE-1-1-18::PROVISIONEDTYPE=PP1GE,ACTUALTYPE=UNKNOWN,AINSMODE=NOWAIT,ALMPROF=LBL-ASAPEQPT-SYSDFLT,REGION=ETSI,PROVMODE=MANEQ-AUTOFC:OOS-AU,FLT"
-   "MDL-1-1-18-1::AUTOPROV=OFF:OOS-AUMA,UAS&UEQ"
-   "MDL-1-1-18-2::AUTOPROV=OFF:OOS-AUMA,UAS&UEQ"
-   "MDL-1-1-18-3::AUTOPROV=OFF:OOS-AUMA,UAS&UEQ"
-   "MDL-1-1-18-4::AUTOPROV=OFF:OOS-AUMA,UAS&UEQ"
-   "MDL-1-1-18-5::AUTOPROV=OFF:OOS-AUMA,UAS&UEQ"
-   "MDL-1-1-18-6::AUTOPROV=OFF:OOS-AUMA,UAS&UEQ"
-   "MDL-1-1-18-7::AUTOPROV=OFF:OOS-AUMA,UAS&UEQ"
-   "MDL-1-1-18-8::AUTOPROV=OFF:OOS-AUMA,UAS&UEQ"
-   "MDL-1-1-18-9::AUTOPROV=OFF:OOS-AUMA,UAS&UEQ"
-   "MDL-1-1-18-10::AUTOPROV=OFF:OOS-AUMA,UAS&UEQ"
-   "MDL-1-1-19::AUTOPROV=OFF:OOS-AUMA,UAS&UEQ"
-   "MDL-1-1-20::AUTOPROV=OFF:OOS-AUMA,UAS&UEQ"
-   "MDL-1-1-21::AUTOPROV=OFF:OOS-AUMA,UAS&UEQ"
-   "MDL-1-1-22::AUTOPROV=OFF:OOS-AUMA,UAS&UEQ"
-   "MDL-1-1-23::AUTOPROV=OFF:OOS-AUMA,UAS&UEQ"
-   "MDL-1-1-24::AUTOPROV=OFF:OOS-AUMA,UAS&UEQ"
-   "MDL-1-1-25::AUTOPROV=OFF:OOS-AUMA,UAS&UEQ"
-   "MDL-1-1-26::AUTOPROV=OFF:OOS-AUMA,UAS&UEQ"
-   "MDL-1-1-27::AUTOPROV=OFF:OOS-AUMA,UAS&UEQ"
-   "MDL-1-1-28::AUTOPROV=OFF:OOS-AUMA,UAS&UEQ"
-   "MDL-1-1-29::AUTOPROV=OFF:OOS-AUMA,UAS&UEQ"
-   "MDL-1-1-30::AUTOPROV=OFF:OOS-AUMA,UAS&UEQ"
-   "MDL-1-1-31::AUTOPROV=OFF:OOS-AUMA,UAS&UEQ"
-   "MDL-1-1-32::AUTOPROV=OFF:OOS-AUMA,UAS&UEQ"
-   "MDL-1-1-33::AUTOPROV=OFF:OOS-AUMA,UAS&UEQ"
-   "MDL-1-1-34::AUTOPROV=OFF:OOS-AUMA,UAS&UEQ"
-   "MDL-1-1-35::AUTOPROV=OFF:OOS-AUMA,UAS&UEQ"
-   "MDL-1-1-36::AUTOPROV=OFF:OOS-AUMA,UAS&UEQ"
-   "POW320-1-1-37::PROVISIONEDTYPE=PSF320,ACTUALTYPE=UNKNOWN,AINSMODE=NOWAIT,ALMPROF=LBL-ASAPEQPT-SYSDFLT,REGION=ETSI,PROVMODE=MANEQ-AUTOFC:OOS-AU,MEA"
-   "MDL-1-1-38::AUTOPROV=OFF:OOS-AUMA,UAS&UEQ"
-   "POW320-1-1-39::PROVISIONEDTYPE=PSF320,ACTUALTYPE=UNKNOWN,AINSMODE=NOWAIT,ALMPROF=LBL-ASAPEQPT-SYSDFLT,REGION=ETSI,PROVMODE=MANEQ-AUTOFC:OOS-AU,MEA"
-   "FAN320-1-1-40::PROVISIONEDTYPE=FAN320,ACTUALTYPE=UNKNOWN,AINSMODE=NOWAIT,ALMPROF=LBL-ASAPEQPT-SYSDFLT,REGION=ETSI,PROVMODE=MANEQ-AUTOFC:OOS-AU,FLT"
-   "FAN320-1-1-41::PROVISIONEDTYPE=FAN320,ACTUALTYPE=UNKNOWN,AINSMODE=NOWAIT,ALMPROF=LBL-ASAPEQPT-SYSDFLT,REGION=ETSI,PROVMODE=MANEQ-AUTOFC:OOS-AU,FLT"
-   "TBUS-1-1-42::PROVISIONEDTYPE=TBUS320,ACTUALTYPE=UNKNOWN,AINSMODE=NOWAIT,ALMPROF=LBL-ASAPEQPT-SYSDFLT,REGION=ETSI,PROVMODE=MANEQ-AUTOFC:IS"
-   "TBUS-1-1-43::PROVISIONEDTYPE=TBUS320,ACTUALTYPE=UNKNOWN,AINSMODE=NOWAIT,ALMPROF=LBL-ASAPEQPT-SYSDFLT,REGION=ETSI,PROVMODE=MANEQ-AUTOFC:IS"
-   /* RTRV-EQPT::ALL [963] (536871273) */
-;
-"""
-
-    msg6="""
-
    PLEASE-SET-SID-63880 15-09-18 05:11:48
 M  480 COMPLD
    "ASAPEQPT-0,EQPT::DFLT=N,USERLABEL=LBL-ASAPEQPT-None"
@@ -526,6 +688,28 @@ M  480 COMPLD
 ;
 """
 
+    mm = TL1message(msg1)
+    print(mm.decode("JSON"))
+    mm = TL1message(msg4)
+    print(mm.decode("JSON"))
+    mm = TL1message(msg3)
+    print(mm.decode("JSON"))
+    mm = TL1message(msg5)
+    print(mm.decode("JSON"))
+    print(mm.get_cmd_attr_value("ASAPEQPT-0,EQPT", "USERLABEL"))
+    print(mm.get_cmd_attr_values("ASAPEQPT-0,EQPT"))
+    print(mm.get_cmd_attr_values("1"))
+    print(mm.get_cmd_positional_values("43"))
+    print(mm.get_cmd_positional_value("43", 2))
+    filt = TL1check()
+    filt.add_aid("ASAPEQPT-0,EQPT")
+    filt.add_filter("DFLT", "N")
+    filt.add_filter("DFLT", "Y")
+    filt.debug()
+    print(filt.evaluate_msg(mm))
+
+    sys.exit(0)
+
     #print("[{:s}]\n{:s}".format(msg1, "-" * 80))
     mm = TL1message(msg3)
     print(mm.decode("JSON"))
@@ -537,7 +721,6 @@ M  480 COMPLD
     filt.add_filter("PIPPO", "123")
     filt.debug()
     print(filt.evaluate_msg(mm))
-
 
     sys.exit(0)
 
@@ -570,7 +753,6 @@ M  480 COMPLD
             print(v3[1])
 
         print("-" * 80)
-    #mm.encode("ASCII")
 
 
     print("FINE")

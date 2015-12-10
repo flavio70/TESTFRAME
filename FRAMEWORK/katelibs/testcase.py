@@ -10,6 +10,7 @@
 import os
 import argparse
 
+from katelibs.kexception import KUserException, KFrameException
 from katelibs.kenviron import KEnvironment
 
 
@@ -102,9 +103,25 @@ class TestCase(object):
         parser.add_argument("--testClean", help="Run the Test Clean Up", action="store_true")
         parser.add_argument("--DUTClean", help="Run the DUTs Clean Up", action="store_true")
         args = parser.parse_args()
-        self.init()
-        self.run_test(args)
-        self.close()
+
+        try:
+            self.init()
+            self.run_test(args)
+            self.close()
+
+        except KFrameException as eee:
+            msg = "KATE FRAMEWORK EXCEPTION CAUGHT - {}".format(eee)
+            self.trc_err(msg)
+
+        except KUserException as eee:
+            msg = "KATE USER EXCEPTION CAUGHT - {}".format(eee)
+            self.trc_err(msg)
+            self.close()
+
+        except Exception as eee:
+            msg = "GENERIC EXCEPTION CAUGHT - {}".format(eee)
+            self.trc_err(msg)
+            self.close()
 
 
     def run_test(self, args):
@@ -142,6 +159,13 @@ class TestCase(object):
         This function will terminate the specific XML report file related to TPSName test id
         """ 
         self.kenvironment.krepo.stop_tps_block(dut_id, tps_area, tps_name)
+
+
+    def trc_dbg(self, msg):
+        """ Perform a debug message trace. The supplied message will be logged with a time stamp
+            and module, row and function/method
+        """
+        self.kenvironment.ktrc.k_tracer_debug(msg)
 
 
     def trc_inf(self, msg):
