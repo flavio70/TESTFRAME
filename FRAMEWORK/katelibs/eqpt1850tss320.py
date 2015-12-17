@@ -70,6 +70,7 @@ class Eqpt1850TSS320(Equipment):
 
         self.cli = Plugin1850CLI(   self.__net.get_ip_str(),
                                     eRef=self,
+                                    ktrc=self.__kenv.ktrc,
                                     krepo=self.__krepo)
 
         self.bm  = Plugin1850BM(    self.__net.get_ip_str(),
