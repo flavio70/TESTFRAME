@@ -47,7 +47,9 @@ class Plugin1850CLI():
         self.__prompt = ""
         self.__last_cmd = "UNSET"         # last CLI command
         self.__last_output = ""           # last CLI command output
-        self.__last_status = "SUCCESS"    # last CLI command status)
+        self.__last_status = "NONE"       # last CLI command status)
+        # Semaphore for CLI Keep Alive Threading area
+        #self.__thread_lock = threading.Lock()
 
     def get_last_cmd(self):
         """
@@ -81,7 +83,6 @@ class Plugin1850CLI():
             self.__trc_err(msg)
             self.__last_status = "FAILURE"
             return
-
 
         self.__trc_inf("CONNECTING CLI...")
 
@@ -127,6 +128,8 @@ class Plugin1850CLI():
             Connection to CLI port of selected equipment.
             Returns False if detected exceptions otherwise returns True.
         """
+        #with self.__thread_lock:
+        self.__KeepaliveEnb = False
 
         try:
             # Creates telnet instance and opens connection
@@ -153,6 +156,9 @@ class Plugin1850CLI():
         # Marks connection completed
         self.__connected = True
 
+        #with self.__thread_lock:
+        self.__KeepaliveEnb = True
+
         return True
 
 
@@ -176,6 +182,19 @@ class Plugin1850CLI():
         """ INTERNAL USAGE
             Set and start a Timer in order to keep the cli dialog alive
         """
+        #with self.__thread_lock:
+        while not self.__KeepaliveEnb:
+            #time.sleep(3)
+            #self.__trc_inf(self.__KeepaliveEnb)
+            pass
+
+        # Exit if not connected
+        if not self.__connected:
+            return True
+
+        #self.__trc_inf("++++++++++++++++++++++++")
+        #self.__trc_inf("RESTART TIMER")
+        #self.__trc_inf("++++++++++++++++++++++++")
         self.__timer = threading.Timer(5, self.__keep_alive)
         try:
             self.__timer.start()
@@ -259,7 +278,6 @@ class Plugin1850CLI():
             Returns False if detected exceptions otherwise returns True.
         """
 
-
         if policy is not None and policy != "COMPLD" and policy != "DENY":
             msg = "Policy parameter must be <none> or COMPLD or DENY"
             self.__trc_err(msg)
@@ -303,6 +321,7 @@ class Plugin1850CLI():
         if policy == "COMPLD":
             if cnd_success:
                 self.__t_success(cmd, None, self.get_last_outcome())
+                self.__last_status = "SUCCESS"
             else:
                 if condition:
                     errmsg = "Policy: COMPLD -- Condition ({:s}): NOT-SATISFIED".format(condition)
@@ -313,6 +332,7 @@ class Plugin1850CLI():
         elif policy == "DENY":
             if not cnd_success:
                 self.__t_success(cmd, None, self.get_last_outcome())
+                self.__last_status = "SUCCESS"
             else:
                 if condition:
                     errmsg = "Policy: DENY -- Condition ({:s}): SATISFIED".format(condition)
@@ -328,14 +348,12 @@ class Plugin1850CLI():
                     self.__last_status = "FAILURE"
                 else:
                     self.__t_success(cmd, None, self.get_last_outcome())
+                    self.__last_status = "SUCCESS"
             else:
                 self.__t_success(cmd, None, self.get_last_outcome())
 
 
-        if self.get_last_cmd_status() == "SUCCESS":
-            self.__trc_inf("\n[=====>\n{:s}\n=====]".format(self.get_last_outcome()), level=0)
-        else:
-            self.__trc_inf("\n[=====>\nCommand: {:s}\nResult:  {:s}\n=====]".format(self.get_last_cmd(), self.get_last_cmd_status()), level=0)
+        self.__trc_inf("\n[=====>\nCommand: {:s}\nResult:  {:s}\nOutput:\n{:s}\n=====]".format(self.get_last_cmd(), self.get_last_cmd_status(), self.get_last_outcome()), level=0)
 
         return
 
@@ -349,16 +367,24 @@ class Plugin1850CLI():
             self.__last_output contains the result of the coomand.
         """
 
-        # Setting last command, last_output and last_status.
-        self.__last_cmd = cmd
-        self.__last_output = ""
-        self.__last_status = "SUCCESS"
-
-        # Trash all trailing characters from stream
-        while str(self.__if_cmd.read_very_eager().strip(), 'utf-8') != "":
-            pass
+        #self.__trc_inf("++++++++++++++++++++++++")
+        #self.__trc_inf(keepalive)
+        #self.__trc_inf("++++++++++++++++++++++++")
 
         if cmd != "logout" and not keepalive:
+            # Trash all trailing characters from stream
+            while str(self.__if_cmd.read_very_eager().strip(), 'utf-8') != "":
+                pass
+            #self.__trc_inf("++++++++++++++++++++++++")
+            #self.__trc_inf("SET KEEPALIVE FLAG FALSE")
+            #self.__trc_inf("++++++++++++++++++++++++")
+            #with self.__thread_lock:
+            self.__KeepaliveEnb = False
+            # Setting last command, last_output and last_status.
+            self.__last_cmd = cmd
+            self.__last_output = ""
+            self.__last_status = "NONE"
+
             # Set current timeout value
             if not self.__to_set():
                 msg = "Timeout detected before invoking commad {:s} execution".format(cmd)
@@ -366,8 +392,8 @@ class Plugin1850CLI():
                 self.__last_status = "TIMEOUT"
                 return False
 
+        # Invoking cli command execution
         try:
-            # Invoking cli command execution
             self.__if_cmd.write(cmd.encode() + b"\r\n")
         except EOFError as eee:
             msg = "Error invoking cli command({:s})\nException: {:s}".format(cmd, str(eee))
@@ -390,6 +416,12 @@ class Plugin1850CLI():
                 return False
             skip = ".. message: waiting - other CLI command in progress\r"
             self.__last_output = buf.decode().replace(skip,"")
+        if not keepalive:
+            #with self.__thread_lock:
+            self.__KeepaliveEnb = True
+            #self.__trc_inf("++++++++++++++++++++++++")
+            #self.__trc_inf("SET KEEPALIVE FLAG TRUE")
+            #self.__trc_inf("++++++++++++++++++++++++")
         return True
 
 
@@ -428,6 +460,13 @@ class Plugin1850CLI():
         if self.__krepo:
             self.__krepo.add_skipped(self.__eqpt_ref, title, e_time, out_text, err_text, skip_text)
 
+
+
+    def __trc_dbg(self, msg, level=None):
+        """ INTERNAL USAGE
+        """
+        if self.__ktrc is not None:
+            self.__ktrc.k_tracer_debug(msg, level)
 
 
     def __trc_inf(self, msg, level=None):
@@ -494,28 +533,31 @@ if __name__ == "__main__":
         repo.frame_close()
         exit()
 
-    # 1. Condizione iniziale
+    # cli._Plugin1850CLI__trc_inf(" 1. Condizione iniziale")
+
+    cli._Plugin1850CLI__trc_inf(" 1. Condizione iniziale")
     cli.do("linkagg show")
+    
     #
     # lag      AdminKey    LAG User Label                     LAG Size Admin State
     # ======== =========== ================================== ======== ===============
     #
     # .. message: not found Entry
 
-    # 2. Creazione di una LAG (EXPECTED SUCCESS)
-    cli.do("linkagg activate lag1 size 2 adminkey  1 ets lagname LAG_1", policy="COMPLD", timeout=10)
+    cli._Plugin1850CLI__trc_inf(" 2. Creazione di una LAG (EXPECTED SUCCESS)")
+    cli.do("linkagg activate lag1 size 2 adminkey  1 ets lagname LAG_1", policy="COMPLD", timeout=20)
     #
     # .. message: successful completed command
     #
 
-    # 3. SHOW delle LAG create
+    cli._Plugin1850CLI__trc_inf(" 3. SHOW delle LAG create")
     cli.do("linkagg show")
     #
     # lag      AdminKey    LAG User Label                     LAG Size Admin State
     # ======== =========== ================================== ======== ===============
     # 1        1           'LAG_1'                            2        enable
 
-    # 4. Show della LAG1 
+    cli._Plugin1850CLI__trc_inf(" 4. Show della LAG1 ")
     cli.do("linkagg show lag1")
     # 
     # Link Aggregation Info of lag1
@@ -525,41 +567,41 @@ if __name__ == "__main__":
     # LAG Size: 2
     # ...
 
-    # 5. EDIT LAG con valore del campo size fuori range (expected Deny da parte della CLI)
-    #    NB: i deny dati direttamente dalla CLI non hanno sempre output univoco,
-    #    cmq solitamente contengono "Error" oppure "unsuccessful" 
-    cli.do("linkagg config lag1 size 20")
+    cli._Plugin1850CLI__trc_inf(" 5. EDIT LAG con valore del campo size fuori range (expected Deny da parte della CLI)")
+    cli._Plugin1850CLI__trc_inf("    NB: i deny dati direttamente dalla CLI non hanno sempre output univoco,")
+    cli._Plugin1850CLI__trc_inf("    cmq solitamente contengono 'Error' oppure 'unsuccessful'")
+    cli.do("linkagg config lag1 size 20", policy="COMPLD", timeout=20)
     #                                ^
     # Error: Out of range. Valid range is: 1 - 16
 
-    # 6. EDIT LAG con valore ammissibile  del campo size (expected SUCCESS)
-    cli.do("linkagg config lag1 size 10")
+    cli._Plugin1850CLI__trc_inf(" 6. EDIT LAG con valore ammissibile  del campo size (expected SUCCESS)")
+    cli.do("linkagg config lag1 size 10", policy="COMPLD", timeout=20)
     #                                ^
     # .. message: successful completed command
 
-    # 7. EDIT parametro LACP della LAG (expected Deny da parte della CLI)
-    cli.do("linkagg config lag1 lacp disable")
+    cli._Plugin1850CLI__trc_inf(" 7. EDIT parametro LACP della LAG (expected Deny da parte della CLI)")
+    cli.do("linkagg config lag1 lacp disable", policy="COMPLD", timeout=20)
     # 
     # .. message: enabled Lag; refused change of param lacp
     # 
     # .. message: unsuccessful completed command
 
-    # 8. EDIT Dello stato amministrativo: Disable, del parametro LACP e ancora dello
-    #    stato amministrativo Enable (EXPECTED SUCCESS)
-    cli.do("linkagg config lag1 adminstate disable")
+    cli._Plugin1850CLI__trc_inf(" 8. EDIT Dello stato amministrativo: Disable, del parametro LACP e ancora dello")
+    cli._Plugin1850CLI__trc_inf("    stato amministrativo Enable (EXPECTED SUCCESS)")
+    cli.do("linkagg config lag1 adminstate disable", policy="COMPLD", timeout=10)
     # 
     # .. message: successful completed command
     # 
-    cli.do("linkagg config lag1 lacp disable")
+    cli.do("linkagg config lag1 lacp disable", policy="COMPLD", timeout=10)
     # 
     # .. message: successful completed command
     # 
-    cli.do("linkagg config lag1 adminstate enable")
+    cli.do("linkagg config lag1 adminstate enable", policy="COMPLD", timeout=10)
     # 
     # .. message: successful completed command
     # 
 
-    # 11. Show delle VPLS  (expected nessuna)
+    cli._Plugin1850CLI__trc_inf(" 11. Show delle VPLS  (expected nessuna)")
     cli.do("vpls show")
     # 
     # LabelKey     vpls VpnId                       Status
@@ -567,19 +609,19 @@ if __name__ == "__main__":
     # 
     # .. message: not found Entry
 
-    # 12. Creazione VPLS e bind della LAG (expected SUCCESS)
-    cli.do("vpls activate  VPLAG portset lag1")
+    cli._Plugin1850CLI__trc_inf(" 12. Creazione VPLS e bind della LAG (expected SUCCESS)")
+    cli.do("vpls activate  VPLAG portset lag1", policy="COMPLD", timeout=20)
     # 
     # .. message: successful completed command
 
-    #13. Show delle VPLS
+    cli._Plugin1850CLI__trc_inf(" 13. Show delle VPLS")
     cli.do("vpls show")
     # 
     # LabelKey     vpls VpnId                       Status
     # ============ ================================ ===============
     # @1           'VPLAG'                          active
 
-    #14. Show della VPLS VPLAG
+    cli._Plugin1850CLI__trc_inf(" 14. Show della VPLS VPLAG")
     cli.do("vpls show VPLAG")
     # 
     # VPLS Info
@@ -589,58 +631,57 @@ if __name__ == "__main__":
     # vpls Descr: ''
     # ...
 
-    # 15. Creazione di una xconnessione NNI-UNI tra la Vpls e la LAG
-    cli.do("pbflowoutunidir activate  test_VPLS_LAG  port lag1 vpls VPLAG outtraffictype be")
+    cli._Plugin1850CLI__trc_inf(" 15. Creazione di una xconnessione NNI-UNI tra la Vpls e la LAG")
+    cli.do("pbflowoutunidir activate test_VPLS_LAG  port lag1 vpls VPLAG outtraffictype be", policy="COMPLD", timeout=30)
     # 
     # .. message: successful completed command
 
-    # 16. Show dei Traffic Descriptor 
+    cli._Plugin1850CLI__trc_inf(" 16. Show dei Traffic Descriptor ")
     cli.do("trafficdescriptor show")
     # 
     # LabelKey UserLabel              Status Type  cir      pir      cbs      pbs
     # ======== ====================== ====== ===== ======== ======== ======== ========
     # @1       'nullBeTD'             active be    0        0        0        0
 
-    # 17. Cancellazione del TrafficDescriptor  (expected DENY da parte dell'AGENT perche' in uso)
-    # N.B.: i Deny dell'agent provocano sempre il messaggio "error: db writing error"
-    # 
-    cli.do("trafficdescriptor delete  nullBeTD")
+    cli._Plugin1850CLI__trc_inf(" 17. Cancellazione del TrafficDescriptor  (expected DENY da parte dell'AGENT perche' in uso)")
+    cli._Plugin1850CLI__trc_inf("     N.B.: i Deny dell'agent provocano sempre il messaggio 'error: db writing error'")
+    cli.do("trafficdescriptor delete  nullBeTD", policy="COMPLD", timeout=20)
     # 
     # >> error: db writing error for Status=destroy of 1
     # 
     # .. message: unsuccessful completed command
 
-    # 18. Cancellazione della VPLS (expected DENY da parte dell'AGENT per la presenza
-    #     della xconnessione)
-    cli.do("vpls delete VPLAG")
+    cli._Plugin1850CLI__trc_inf(" 18. Cancellazione della VPLS (expected DENY da parte dell'AGENT per la presenza")
+    cli._Plugin1850CLI__trc_inf("     della xconnessione)")
+    cli.do("vpls delete VPLAG", policy="COMPLD", timeout=10)
     # 
     # >> error: db writing error for vplsConfigStaticEgressPorts=
     #    [00] repeats 512 times of 1
     # 
     # .. message: unsuccessful completed command
 
-    # 19. Cancellazione della xconnessione (expected Success)
-    cli.do("pbflowoutunidir delete test_VPLS_LAG")
+    cli._Plugin1850CLI__trc_inf(" 19. Cancellazione della xconnessione (expected Success)")
+    cli.do("pbflowoutunidir delete test_VPLS_LAG", policy="COMPLD", timeout=20)
     # 
     # .. message: successful completed command
 
-    # 20. Cancellazione del TrafficDescriptor (expected Success)
-    cli.do("trafficdescriptor delete  nullBeTD")
+    cli._Plugin1850CLI__trc_inf(" 20. Cancellazione del TrafficDescriptor (expected Success)")
+    cli.do("trafficdescriptor delete  nullBeTD", policy="COMPLD", timeout=10)
     # 
     # .. message: successful completed command
 
-    # 21. Cancellazione dela VPLS (expected Success)
-    cli.do("vpls delete VPLAG")
+    cli._Plugin1850CLI__trc_inf(" 21. Cancellazione dela VPLS (expected Success)")
+    cli.do("vpls delete VPLAG", policy="COMPLD", timeout=10)
     # 
     # .. message: successful completed command
 
-    # 22. Cancellazione della Lag (Expected Success)
-    cli.do("linkagg delete lag1")
+    cli._Plugin1850CLI__trc_inf(" 22. Cancellazione della Lag (Expected Success)")
+    cli.do("linkagg delete lag1", policy="COMPLD", timeout=10)
     # 
     # .. message: successful completed command
 
-    # 23. Show delle LAG, delle VPLS, dei TrafficDescriptor e delle
-    #     Xconnessioni NNI-UNI (expected: vuoto)
+    cli._Plugin1850CLI__trc_inf(" 23. Show delle LAG, delle VPLS, dei TrafficDescriptor e delle")
+    cli._Plugin1850CLI__trc_inf("     Xconnessioni NNI-UNI (expected: vuoto)")
     cli.do("linkagg show")
     # 
     # lag      AdminKey    LAG User Label                     LAG Size Admin State

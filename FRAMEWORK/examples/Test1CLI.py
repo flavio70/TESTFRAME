@@ -84,7 +84,7 @@ class Test(TestCase):
         test Setup Section implementation
         insert general SetUp code for your test below
         '''
-        self.kenvironment.krepo.start_tps_block("EM", "1-2-3")
+        #self.kenvironment.krepo.start_tps_block("EM", "1-2-3")
         NE1.tl1.do("ACT-USER::admin:::Alcatel1;")
         NE1.cli.connect()
 
@@ -94,10 +94,184 @@ class Test(TestCase):
         test Body Section implementation
         insert Main body code for your test below
         '''
+        self.trc_inf(" 1. Condizione iniziale")
+        NE1.cli.do("linkagg show")
 
-        NE1.cli.do("interface show", policy="COMPLD", condition=".. message: not found interface\n", timeout=10)
+        # lag      AdminKey    LAG User Label                     LAG Size Admin State
+        # ======== =========== ================================== ======== ===============
+        #
+        # .. message: not found Entry
 
-        NE1.cli.do_until("interface show", condition=".. message: not found interface\n", timeout=10)
+        self.trc_inf(" 2. Creazione di una LAG (EXPECTED SUCCESS)")
+        NE1.cli.do("linkagg activate lag1 size 2 adminkey  1 ets lagname LAG_1", policy="COMPLD", timeout=20)
+        #
+        # .. message: successful completed command
+        #
+
+        self.trc_inf(" 3. SHOW delle LAG create")
+        NE1.cli.do("linkagg show")
+        #
+        # lag      AdminKey    LAG User Label                     LAG Size Admin State
+        # ======== =========== ================================== ======== ===============
+        # 1        1           'LAG_1'                            2        enable
+
+        self.trc_inf(" 4. Show della LAG1 ")
+        NE1.cli.do("linkagg show lag1")
+        # 
+        # Link Aggregation Info of lag1
+        # -----------------------------
+        # LAG Number: lag1
+        # LAG User Label: 'LAG_1'
+        # LAG Size: 2
+        # ...
+
+        self.trc_inf(" 5. EDIT LAG con valore del campo size fuori range (expected Deny da parte della CLI)")
+        self.trc_inf("    NB: i deny dati direttamente dalla CLI non hanno sempre output univoco,")
+        self.trc_inf("    cmq solitamente contengono 'Error' oppure 'unsuccessful'")
+        NE1.cli.do("linkagg config lag1 size 20", policy="COMPLD", timeout=20)
+        #                                ^
+        # Error: Out of range. Valid range is: 1 - 16
+
+        self.trc_inf(" 6. EDIT LAG con valore ammissibile  del campo size (expected SUCCESS)")
+        NE1.cli.do("linkagg config lag1 size 10", policy="COMPLD", timeout=20)
+        #                                ^
+        # .. message: successful completed command
+
+        self.trc_inf(" 7. EDIT parametro LACP della LAG (expected Deny da parte della CLI)")
+        NE1.cli.do("linkagg config lag1 lacp disable", policy="COMPLD", timeout=20)
+        # 
+        # .. message: enabled Lag; refused change of param lacp
+        # 
+        # .. message: unsuccessful completed command
+
+        self.trc_inf(" 8. EDIT Dello stato amministrativo: Disable, del parametro LACP e ancora dello")
+        self.trc_inf("    stato amministrativo Enable (EXPECTED SUCCESS)")
+        NE1.cli.do("linkagg config lag1 adminstate disable", policy="COMPLD", timeout=10)
+        # 
+        # .. message: successful completed command
+        # 
+        NE1.cli.do("linkagg config lag1 lacp disable", policy="COMPLD", timeout=10)
+        # 
+        # .. message: successful completed command
+        # 
+        NE1.cli.do("linkagg config lag1 adminstate enable", policy="COMPLD", timeout=10)
+        # 
+        # .. message: successful completed command
+        # 
+
+        self.trc_inf(" 11. Show delle VPLS  (expected nessuna)")
+        NE1.cli.do("vpls show")
+        # 
+        # LabelKey     vpls VpnId                       Status
+        # ============ ================================ ===============
+        # 
+        # .. message: not found Entry
+
+        self.trc_inf(" 12. Creazione VPLS e bind della LAG (expected SUCCESS)")
+        NE1.cli.do("vpls activate  VPLAG portset lag1", policy="COMPLD", timeout=20)
+        # 
+        # .. message: successful completed command
+
+        self.trc_inf(" 13. Show delle VPLS")
+        NE1.cli.do("vpls show")
+        # 
+        # LabelKey     vpls VpnId                       Status
+        # ============ ================================ ===============
+        # @1           'VPLAG'                          active
+
+        self.trc_inf(" 14. Show della VPLS VPLAG")
+        NE1.cli.do("vpls show VPLAG")
+        # 
+        # VPLS Info
+        # ---------
+        # vpls VpnId: 'VPLAG'
+        # vpls Name: ''
+        # vpls Descr: ''
+        # ...
+
+        self.trc_inf(" 15. Creazione di una xconnessione NNI-UNI tra la Vpls e la LAG")
+        NE1.cli.do("pbflowoutunidir activate test_VPLS_LAG  port lag1 vpls VPLAG outtraffictype be", policy="COMPLD", timeout=30)
+        # 
+        # .. message: successful completed command
+
+        self.trc_inf(" 16. Show dei Traffic Descriptor ")
+        NE1.cli.do("trafficdescriptor show")
+        # 
+        # LabelKey UserLabel              Status Type  cir      pir      cbs      pbs
+        # ======== ====================== ====== ===== ======== ======== ======== ========
+        # @1       'nullBeTD'             active be    0        0        0        0
+
+        self.trc_inf(" 17. Cancellazione del TrafficDescriptor  (expected DENY da parte dell'AGENT perche' in uso)")
+        self.trc_inf("     N.B.: i Deny dell'agent provocano sempre il messaggio 'error: db writing error'")
+        NE1.cli.do("trafficdescriptor delete  nullBeTD", policy="COMPLD", timeout=20)
+        # 
+        # >> error: db writing error for Status=destroy of 1
+        # 
+        # .. message: unsuccessful completed command
+
+        self.trc_inf(" 18. Cancellazione della VPLS (expected DENY da parte dell'AGENT per la presenza")
+        self.trc_inf("     della xconnessione)")
+        NE1.cli.do("vpls delete VPLAG", policy="COMPLD", timeout=10)
+        # 
+        # >> error: db writing error for vplsConfigStaticEgressPorts=
+        #    [00] repeats 512 times of 1
+        # 
+        # .. message: unsuccessful completed command
+
+        self.trc_inf(" 19. Cancellazione della xconnessione (expected Success)")
+        NE1.cli.do("pbflowoutunidir delete test_VPLS_LAG", policy="COMPLD", timeout=20)
+        # 
+        # .. message: successful completed command
+
+        self.trc_inf(" 20. Cancellazione del TrafficDescriptor (expected Success)")
+        NE1.cli.do("trafficdescriptor delete  nullBeTD", policy="COMPLD", timeout=10)
+        # 
+        # .. message: successful completed command
+
+        self.trc_inf(" 21. Cancellazione dela VPLS (expected Success)")
+        NE1.cli.do("vpls delete VPLAG", policy="COMPLD", timeout=10)
+        # 
+        # .. message: successful completed command
+
+        self.trc_inf(" 22. Cancellazione della Lag (Expected Success)")
+        NE1.cli.do("linkagg delete lag1", policy="COMPLD", timeout=10)
+        # 
+        # .. message: successful completed command
+
+        self.trc_inf(" 23. Show delle LAG, delle VPLS, dei TrafficDescriptor e delle")
+        self.trc_inf("     Xconnessioni NNI-UNI (expected: vuoto)")
+        NE1.cli.do("linkagg show")
+        # 
+        # lag      AdminKey    LAG User Label                     LAG Size Admin State
+        # ======== =========== ================================== ======== ===============
+        # 
+        # .. message: not found Entry
+
+        NE1.cli.do("vpls show")
+        # 
+        # LabelKey     vpls VpnId                       Status
+        # ============ ================================ ===============
+        # 
+        # .. message: not found Entry
+
+        NE1.cli.do("trafficdescriptor show")
+        # 
+        # LabelKey UserLabel              Status Type  cir      pir      cbs      pbs
+        # ======== ====================== ====== ===== ======== ======== ======== ========
+        # 
+        # .. message: not found Entry
+
+        NE1.cli.do("pbflowoutunidir show")
+        # 
+        # 
+        # .. message: not found Cross Connection
+
+
+
+
+        #NE1.cli.do("interface show", policy="COMPLD", condition=".. message: not found interface\n", timeout=10)
+
+        #NE1.cli.do_until("interface show", condition=".. message: not found interface\n", timeout=10)
 
 
     def test_cleanup(self):
@@ -113,7 +287,7 @@ class Test(TestCase):
         insert DUT CleanUp code for your test below
         '''
         print('@DUT CleanUP')
-        self.kenvironment.krepo.stop_tps_block("EM", "1-2-3")
+        #self.kenvironment.krepo.stop_tps_block("EM", "1-2-3")
 
 
 #Please don't change the code below#
