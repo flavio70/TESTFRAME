@@ -32,10 +32,11 @@ class TL1check():
             an ATTR calling this method with different VALUE
             Please note: a Positional value is a Named value with ATTR := position
         """
-        try:
-            self.__fld_l[attr].append(value)
-        except KeyError:
-            self.__fld_l[attr] = [value]
+        self.__fld_l[attr] = value
+        #try:
+            #self.__fld_l[attr].append(value)
+        #except KeyError:
+            #self.__fld_l[attr] = [value]
 
 
     def res_field(self, attr=None, value=None):
@@ -136,28 +137,26 @@ class TL1check():
 
                 match_list = []
 
-                the_pst,the_sst = msg.get_cmd_status_value(the_aid)
-
-                match_pst = self.__evaluate_pst(the_pst, rule=pst)
-                match_sst = self.__evaluate_sst(the_sst, rule=sst)
-
-                #print(match_pst, match_sst)
+                match_pst = self.__evaluate_pst(msg.get_cmd_pst(the_aid), rule=pst)
+                match_sst = self.__evaluate_sst(msg.get_cmd_sst(the_aid), rule=sst)
 
                 if match_pst[0] and match_sst[0]:
 
+                    print("messaggio := {}".format(msg.get_cmd_attr_values(the_aid)))
+                    print(" da filtr := {}".format(self.__fld_l))
                     for the_attr,the_val in msg.get_cmd_attr_values(the_aid).items():
-                        the_att_val = self.__evaluate_attr_val(the_attr, the_val)
 
-                        if the_att_val[0]:
+                        match_attr_val = self.__evaluate_attr_val(the_attr, the_val, rule=fld)
+
+                        if match_attr_val[0]:
                             result = True
-                            match_list.append(the_att_val[1])
-                            #print(the_aid, match_pst[1], match_sst[1], the_att_val[1])
+                            match_list.append(match_attr_val[1])
 
                     if match_pst[1] != {}:
                         match_list.append(match_pst[1])
+
                     if match_sst[1] != {}:
                         match_list.append(match_sst[1])
-
 
                 if match_list != []:
                     result_list[the_aid] = match_list
@@ -220,11 +219,14 @@ class TL1check():
     def __evaluate_attr_val(self, the_attr, the_val, rule='OR'):
         """ INTERNAL USAGE
         """
-        for attr, values in self.__fld_l.items():
-            if attr == the_attr:
-                for val in values:
-                    if val == the_val:
-                        return True, "{:s}={:s}".format(attr, val)
+        if rule == 'OR':
+            for attr, values in self.__fld_l.items():
+                if attr == the_attr:
+                    for val in values:
+                        if val == the_val:
+                            return True, "{:s}={:s}".format(attr, val)
+        else:
+            pass
 
         return False, ""
 
@@ -259,9 +261,10 @@ class TL1message():
                 'R_BODY_OK' : Body Section(Only for successfull command response)
                               list of 1 or more items - Dictionary:
                                  aid : AID or index of element (key for dictionary)
-                                     'VAL_REF': sequence ATTR=Value
-                                     'VAL_POS': positional value list
+                                     'VALUE': sequence ATTR=Value
                                      'STATE'  : Primary and Secondary state
+                                     'PST'    : Primary State value list
+                                     'SST'    : Secondary State value list
                 'R_BODY_KO' : Body Section (Only for failure command response)
                                list of two string response specification
             - only for Spontaneous Messages:
@@ -392,7 +395,7 @@ class TL1message():
                         for elem in words[2].split(','):
                             attr_val_list[elem.split('=')[0]] = elem.split('=')[1]
 
-                    row[ words[0] ] = {'VAL_REF' : attr_val_list, 'STATE' : words[3]}
+                    row[ words[0] ] = {'VALUE' : attr_val_list, 'STATE' : words[3], 'PST' : words[3].split(',')[0].split('&'), 'SST' : words[3].split(',')[1].split('&')}
 
                     self.__m_coded['R_BODY_OK'].update(row)
                 elif self.__m_coded['R_STATUS'] == "DENY":
@@ -418,7 +421,7 @@ class TL1message():
 
         f_skip_n = 0
 
-        counter = 1
+        pseudo_aid = 1  # Identifier for "emtpy-aid" response rows
 
         for line in self.__m_plain.split('\n'):
             if f_skip_n > 0:
@@ -476,10 +479,15 @@ class TL1message():
                         attr_val_list = {}
                         for elem in words[2].split(','):
                             attr_val_list[elem.split('=')[0]] = elem.split('=')[1]
-                        row[ words[0] ] = {'VAL_REF' : attr_val_list}
+                        row[ words[0] ] = {'VALUE' : attr_val_list}
                     else:
-                        row[ str(counter) ] = {'VAL_POS' : words[2].split(',')}
-                        counter = counter + 1
+                        positional = 1
+                        attr_val_list = {}
+                        for elem in words[2].split(','):
+                            attr_val_list[ positional ] = elem
+                            positional = positional + 1
+                        row[ str(pseudo_aid) ] = {'VALUE' : attr_val_list}
+                        pseudo_aid = pseudo_aid + 1
                     self.__m_coded['R_BODY_OK'].update(row)
                 elif self.__m_coded['R_STATUS'] == "DENY":
                     if len(stripped_line) == 4:
@@ -602,31 +610,50 @@ class TL1message():
         return list(self.__m_coded['R_BODY_OK'].keys())
 
 
-    def get_cmd_status_value(self, aid):
-        """ Return a couple (pst,sst) for command response
-            (None, None) for not completed TL1 Messages
+    def get_cmd_pst(self, aid):
+        """ For specified aid item, return the Primary State value
+            In case of errors, a None is returned
         """
         if self.__m_event:
-            return None, None
+            return None
 
         if self.get_cmd_status() != (True, "COMPLD"):
-            return None, None
+            return None
 
         the_elem = self.__m_coded['R_BODY_OK'].get(aid)
         if the_elem is None:
-            return None, None
+            return None
 
         try:
-            pst_list,sst_list = the_elem['STATE'].split(',')
-            return pst_list.split('&'), sst_list.split('&')
+            return the_elem['PST']
         except Exception as eee:
-            return None, None
+            return None
+
+
+    def get_cmd_sst(self, aid):
+        """ For specified aid item, return the Secondary State value
+            In case of errors, a None is returned
+        """
+        if self.__m_event:
+            return None
+
+        if self.get_cmd_status() != (True, "COMPLD"):
+            return None
+
+        the_elem = self.__m_coded['R_BODY_OK'].get(aid)
+        if the_elem is None:
+            return None
+
+        try:
+            return the_elem['SST']
+        except Exception as eee:
+            return None
 
 
     def get_cmd_attr_value(self, aid, attr):
-        """ Return the value for specified attribute and AID
+        """ for <ATTR,VALUE> response list: return value of specified attribute
+            for positional response list: 'attr' indicate the positional index
             None if wrong parameters are supplied
-            Only for <ATTR,VALUE> response list
         """
         if self.__m_event:
             return None
@@ -635,7 +662,7 @@ class TL1message():
             return None
 
         try:
-            return self.__m_coded['R_BODY_OK'].get(aid)['VAL_REF'][attr]
+            return self.__m_coded['R_BODY_OK'].get(aid)['VALUE'][attr]
         except Exception as eee:
             return None
 
@@ -643,9 +670,10 @@ class TL1message():
 
 
     def get_cmd_attr_values(self, aid):
-        """ Return the <attr,value> list for specified AID
+        """ Return the response list for specified AID
+            The response could be a <ATTR,VALUE> list for named parameters, or
+            a <POS,VALUE> list for positional parameters
             None if wrong parameters are supplied
-            Only for <ATTR,VALUE> response list
         """
         if self.__m_event:
             return None
@@ -654,41 +682,7 @@ class TL1message():
             return None
 
         try:
-            return self.__m_coded['R_BODY_OK'].get(aid)['VAL_REF']
-        except Exception as eee:
-            return None
-
-
-    def get_cmd_positional_value(self, aid, pos):
-        """ Return the value for specified positional attribute and AID
-            None if wrong parameters are supplied
-            Only for Positional response list
-        """
-        if self.__m_event:
-            return None
-
-        if self.get_cmd_status() != (True, "COMPLD"):
-            return None
-
-        try:
-            return self.__m_coded['R_BODY_OK'].get(aid)['VAL_POS'][pos]
-        except Exception as eee:
-            return None
-
-
-    def get_cmd_positional_values(self, aid):
-        """ Return the value for specified positional attribute and AID
-            None if wrong parameters are supplied
-            Only for Positional response list
-        """
-        if self.__m_event:
-            return None
-
-        if self.get_cmd_status() != (True, "COMPLD"):
-            return None
-
-        try:
-            return self.__m_coded['R_BODY_OK'].get(aid)['VAL_POS']
+            return self.__m_coded['R_BODY_OK'].get(aid)['VALUE']
         except Exception as eee:
             return None
 
@@ -841,27 +835,86 @@ M  780 COMPLD
 ;
 """
 
+    msg6 = """
+
+   PLEASE-SET-SID-63880 15-09-18 05:11:48
+M  480 COMPLD
+   "ASAPEQPT-0,EQPT::DFLT=N,USERLABEL=LBL-ASAPEQPT-None"
+   "::ABNORMAL,NR,NSA,NEND"
+   "::AIRTEMP,NR,NSA,NEND"
+   "::BPERROR,NR,SA,NEND"
+   "::CONTBUS,NR,SA,NEND"
+   "::CONTBUS,NR,NSA,NEND"
+   "::CONTCOM,NR,SA,NEND"
+   "::DBF,NR,NSA,NEND"
+   "::FA,NR,SA,NEND"
+   "::FA,NR,NSA,NENDxx"
+   "::HWFAIL,NR,SA,NEND"
+   "::HWFAIL,NR,NSA,NEND"
+   "::IMPROPRMVL,NR,SA,NEND"
+   "::IMPROPRMVL,NR,NSA,NEND"
+   "::LANFAIL,NR,SA,NEND"
+   "::MAN,NR,SA,NEND"
+   "::MAN,NR,NSA,NEND"
+   "::MISC-1,NR,NSA,NEND"
+   "::MTXLNKFAIL,NR,SA,NEND"
+   "::MTXLNKFAIL,NR,NSA,NEND"
+   "::NTPOOSYNC,NR,NSA,NEND"
+   "::PRCDRERR,NR,SA,NEND"
+   "::PRCDRERR,NR,NSA,NEND"
+   "::PWR,NR,SA,NEND"
+   "::PWR,NR,NSA,NEND"
+   "::RAIDSYNC,NR,NSA,NEND"
+   "::SYNCEQPT,NR,SA,NEND"
+   "::SYNCEQPT,NR,NSA,NEND"
+   "::CLKADJ,NR,NSA,NEND"
+   "::IR-EOLSPAN,NR,NSA,NEND"
+   "::IR-N1,NR,NSA,NEND"
+   "::IR-VOA,NR,NSA,NEND"
+   "::IR-IT,NR,NSA,NEND"
+   "::IR-OP1,NR,NSA,NEND"
+   "::IR-OP2,NR,NSA,NEND"
+   "::DBPROB,NR,SA,NEND"
+   "::DBCKFAIL,NR,SA,NEND"
+   "::SWCKFAIL,NR,SA,NEND"
+   "::SWCKFAIL,NR,SA,NEND"
+   "::MNGIFPLGIN,NR,NSA,NEND"
+   "::DISKFULL,NR,NSA,NEND"
+   "::DSCFGALIGN,NR,NSA,NEND"
+   "::PWROFF,NR,SA,NEND"
+   "::PWROFF,NR,NSA,NEND"
+   /* RTRV-ASAP-PROF::ASAPEQPT-0 [480] (536871198) */
+;
+"""
+
     #mm = TL1message(msg1)
     #print(mm.decode("JSON"))
     #mm = TL1message(msg4)
     #print(mm.decode("JSON"))
     #mm = TL1message(msg3)
     #print(mm.decode("JSON"))
-    mm = TL1message(msg5)
-    print(mm.decode("JSON"))
-    print(mm.get_cmd_attr_value("MVC4-1-1-36-23", "TRC"))
-    filt = TL1check()
-    filt.add_aid("MVC4-1-1-36-33")
-    filt.add_aid("MVC4-1-1-36-23")
-    filt.add_aid("MVC4-1-1-36-49")
-    filt.add_aid("MVC4-1-1-36-3")
-    filt.add_pst("OOS-AU")
-    filt.add_sst("SGEO")
-    filt.add_sst("PMD")
-    filt.add_field("PTFTYPE", "MODVC4")
-    filt.add_field("TRC", "X010010011101010010010101110010")
-    filt.debug()
-    print(filt.evaluate_msg(mm, sst='AND'))
+    if True:
+        mm = TL1message(msg5)
+        print(mm.decode("JSON"))
+        print(mm.get_cmd_attr_value("MVC4-1-1-36-23", "TRC"))
+        filt = TL1check()
+        filt.add_aid("MVC4-1-1-36-33")
+        filt.add_aid("MVC4-1-1-36-23")
+        filt.add_aid("MVC4-1-1-36-49")
+        filt.add_aid("MVC4-1-1-36-3")
+        filt.add_pst("OOS-AU")
+        filt.add_sst("SGEO")
+        filt.add_sst("PMD")
+        filt.add_field("PTFTYPE", "MODVC4")
+        filt.add_field("TRC", "X010010011101010010010101110010")
+        filt.add_field("TRC", "PIPPO")
+        filt.debug()
+        print(filt.evaluate_msg(mm, sst='AND'))
+    else:
+        mm = TL1message(msg6)
+        print(mm.decode("JSON"))
+        print(mm.get_cmd_attr_values("9"))
+        print(mm.get_cmd_attr_value("9", 4))
 
     sys.exit(0)
 

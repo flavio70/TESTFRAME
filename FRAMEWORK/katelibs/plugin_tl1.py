@@ -16,6 +16,7 @@ import time
 import os
 
 from katelibs.kexception    import KFrameException
+from katelibs.facility_tl1  import TL1check
 from katelibs.facility_tl1  import TL1message
 
 
@@ -79,17 +80,12 @@ class Plugin1850TL1():
         return self.__last_output
 
 
-    def do_until(self, cmd, timeout=TL1_TIMEOUT, condPST=None, condSST=None):
+    def do_until(self, cmd, timeout=TL1_TIMEOUT, cond):
         """ Send the specified TL1 command to equipment until almost one of conditions will be
             reached.
             cmd     : the TL1 command string
             timeout : (secons) timeout to terminate loop
-            condPST : a COMPLD will be detected if the Primary State
-                      for involved AID goes to specified value. The timeout parameters will be
-                      evaluated in order to close procedure
-            condSST : a COMPLD will be detected if the Secondary State
-                      for involved AID goes to specified value. The timeout parameters will be
-                      evaluated in order to close procedure
+            cond    : instance of TL1check class (see for details).
         """
         self.__last_cmd = cmd
         self.__time_mark = time.time() + timeout
@@ -104,16 +100,14 @@ class Plugin1850TL1():
 
             if int(time.time()) <= self.__time_mark:
                 msg_coded = TL1message(self.__last_output)
-                aid_list = msg_coded.get_cmd_aid_list()
-                pst,sst = msg_coded.get_cmd_status_value(aid_list[0])
-                if pst is not None:
-                    if pst == condPST:
-                        result = True
-                        break
-                else:
-                    error_msg = "No AID found on TL1 response"
-                    result = False
+                # Evaluation of result conditions
+                match_cond = cond.evaluate_msg(msg_coded)
+                self.__trc_dbg("TL1 Condition Evaluated := {}".format(match_cond))
+
+                if match_cond[0]:
+                    result = True
                     break
+
                 time.sleep(1)
             else:
                 error_msg = "TIMEOUT ({:d}s) DETECTED ON SENDING '{:s}'".format(timeout, cmd)
@@ -132,7 +126,7 @@ class Plugin1850TL1():
         return result
 
 
-    def do(self, cmd, policy="COMPLD", timeout=TL1_TIMEOUT, condPST=None, condSST=None):
+    def do(self, cmd, policy="COMPLD", timeout=TL1_TIMEOUT, cond=None):
         """ Send the specified TL1 command to equipment.
             It is possible specify an error behaviour and/or a matching string
             cmd     : the TL1 command string
@@ -141,18 +135,12 @@ class Plugin1850TL1():
                       "COND"   -> specify a conditional command execution (see condXXX parameters)
                       It is ignored when policy="DENY"
             timeout : (secons) timeout to close a conditional command
-            condPST : (used only on policy="COND") a COMPLD will be detected if the Primary State
-                      for involved AID goes to specified value. The timeout parameters will be
-                      evaluated in order to close procedure
-            condSST : (used only on policy="COND") a COMPLD will be detected if the Secondary State
-                      for involved AID goes to specified value. The timeout parameters will be
-                      evaluated in order to close procedure
+            cond    : instance of TL1check class (see for details). Ignored if policy != "COND"
         """
 
-        if policy == "COND":
-            if condPST is None  and  condSST is None:
-                self.__trc_error("ATTENZIONE: ALMENO UNO TRA condPST e condSST deve essere valorizzato")
-                return False
+        if policy == "COND" and cond is None:
+            self.__trc_error("An instance of TL1check is mandatory for policy=='COND'")
+            return False
 
         self.__last_cmd = cmd
         self.__time_mark = time.time() + timeout
@@ -162,19 +150,22 @@ class Plugin1850TL1():
 
         error_msg = ""
 
-        result = self.__do("CMD", cmd, policy)
+        if policy == "COND":
+            result = self.__do("CMD", cmd, "COMPLD")
+        else:
+            result = self.__do("CMD", cmd, policy)
 
         if result  and  policy == "COND":
-            # Evaluation of result conditions
             msg_coded = TL1message(self.__last_output)
-            aid_list = msg_coded.get_cmd_aid_list()
-            pst,sst = msg_coded.get_cmd_status_value(aid_list[0])
 
-            if pst is not None:
-                result = (pst == condPST)
-            else:
-                error_msg = "No AID found on TL1 response"
-                result = False
+            # Evaluation of result conditions
+            print("APPLING FILTER")
+            match_cond = cond.evaluate_msg(msg_coded)
+            self.__trc_dbg("TL1 Condition Evaluated := {}".format(match_cond))
+            print("DONE FILTER")
+            print(match_cond)
+
+            result = match_cond[0]
 
         self.__trc_dbg("DEBUG: result := {:s} - errmsg := [{:s}]\n".format(str(result), error_msg))
 
@@ -554,7 +545,7 @@ if __name__ == "__main__":
 
     print("DEBUG")
 
-    trace = KTracer(level="INFO")
+    trace = KTracer(level="DEBUG")
     tl1 = Plugin1850TL1("135.221.125.79", ktrc=trace)
     trace.k_tracer_error("PROVA", level=0)
 
@@ -572,8 +563,10 @@ if __name__ == "__main__":
         tl1.do("ACT-USER::admin:MYTAG::Alcatel1;")
         tl1.event_collection_start()
         time.sleep(2)
-        tl1.do("ENT-EQPT::PP1GE-1-1-18::::PROVISIONEDTYPE=PP1GE:IS;", policy="COND", condPST="IS")
-        time.sleep(30)
+        filt = TL1check()
+        filt.add_pst("IS")
+        tl1.do("ENT-EQPT::PP1GE-1-1-18::::PROVISIONEDTYPE=PP1GE:IS;", policy="COND", cond=filt)
+        time.sleep(15)
         tl1.do("RTRV-EQPT::MDL-1-1-18;")
         res = tl1.get_last_outcome()
         print(res)
