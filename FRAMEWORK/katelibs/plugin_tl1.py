@@ -80,7 +80,7 @@ class Plugin1850TL1():
         return self.__last_output
 
 
-    def do_until(self, cmd, timeout=TL1_TIMEOUT, cond):
+    def do_until(self, cmd, cond, timeout=TL1_TIMEOUT):
         """ Send the specified TL1 command to equipment until almost one of conditions will be
             reached.
             cmd     : the TL1 command string
