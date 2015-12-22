@@ -15,7 +15,9 @@ import threading
 import time
 import os
 
-from katelibs.tl1_facility import TL1message
+from katelibs.kexception    import KFrameException
+from katelibs.facility_tl1  import TL1check
+from katelibs.facility_tl1  import TL1message
 
 
 
@@ -69,6 +71,8 @@ class Plugin1850TL1():
         self.__thread.daemon = False
         self.__thread.start()
 
+        self.__trc_inf("Plugin BM available")
+
 
     def get_last_outcome(self):
         """ Return the latest TL1 command output (multi-line string)
@@ -76,17 +80,12 @@ class Plugin1850TL1():
         return self.__last_output
 
 
-    def do_until(self, cmd, timeout=TL1_TIMEOUT, condPST=None, condSST=None):
+    def do_until(self, cmd, cond, timeout=TL1_TIMEOUT):
         """ Send the specified TL1 command to equipment until almost one of conditions will be
             reached.
             cmd     : the TL1 command string
             timeout : (secons) timeout to terminate loop
-            condPST : a COMPLD will be detected if the Primary State
-                      for involved AID goes to specified value. The timeout parameters will be
-                      evaluated in order to close procedure
-            condSST : a COMPLD will be detected if the Secondary State
-                      for involved AID goes to specified value. The timeout parameters will be
-                      evaluated in order to close procedure
+            cond    : instance of TL1check class (see for details).
         """
         self.__last_cmd = cmd
         self.__time_mark = time.time() + timeout
@@ -101,24 +100,23 @@ class Plugin1850TL1():
 
             if int(time.time()) <= self.__time_mark:
                 msg_coded = TL1message(self.__last_output)
-                aid_list = msg_coded.get_cmd_aid_list()
-                pst,sst = msg_coded.get_cmd_status_value(aid_list[0])
-                if pst is not None:
-                    if pst == condPST:
-                        result = True
-                        break
-                else:
-                    error_msg = "No AID found on TL1 response"
-                    result = False
+                # Evaluation of result conditions
+                match_cond = cond.evaluate_msg(msg_coded)
+                self.__trc_dbg("TL1 Condition Evaluated := {}".format(match_cond))
+
+                if match_cond[0]:
+                    result = True
                     break
+
                 time.sleep(1)
             else:
                 error_msg = "TIMEOUT ({:d}s) DETECTED ON SENDING '{:s}'".format(timeout, cmd)
                 self.__trc_error(error_msg)
                 result = False
+                raise KFrameException(error_msg)
                 break
 
-        self.__trc_inf("DEBUG: result := {:s} - errmsg := [{:s}]\n".format(str(result), error_msg))
+        self.__trc_dbg("DEBUG: result := {:s} - errmsg := [{:s}]\n".format(str(result), error_msg))
 
         if result:
             self.__t_success(cmd, None, self.get_last_outcome())
@@ -128,7 +126,7 @@ class Plugin1850TL1():
         return result
 
 
-    def do(self, cmd, policy="COMPLD", timeout=TL1_TIMEOUT, condPST=None, condSST=None):
+    def do(self, cmd, policy="COMPLD", timeout=TL1_TIMEOUT, cond=None):
         """ Send the specified TL1 command to equipment.
             It is possible specify an error behaviour and/or a matching string
             cmd     : the TL1 command string
@@ -137,18 +135,12 @@ class Plugin1850TL1():
                       "COND"   -> specify a conditional command execution (see condXXX parameters)
                       It is ignored when policy="DENY"
             timeout : (secons) timeout to close a conditional command
-            condPST : (used only on policy="COND") a COMPLD will be detected if the Primary State
-                      for involved AID goes to specified value. The timeout parameters will be
-                      evaluated in order to close procedure
-            condSST : (used only on policy="COND") a COMPLD will be detected if the Secondary State
-                      for involved AID goes to specified value. The timeout parameters will be
-                      evaluated in order to close procedure
+            cond    : instance of TL1check class (see for details). Ignored if policy != "COND"
         """
 
-        if policy == "COND":
-            if condPST is None  and  condSST is None:
-                self.__trc_error("ATTENZIONE: ALMENO UNO TRA condPST e condSST deve essere valorizzato")
-                return False
+        if policy == "COND" and cond is None:
+            self.__trc_error("An instance of TL1check is mandatory for policy=='COND'")
+            return False
 
         self.__last_cmd = cmd
         self.__time_mark = time.time() + timeout
@@ -158,21 +150,24 @@ class Plugin1850TL1():
 
         error_msg = ""
 
-        result = self.__do("CMD", cmd, policy)
+        if policy == "COND":
+            result = self.__do("CMD", cmd, "COMPLD")
+        else:
+            result = self.__do("CMD", cmd, policy)
 
         if result  and  policy == "COND":
-            # Evaluation of result conditions
             msg_coded = TL1message(self.__last_output)
-            aid_list = msg_coded.get_cmd_aid_list()
-            pst,sst = msg_coded.get_cmd_status_value(aid_list[0])
 
-            if pst is not None:
-                result = (pst == condPST)
-            else:
-                error_msg = "No AID found on TL1 response"
-                result = False
+            # Evaluation of result conditions
+            print("APPLING FILTER")
+            match_cond = cond.evaluate_msg(msg_coded)
+            self.__trc_dbg("TL1 Condition Evaluated := {}".format(match_cond))
+            print("DONE FILTER")
+            print(match_cond)
 
-        self.__trc_inf("DEBUG: result := {:s} - errmsg := [{:s}]\n".format(str(result), error_msg))
+            result = match_cond[0]
+
+        self.__trc_dbg("DEBUG: result := {:s} - errmsg := [{:s}]\n".format(str(result), error_msg))
 
         if result:
             self.__t_success(cmd, None, self.get_last_outcome())
@@ -188,9 +183,9 @@ class Plugin1850TL1():
         self.__last_cmd = cmd   # added for internal running invocation
 
         if channel == "CMD":
-            self.__trc_inf("sending [{:s}]".format(cmd))
+            self.__trc_dbg("sending [{:s}]".format(cmd))
         else:
-            self.__trc_inf("sending [{:s}] (EVENT INTERFACE)".format(cmd))
+            self.__trc_dbg("sending [{:s}] (EVENT INTERFACE)".format(cmd))
 
         tl1_verb = cmd.replace(";", "").split(":")[0].lower().replace("\r", "").replace("\n", "")
 
@@ -198,12 +193,14 @@ class Plugin1850TL1():
         if self.__read_all(channel) == False:
             self.__trc_error("error [1] sending TL1 command [{:s}]".format(cmd))
             self.__last_output = "TIMEOUT DETECTED ON TL1 INTERFACE"
+            raise KFrameException(self.__last_output)
             return False
 
         # Sending command to interface
         if self.__write(channel, cmd) == False:
             self.__trc_error("error [2] sending TL1 command [{:s}]".format(cmd))
             self.__last_output = "TIMEOUT DETECTED ON TL1 INTERFACE"
+            raise KFrameException(self.__last_output)
             return False
 
 
@@ -221,6 +218,7 @@ class Plugin1850TL1():
                 if result_list == ([],[],[]):
                     self.__trc_error("error [3] sending TL1 command [{:s}]".format(cmd))
                     self.__last_output = "TIMEOUT DETECTED ON TL1 INTERFACE"
+                    raise KFrameException(self.__last_output)
                     return False
 
                 msg_tmp = str(result_list[2], 'utf-8')
@@ -239,7 +237,8 @@ class Plugin1850TL1():
                         keepalive_count = keepalive_count + 1
                         if keepalive_count == keepalive_count_max:
                             self.__trc_error("error [4] sending TL1 command [{:s}]".format(cmd))
-                            self.__last_output = "MAXIMUM KEEPALINE ON TL1 RESPONSE REACHED"
+                            self.__last_output = "MAXIMUM KEEPALIVE ON TL1 RESPONSE REACHED"
+                            raise KFrameException(self.__last_output)
                             return False
                         continue
 
@@ -249,6 +248,7 @@ class Plugin1850TL1():
                             if tl1_response.count(";") > 1:
                                 self.__trc_error("error [5] sending TL1 command [{:s}]".format(cmd))
                                 self.__last_output = "INVALID TL1 TERMINATION"
+                                raise KFrameException(self.__last_output)
                                 return False
                         if tl1_response.strip() == ";":
                             continue
@@ -335,40 +335,42 @@ class Plugin1850TL1():
         is_connected = False
 
         if channel == "CMD":
-            self.__trc_inf("(re)CONNECTING TL1...")
+            self.__trc_dbg("(re)CONNECTING TL1...")
 
             while int(time.time()) <= self.__time_mark:
                 try:
                     self.__if_cmd = telnetlib.Telnet(self.__the_ip, self.__the_port, 5)
-                    self.__trc_inf("... TL1 INTERFACE for commands ready.")
+                    self.__trc_dbg("... TL1 INTERFACE for commands ready.")
                     is_connected = True
                     break
                 except Exception as eee:
-                    self.__trc_inf("TL1: error connecting CMD channel - {:s}".format(str(eee)))
-                    self.__trc_inf("... retrying in 1s ...")
+                    self.__trc_dbg("TL1: error connecting CMD channel - {:s}".format(str(eee)))
+                    self.__trc_dbg("... retrying in 1s ...")
                     time.sleep(1)
 
             if not is_connected:
                 self.__trc_error("TL1: Timeout on connection")
+                raise KFrameException("TL1: Timeout on connection")
 
             return self.__if_cmd
 
         else:
-            self.__trc_inf("(re)CONNECTING TL1 (Event channel)...")
+            self.__trc_dbg("(re)CONNECTING TL1 (Event channel)...")
 
             while int(time.time()) <= self.__time_mark:
                 try:
                     self.__if_eve = telnetlib.Telnet(self.__the_ip, self.__the_port, 5)
-                    self.__trc_inf("... TL1 INTERFACE for events ready.")
+                    self.__trc_dbg("... TL1 INTERFACE for events ready.")
                     is_connected = True
                     break
                 except Exception as eee:
-                    self.__trc_inf("TL1: error connecting EVE channel - {:s}".format(str(eee)))
-                    self.__trc_inf("... retrying in 1s ...")
+                    self.__trc_dbg("TL1: error connecting EVE channel - {:s}".format(str(eee)))
+                    self.__trc_dbg("... retrying in 1s ...")
                     time.sleep(1)
 
             if not is_connected:
                 self.__trc_error("TL1: Timeout on connection")
+                raise KFrameException("TL1: Timeout on connection")
 
             return self.__if_eve
 
@@ -381,6 +383,7 @@ class Plugin1850TL1():
         except Exception as eee:
             msg = "Error in disconnection - {:s}".format(str(eee))
             self.__trc_error(msg)
+            raise KFrameException(msg)
 
         self.__if_eve = None
 
@@ -389,6 +392,7 @@ class Plugin1850TL1():
         except Exception as eee:
             msg = "Error in disconnection - {:s}".format(str(eee))
             self.__trc_error(msg)
+            raise KFrameException(msg)
 
         self.__if_cmd = None
 
@@ -514,6 +518,13 @@ class Plugin1850TL1():
             self.__krepo.add_skipped(self.__eqpt_ref, title, e_time, out_text, err_text, skip_text)
 
 
+    def __trc_dbg(self, msg, level=None):
+        """ INTERNAL USAGE
+        """
+        if self.__ktrc is not None:
+            self.__ktrc.k_tracer_debug(msg, level)
+
+
     def __trc_inf(self, msg, level=None):
         """ INTERNAL USAGE
         """
@@ -534,7 +545,7 @@ if __name__ == "__main__":
 
     print("DEBUG")
 
-    trace = KTracer(level="INFO")
+    trace = KTracer(level="DEBUG")
     tl1 = Plugin1850TL1("135.221.125.79", ktrc=trace)
     trace.k_tracer_error("PROVA", level=0)
 
@@ -552,8 +563,10 @@ if __name__ == "__main__":
         tl1.do("ACT-USER::admin:MYTAG::Alcatel1;")
         tl1.event_collection_start()
         time.sleep(2)
-        tl1.do("ENT-EQPT::PP1GE-1-1-18::::PROVISIONEDTYPE=PP1GE:IS;", policy="COND", condPST="IS")
-        time.sleep(30)
+        filt = TL1check()
+        filt.add_pst("IS")
+        tl1.do("ENT-EQPT::PP1GE-1-1-18::::PROVISIONEDTYPE=PP1GE:IS;", policy="COND", cond=filt)
+        time.sleep(15)
         tl1.do("RTRV-EQPT::MDL-1-1-18;")
         res = tl1.get_last_outcome()
         print(res)

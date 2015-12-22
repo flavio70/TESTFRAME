@@ -65,6 +65,9 @@ class KEnvironment():
         # Log Management
         # ...
 
+        # All done
+        self.__closed = False
+
 
     def __setup_workspace(self, basedir, testfilename):
         """
@@ -150,7 +153,9 @@ class KEnvironment():
         """
         Closing environment and release resources
         """
-        self.krepo.frame_close()
+        if not self.__closed:
+            self.__closed = True
+            self.krepo.frame_close()
 
 
 

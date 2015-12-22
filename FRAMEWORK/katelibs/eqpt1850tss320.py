@@ -16,7 +16,7 @@ from katelibs.kunit         import Kunit
 from katelibs.equipment     import Equipment
 from katelibs.facility1850  import IP, NetIF, SerIF
 from katelibs.access1850    import SER1850, SSH1850
-from katelibs.tl1_facility  import TL1message
+from katelibs.facility_tl1  import TL1message
 from katelibs.plugin_tl1    import Plugin1850TL1
 from katelibs.plugin_cli    import Plugin1850CLI
 from katelibs.plugin_bm     import Plugin1850BM
@@ -37,6 +37,7 @@ class Eqpt1850TSS320(Equipment):
         self.tl1        = None          # TL1 plugin (used to send TL1 command to equipment)
         self.cli        = None          # CLI plugin (used to send CLI command to equipment)
         self.bm         = None          # BM  plugin (used to send BM command to equipment)
+        self.id         = None          # 1850 Database ID
         # Private members:
         self.__kenv     = kenv          # Kate Environment
         self.__krepo    = kenv.krepo    # result report (Kunit class instance)
@@ -50,6 +51,8 @@ class Eqpt1850TSS320(Equipment):
 
         super().__init__(label, self.__prs.get_id(label))
 
+        self.id = self.get_id()
+        
         self.__get_eqpt_info_from_db(self.__prs.get_id(label))
 
         flc1ser = self.__ser.get_val(1)
@@ -67,6 +70,7 @@ class Eqpt1850TSS320(Equipment):
 
         self.cli = Plugin1850CLI(   self.__net.get_ip_str(),
                                     eRef=self,
+                                    ktrc=self.__kenv.ktrc,
                                     krepo=self.__krepo)
 
         self.bm  = Plugin1850BM(    self.__net.get_ip_str(),
@@ -88,12 +92,12 @@ class Eqpt1850TSS320(Equipment):
             self.__krepo.start_time()
 
         if self.__is_reachable_by_ip():
-            self.__trc_inf("Equipment '{}' reachable by IP {}\nnothing to do.".format(\
+            self.__trc_dbg("Equipment '{}' reachable by IP {}\nnothing to do.".format(\
                                 self.get_label(), self.__net.get_ip_str()))
             self.__t_skipped("CONFIGURE IP", None, "equipment already reachable", "")
             return True
         else:
-            self.__trc_inf("Configuring IP address for equipment '{}'".format(self.get_label()))
+            self.__trc_dbg("Configuring IP address for equipment '{}'".format(self.get_label()))
             dev = self.__net.get_dev()
             cmd_ifdn = "ifconfig {:s} down".format(dev)
             cmd_ipad = "ifconfig {:s} {:s} netmask {:s} hw ether {:s}".format(\
@@ -107,7 +111,7 @@ class Eqpt1850TSS320(Equipment):
             max_iterations = 50
 
             for i in range(1, max_iterations+1):
-                self.__trc_inf("trying to connect (#{:d}/{:d})".format(i, max_iterations))
+                self.__trc_dbg("trying to connect (#{:d}/{:d})".format(i, max_iterations))
                 self.__ser_con.send_cmd_simple(cmd_ifdn)
                 time.sleep(3)
                 self.__ser_con.send_cmd_simple(cmd_ipad)
@@ -120,12 +124,12 @@ class Eqpt1850TSS320(Equipment):
                 if not self.__is_ongoing_to_address(self.__net.get_gw_str()):
                     self.__trc_err("Error in IP Configuration. Retrying... [{:d}/{:d}]".format(i, max_iterations))
                 else:
-                    self.__trc_inf("Equipment IP configuration OK. Waiting for external reachability")
+                    self.__trc_dbg("Equipment IP configuration OK. Waiting for external reachability")
                     break
 
             for i in range(1, max_iterations+1):
                 if not self.__is_reachable_by_ip():
-                    self.__trc_inf("Equipment still not reachable. Retrying... [{:02d}/{:d}]".format(i, max_iterations))
+                    self.__trc_dbg("Equipment still not reachable. Retrying... [{:02d}/{:d}]".format(i, max_iterations))
                     time.sleep(15)
                 else:
                     self.__t_success("CONFIGURE IP", None, "Equipment reachable")
@@ -140,7 +144,7 @@ class Eqpt1850TSS320(Equipment):
     def flc_stop_dhcp(self):
         """ Shutdown DHCP daemon
         """
-        self.__trc_inf("DHCP DOWN")
+        self.__trc_dbg("DHCP DOWN")
 
         if self.__krepo:
             self.__krepo.start_time()
@@ -150,7 +154,7 @@ class Eqpt1850TSS320(Equipment):
             self.__trc_err("DHCP not stopped")
             self.__t_failure("DHCP SHUTDOWN", None, "error in DHCP shutdown", "")
         else:
-            self.__trc_inf("DHCP stopped")
+            self.__trc_dbg("DHCP stopped")
             self.__t_success("DHCP SHUTDOWN", None, "DHCP shutted down")
         return res
 
@@ -158,7 +162,7 @@ class Eqpt1850TSS320(Equipment):
     def flc_reboot(self):
         """ Perform FLC reboot
         """
-        self.__trc_inf("REBOOT FLC MAIN")
+        self.__trc_dbg("REBOOT FLC MAIN")
 
         if self.__krepo:
             self.__krepo.start_time()
@@ -168,7 +172,7 @@ class Eqpt1850TSS320(Equipment):
         klist = [b'Start BOOT image V', b'Restarting system']
         res = self.__ser_con.expect(klist)
         if res[0] == 0  or  res[0] == 1:
-            self.__trc_inf("FLC RESTARTED")
+            self.__trc_dbg("FLC RESTARTED")
             self.__t_success("FLC REBOOT", None, "FLC restarted")
             return True
         else:
@@ -184,11 +188,11 @@ class Eqpt1850TSS320(Equipment):
         slc_ip = "100.0.1.{:d}".format(slot)
 
         if not self.__is_ongoing_to_address(slc_ip):
-            self.__trc_inf("SLC {:s} NOT PRESENT ".format(slot))
+            self.__trc_dbg("SLC {:s} NOT PRESENT ".format(slot))
             self.__t_skipped("SLC {:d} REBOOT".format(slot), None, "SLC not present", "")
             return True
 
-        self.__trc_inf("REBOOT SLC {:s}".format(slot))
+        self.__trc_dbg("REBOOT SLC {:s}".format(slot))
 
         self.bm.slc_reboot(slot)
         print("BM COMMAND SENT")
@@ -201,7 +205,7 @@ class Eqpt1850TSS320(Equipment):
     def flc_scratch_db(self):
         """ Force a DB clean
         """
-        self.__trc_inf("SCRATCH DB...")
+        self.__trc_dbg("SCRATCH DB...")
 
         if self.__krepo:
             self.__krepo.start_time()
@@ -213,7 +217,7 @@ class Eqpt1850TSS320(Equipment):
             self.__trc_err("DB not scrtatched")
             self.__t_failure("SCRATCH DB", None, "error in scratching DB", "")
         else:
-            self.__trc_inf("DB scratched")
+            self.__trc_dbg("DB scratched")
             self.__t_success("SCRATCH DB", None, "DB correctly scratched")
         return res
 
@@ -238,7 +242,7 @@ class Eqpt1850TSS320(Equipment):
         for i in range(1, max_iterations+1):
             out = self.__net_con.send_cmd_and_capture("pidof bin_1850TSS_TDM320_FLC.bin")
             if out[:-1] == "":
-                self.__trc_inf("No running SWP yet. Retrying in 15s [{:d}/{:d}]".format(i, max_iterations))
+                self.__trc_dbg("No running SWP yet. Retrying in 15s [{:d}/{:d}]".format(i, max_iterations))
                 time.sleep(15)
             else:
                 res = True
@@ -252,10 +256,10 @@ class Eqpt1850TSS320(Equipment):
         res = False
         for i in range(1, max_iterations+1):
             if not self.__net_con.send_cmd_and_check("netstat -anp | grep ':3083'", "0.0.0.0:3083"):
-                self.__trc_inf("TL1 agent not ready. Retrying in 15s [{:d}/{:d}]".format(i, max_iterations))
+                self.__trc_dbg("TL1 agent not ready. Retrying in 15s [{:d}/{:d}]".format(i, max_iterations))
                 time.sleep(15)
             else:
-                self.__trc_inf("TL1 agent ready in {:d}s".format(15*i))
+                self.__trc_dbg("TL1 agent ready in {:d}s".format(15*i))
                 res = True
                 break
         if not res:
@@ -269,12 +273,12 @@ class Eqpt1850TSS320(Equipment):
             for i in range(1, max_iterations+1):
                 cmd = "netstat -anp | grep '{:d}'".format(sub_agent)
                 if not self.__net_con.send_cmd_and_check(cmd, "bin_1850TSS_"):
-                    self.__trc_inf("SNMP:{:s} sub-agent not ready. Retrying in 15s [{:d}/{:d}]".format(sub_agent,
+                    self.__trc_dbg("SNMP:{:s} sub-agent not ready. Retrying in 15s [{:d}/{:d}]".format(sub_agent,
                                                                                                        i,
                                                                                                        max_iterations))
                     time.sleep(15)
                 else:
-                    self.__trc_inf("SNMP:{:d} sub-agent ready in {:d}s".format(sub_agent, 15*i))
+                    self.__trc_dbg("SNMP:{:d} sub-agent ready in {:d}s".format(sub_agent, 15*i))
                     res = True
                     break
             if not res:
@@ -282,7 +286,7 @@ class Eqpt1850TSS320(Equipment):
                 self.__trc_err(msg)
                 self.__t_failure("FLC IN SERVICE", None, "timeout", msg)
 
-        self.__trc_inf("FLC IN SERVICE")
+        self.__trc_dbg("FLC IN SERVICE")
 
         self.__t_success("FLC IN SERVICE", None, "FLC correctly in service")
 
@@ -301,13 +305,13 @@ class Eqpt1850TSS320(Equipment):
             self.flc_ip_config()
 
         if self.flc_check_running_swp():
-            self.__trc_inf("SWP '{:s}' ALREADY RUNNING\n".format(self.__swp.get_swp_ref()))
+            self.__trc_dbg("SWP '{:s}' ALREADY RUNNING\n".format(self.__swp.get_swp_ref()))
             res = True
             self.__t_skipped("SWP LOAD", None, "SWP already running", "")
         else:
             swp_string = self.__swp.get_startapp(self.__arch)
 
-            self.__trc_inf("LOADING SWP ON '{:s}\nSWP STRING: '{:s}'".format(self.get_label(), swp_string))
+            self.__trc_dbg("LOADING SWP ON '{:s}\nSWP STRING: '{:s}'".format(self.get_label(), swp_string))
 
             res = self.__net_con.send_cmd_and_check(swp_string, "EC_SetSwVersionActive status SUCCESS")
 
@@ -315,7 +319,7 @@ class Eqpt1850TSS320(Equipment):
                 self.__trc_err("SWP LOAD ERROR\n")
                 self.__t_failure("SWP LOAD", None, "error in loading SWP", "")
             else:
-                self.__trc_inf("SWP LOADING TERMINATE\n")
+                self.__trc_dbg("SWP LOADING TERMINATE\n")
                 self.__t_success("SWP LOAD", None, "SWP correctly load")
 
         return res
@@ -354,9 +358,9 @@ class Eqpt1850TSS320(Equipment):
             return False
 
         if do_format:
-            self.__trc_inf("FORMAT DISK AND INSTALL NODE")
+            self.__trc_dbg("FORMAT DISK AND INSTALL NODE")
         else:
-            self.__trc_inf("INSTALL NODE")
+            self.__trc_dbg("INSTALL NODE")
             if not self.flc_ip_config():
                 self.__trc_err("INSTALL ABORTED")
                 return False
@@ -509,11 +513,16 @@ class Eqpt1850TSS320(Equipment):
             self.__krepo.add_skipped(self, title, e_time, out_text, err_text, skip_text)
 
 
+    def __trc_dbg(self, msg):
+        """ INTERNAL USAGE
+        """
+        self.__kenv.ktrc.k_tracer_debug(msg, level=1)
+
+
     def __trc_inf(self, msg):
         """ INTERNAL USAGE
         """
         self.__kenv.ktrc.k_tracer_info(msg, level=1)
-
 
 
     def __trc_err(self, msg):
