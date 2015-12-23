@@ -85,6 +85,12 @@ class Eqpt1850TSS320(Equipment):
         self.bm.clean_up()
 
 
+    def get_preset(self, name):
+        """ Get current value for specified presetting
+        """
+        return self.__kenv.kprs.get_elem(self.get_label(), name)
+
+
     def flc_ip_config(self):
         """ Initialize Network configuration of Equipment
         """
