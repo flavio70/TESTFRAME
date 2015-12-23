@@ -86,6 +86,8 @@ class Test(TestCase):
         insert general SetUp code for your test below
         '''
         #self.start_tps_block("EM", "1-2-3")
+        print("[P1] := {}".format(NE1.get_preset("P1")))
+        #NE1.tl1.event_collection_start()
         #NE1.tl1.do("ACT-USER::admin:::Alcatel1;")
 
 
@@ -95,7 +97,7 @@ class Test(TestCase):
         insert Main body code for your test below
         '''
 
-        #NE1.tl1.do("RTRV-ASAP-PROF::ASAPEQPT-0;")
+        NE1.tl1.do("RTRV-ASAP-PROF::ASAPEQPT-0;")
         #self.trc_inf(NE1.tl1.get_last_outcome())
 
     def test_cleanup(self):
@@ -112,7 +114,7 @@ class Test(TestCase):
         '''
         self.trc_inf('@DUT CleanUP')
 
-        self.stop_tps_block("EM", "1-2-3")
+        #self.stop_tps_block("EM", "1-2-3")
 
 
 #Please don't change the code below#
