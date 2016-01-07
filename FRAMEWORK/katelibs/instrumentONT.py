@@ -799,7 +799,8 @@ class InstrumentONT(Equipment):
         if verifyResult[0]: # True
             localMessage="Session [{}] not removed: unable to delete it".format(sessionName)
             self.__lc_msg(localMessage)
-            self.__sessionName = None
+            # self.__sessionName = None    # workaround for multiple port management with the same ** default ** session
+            self.__sessionName = sessionName  # workaround for multiple port management with the same ** default ** session
             self.__method_failure(methodLocalName, None, "", localMessage)
             return False, localMessage
         localMessage="Session [{}] deleted".format(sessionName)
