@@ -503,6 +503,92 @@ class TL1message():
                 break
 
 
+    def __encode_response_rtrv_cond(self):
+        """ INTERNAL USAGE
+        """
+        f_header = True
+        f_ident  = True
+        f_block  = True
+
+        f_skip_n = 0
+
+        pseudo_aid = 1  # Identifier for "emtpy-aid" response rows
+
+        for line in self.__m_plain.split('\n'):
+            if f_skip_n > 0:
+                # Skip one or more lines
+                f_skip_n = f_skip_n - 1
+                continue
+
+            if f_header:
+                if line.strip() == "":
+                    continue
+
+                self.__m_coded['C_SID']  = " ".join(line.split()[:-2]).replace('"', '')
+                self.__m_coded['C_DATE'] = line.split()[-2]
+                self.__m_coded['C_TIME'] = line.split()[-1]
+                f_header = False
+                continue
+
+            if f_ident:
+                words = line.split()
+                check_event = ( words[0] == '*C' or
+                                words[0] == '**' or
+                                words[0] == '*'  or
+                                words[0] == 'A'  )
+                if check_event:
+                    print("MESSAGGIO MALFORMATO")
+                    return
+
+                self.__m_coded['C_CODE']    = words[0]
+                self.__m_coded['C_TAG']     = words[1]
+                self.__m_coded['R_STATUS']  = words[2]
+                self.__m_coded['R_BODY_OK'] = {}
+                self.__m_coded['R_BODY_KO'] = []
+                self.__m_coded['R_ERROR']   = ""
+                f_ident = False
+                continue
+
+            if f_block:
+                # Command Response
+                stripped_line = line.strip()
+                if stripped_line == '>':
+                    f_skip_n = 2    # Long response - skip next 2 lines
+                    continue
+                if ( stripped_line.find('/*') != -1                                     and
+                     stripped_line.find("[{:s}]".format(self.__m_coded['C_TAG'])) != -1 and
+                     stripped_line.find('*/') != -1                                     ):
+                    # REMARK found - closing encoding
+                    tmp = stripped_line.replace("/* ","")
+                    tmp = tmp[:tmp.find(":")]
+                    self.__m_coded['R_BODY_CMD'] = tmp
+                    break
+                if self.__m_coded['R_STATUS'] == "COMPLD":
+                    words = stripped_line.replace('"', '').split(':')
+                    print(words)
+                    row = {}
+                    positional = 1
+                    attr_val_list = {}
+                    for elem in words[1].split(','):
+                        attr_val_list[ positional ] = elem
+                        positional = positional + 1
+                    row[ str(pseudo_aid) ] = {'VALUE' : attr_val_list}
+                    pseudo_aid = pseudo_aid + 1
+                    self.__m_coded['R_BODY_OK'].update(row)
+                elif self.__m_coded['R_STATUS'] == "DENY":
+                    if len(stripped_line) == 4:
+                        self.__m_coded['R_ERROR'] = stripped_line
+                    else:
+                        self.__m_coded['R_BODY_KO'].append(stripped_line)
+                else:
+                    print("[{:s}] NON ANCORA GESTITO".format(self.__m_coded['R_STATUS']))
+                continue
+
+            if line == ';':
+                # TERMINATOR found - closing encoding
+                break
+
+
     def __encode(self):
         """ INTERNAL USAGE
             Decompose an ASCII TL1 Message response to structured format
@@ -510,6 +596,7 @@ class TL1message():
         is_event = False
         is_response_std = False
         is_response_asap_prof = False
+        is_response_rtrv_cond = False
 
         for line in self.__m_plain.split('\n'):
             if line.strip() == "":
@@ -518,8 +605,10 @@ class TL1message():
             marker = line.split()[0]
 
             if marker == "M":
-                if self.__m_plain.find("RTRV-ASAP-PROF") != -1:
+                if   self.__m_plain.find("RTRV-ASAP-PROF") != -1:
                     is_response_asap_prof = True
+                elif self.__m_plain.find("RTRV-COND") != -1:
+                    is_response_rtrv_cond = True
                 else:
                     is_response_std = True
                 self.__m_event = False
@@ -538,6 +627,10 @@ class TL1message():
 
         if is_response_asap_prof:
             self.__encode_response_asap_prof()
+            return
+
+        if is_response_rtrv_cond:
+            self.__encode_response_rtrv_cond()
             return
 
         if is_event:
@@ -887,12 +980,20 @@ M  480 COMPLD
 ;
 """
 
-    #mm = TL1message(msg1)
-    #print(mm.decode("JSON"))
-    #mm = TL1message(msg4)
-    #print(mm.decode("JSON"))
-    #mm = TL1message(msg3)
-    #print(mm.decode("JSON"))
+    msg7 = """
+
+PLEASE-SET-SID-CA200 31-08-02 09:45:34
+M 346 COMPLD
+   "STM1AU4-1-1-5-2-1,VC4:NR,UNEQ-P,NSA,08-02,08-47-30,NEND,TRMT"
+   /* RTRV-COND-VC4::STM1AU4-1-1-5-2-1:::UNEQ-P [346] (536870928) */
+;
+"""
+
+    mm = TL1message(msg7)
+    print(mm.decode("JSON"))
+
+    sys.exit(0)
+
     if True:
         mm = TL1message(msg5)
         print(mm.decode("JSON"))
