@@ -56,7 +56,7 @@ class Plugin1850TL1():
         else:
             collector_fn = collector
         self.__f = open(collector_fn, "w")
-        os.chmod(collector_fn, 0o644)
+        os.chmod(collector_fn, 0o666)
 
         # Semaphore for TL1 Event Collector info area
         self.__thread_lock    = threading.Lock()
