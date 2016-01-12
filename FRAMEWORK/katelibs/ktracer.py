@@ -49,6 +49,7 @@ class KTracer():
         self.__main_file = "{:s}/SUITE_trace.log".format(self.__base_path)
 
         if trunk:
+						if os.path.isfile(self.__main_file):os.remove(self.__main_file)
             self.__main_fh = open(self.__main_file, "w")
             os.chmod(self.__main_file, 0o666)
         else:
