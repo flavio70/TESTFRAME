@@ -55,6 +55,8 @@ class Plugin1850TL1():
             collector_fn = "collector.log"
         else:
             collector_fn = collector
+        
+        if os.path.isfile(collector_fn):os.remove(collector_fn)
         self.__f = open(collector_fn, "w")
         os.chmod(collector_fn, 0o666)
 
