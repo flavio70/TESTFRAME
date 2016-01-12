@@ -50,6 +50,7 @@ class KTracer():
 
         if trunk:
             self.__main_fh = open(self.__main_file, "w")
+            os.chmod(self.__main_file, 0o666)
         else:
             self.__main_fh = open(self.__main_file, "a")
 
