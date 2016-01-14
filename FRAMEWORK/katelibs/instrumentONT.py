@@ -786,19 +786,19 @@ class InstrumentONT(Equipment):
     def delete_session(self, sessionName):  ### krepo added ###
         """ delete a <sessionName> session if present """
         methodLocalName = self.__lc_current_method_name(embedKrepoInit=True)
-        # check if session is present
-        localCommand=":SESM:SES?"
-        callResult = self.__send_cmd(localCommand)
-        verifyResult = self.__verify_presence_in_csv_format_answer(callResult, sessionName)
-        if not verifyResult[0]: # False
-            localMessage="Session [{}] not found: unable to delete it".format(sessionName)
-            self.__lc_msg(localMessage)
-            # self.__sessionName = None    # workaround for multiple port management with the same ** default ** session
-            self.__sessionName = sessionName  # workaround for multiple port management with the same ** default ** session
-            self.__method_failure(methodLocalName, None, "", localMessage)
-            return False, localMessage
-        localMessage="Session [{}] found: delete".format(sessionName)
-        self.__lc_msg(localMessage)
+        # check if session is present  <-- removed because of ONT bad answer to :SESM:SES? command
+        # localCommand=":SESM:SES?"
+        # callResult = self.__send_cmd(localCommand)
+        # verifyResult = self.__verify_presence_in_csv_format_answer(callResult, sessionName)
+        # if not verifyResult[0]: # False
+        #     localMessage="Session [{}] not found: unable to delete it".format(sessionName)
+        #     self.__lc_msg(localMessage)
+        #     # self.__sessionName = None    # workaround for multiple port management with the same ** default ** session
+        #     self.__sessionName = sessionName  # workaround for multiple port management with the same ** default ** session
+        #     self.__method_failure(methodLocalName, None, "", localMessage)
+        #     return False, localMessage
+        # localMessage="Session [{}] found: delete".format(sessionName)
+        # self.__lc_msg(localMessage)
 
         # remove session
         localCommand=":SESM:DEL"
