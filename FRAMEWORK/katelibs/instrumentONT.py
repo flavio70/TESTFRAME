@@ -76,8 +76,9 @@ class InstrumentONT(Equipment):
         self.E_TAG = "-10"
 
         super().__init__(label, self.__prs.get_id(label))
-        self.__get_instrument_info_from_db(self.__prs.get_id(label)) # inizializza i dati di IP, tipo di ONT..
-
+        self.__get_instrument_info_from_db(self.__prs.get_id(label)) # inizializza i dati di IP, tipo di ONT..dal DB
+        #self.init_ont_type()  # inizializza i dati di IP, tipo di ONT..leggendo da strumento
+        
         self.__ontUser        = self.__prs.get_elem(self.get_label(), 'USER')
         self.__ontPassword    = self.__prs.get_elem(self.get_label(), 'PWD')
         self.__ontApplication = self.__prs.get_elem(self.get_label(), 'APPL')
@@ -195,21 +196,23 @@ class InstrumentONT(Equipment):
         instr_ip = self.__get_net_info(ID)
 
         self.__ontIpAddress = instr_ip
-        if   instr_type_name == "ONT50":
-            self.__ontType = "5xx"
-        elif instr_type_name == "ONT506":
-            self.__ontType = "5xx"
-        elif instr_type_name == "ONT512":
-            self.__ontType = "5xx"
-        elif instr_type_name == "ONT601":
-            self.__ontType = "6xx"
-        else:
-            localMessage = "__get_instrument_info_from_db error: Unknown instrument type for the specified ID. ID [{}] Instrument[{}] IpAddr[{}]".format(ID,instr_type_name,instr_ip)
-            print(localMessage) 
-            self.__lc_msg(localMessage)
-            return  
-
-        localMessage = "__get_instrument_info_from_db: instrument type specified :ID [{}] Instrument:[{}] IpAddr[{}]".format(ID,instr_type_name,instr_ip)
+        
+        #if   instr_type_name == "ONT50":
+        #    self.__ontType = "5xx"
+        #elif instr_type_name == "ONT506":
+        #    self.__ontType = "5xx"
+        #elif instr_type_name == "ONT512":
+        #    self.__ontType = "5xx"
+        #elif instr_type_name == "ONT601":
+        #    self.__ontType = "6xx"
+        #else:
+        #    localMessage = "__get_instrument_info_from_db error: Unknown instrument type for the specified ID. ID [{}] Instrument[{}] IpAddr[{}]".format(ID,instr_type_name,instr_ip)
+        #    print(localMessage) 
+        #    self.__lc_msg(localMessage)
+        #    return  
+        
+        #localMessage = "__get_instrument_info_from_db: instrument type specified :ID [{}] Instrument:[{}] IpAddr[{}]".format(ID,instr_type_name,instr_ip)
+        localMessage = "__get_instrument_info_from_db: instrument type specified : Instrument:[{}] IpAddr[{}]".format(instr_type_name,instr_ip)
         print(localMessage) 
         self.__lc_msg(localMessage)
         return  
@@ -229,6 +232,18 @@ class InstrumentONT(Equipment):
         localPortId = self.__prs.get_elem(self.get_label(), portId)
         self.__labelToPortId[portId]=localPortId
         localMethodName = inspect.stack()[0][3]   # init_instrument
+        callResult = self.connect()
+        if self.__check_method_execution("connect") == False: 
+            localMessage="Error in method [{}] call \n".format(localMethodName)
+            self.__lc_msg(localMessage)
+            return False, "Error in method "+ localMethodName +" call "
+            self.__lc_msg("Step 1 ++++++++++++++++++++++++++")
+
+        # Check declared and found instrument type
+        self.init_ont_type()  # init ONT TYPE asking it witn *IDN? cmd
+        localMessage="Instrument type answer: [{}] (*** connect moved outside ***)".format(self.__ontType)
+        self.__lc_msg(localMessage)
+
         
         if self.__ontType  == "6xx":   # ONT-6xx Init
             localUser = self.__ontUser  
@@ -238,12 +253,12 @@ class InstrumentONT(Equipment):
 
             # 6xx init
             #tester = InstrumentONT(localUser,localPwd,localOntIpAddress, krepo=r)
-            callResult = self.connect()
-            if self.__check_method_execution("connect") == False: 
-                localMessage="Error in method [{}] call \n".format(localMethodName)
-                self.__lc_msg(localMessage)
-                return False, "Error in method "+ localMethodName +" call "
-            self.__lc_msg("Step 1 ++++++++++++++++++++++++++")
+            #callResult = self.connect() # moved outside if case
+            #if self.__check_method_execution("connect") == False: 
+            #    localMessage="Error in method [{}] call \n".format(localMethodName)
+            #    self.__lc_msg(localMessage)
+            #    return False, "Error in method "+ localMethodName +" call "
+            #self.__lc_msg("Step 1 ++++++++++++++++++++++++++")
 
             callResult = self.open_port_channel(portId)
             if self.__check_method_execution("open_port_channel") == False: 
@@ -252,23 +267,21 @@ class InstrumentONT(Equipment):
                 return False, "Error in method "+ localMethodName +" call "
             self.__lc_msg("Step 2 ++++++++++++++++++++++++++")
 
-
-
-            # Check declared and found instrument type
-            declaredOntType = self.__ontType
-            callResult = self.get_instrument_id()
-            if self.__check_method_execution("get_instrument_id") == False: 
-                localMessage="Error in method [{}] call \n".format(localMethodName)
-                self.__lc_msg(localMessage)
-                return False, "Error in method "+ localMethodName +" call "
-            self.__lc_msg("Step 3 ++++++++++++++++++++++++++")
-            if declaredOntType == self.__ontType: 
-                localMessage="Instrument declared [{}] and found [{}] consistency verified".format(declaredOntType, self.__ontType)
-                self.__lc_msg(localMessage)
-            else:
-                localMessage="Instrument declared [{}] but not found [{}] please verify DB data for id [{}]".format(declaredOntType, self.__ontType)
-                self.__lc_msg(localMessage)
-                return False, localMessage
+           
+            #declaredOntType = self.__ontType
+            #callResult = self.get_instrument_id()
+            #if self.__check_method_execution("get_instrument_id") == False: 
+            #    localMessage="Error in method [{}] call \n".format(localMethodName)
+            #    self.__lc_msg(localMessage)
+            #    return False, "Error in method "+ localMethodName +" call "
+            #self.__lc_msg("Step 3 ++++++++++++++++++++++++++")
+            #if declaredOntType == self.__ontType: 
+            #    localMessage="Instrument declared [{}] and found [{}] consistency verified".format(declaredOntType, self.__ontType)
+            #    self.__lc_msg(localMessage)
+            #else:
+            #    localMessage="Instrument declared [{}] but not found [{}] please verify DB data for id [{}]".format(declaredOntType, self.__ontType)
+            #    self.__lc_msg(localMessage)
+            #    return False, localMessage
 
             # Unload Application to clean wrong situations...
             callResult = self.unload_app(portId, myApplication)
@@ -293,13 +306,12 @@ class InstrumentONT(Equipment):
             myApplication="SdhBert"
             #tester = InstrumentONT(localUser,localPwd, krepo=r)
             
-            callResult = self.connect()
-            if self.__check_method_execution("connect") == False: 
-                localMessage="Error in method [{}] call \n".format(localMethodName)
-                self.__lc_msg(localMessage)
-                return False, "Error in method "+ localMethodName +" call "
-
-            self.__lc_msg("Step 1 ++++++++++++++++++++++++++")
+            #callResult = self.connect()   # moved outside if case
+            #if self.__check_method_execution("connect") == False: 
+            #    localMessage="Error in method [{}] call \n".format(localMethodName)
+            #    self.__lc_msg(localMessage)
+            #    return False, "Error in method "+ localMethodName +" call "
+            #self.__lc_msg("Step 1 ++++++++++++++++++++++++++")
            
             callResult = self.create_session(self.__sessionName)
             if self.__check_method_execution("create_session") == False: 
@@ -327,23 +339,23 @@ class InstrumentONT(Equipment):
             self.__lc_msg("Step 4 ++++++++++++++++++++++++++")
 
             # Check declared and found instrument type
-            declaredOntType = self.__ontType
+            #declaredOntType = self.__ontType
             
-            callResult = self.get_instrument_id()
-            if self.__check_method_execution("get_instrument_id") == False: 
-                localMessage="Error in method [{}] call \n".format(localMethodName)
-                self.__lc_msg(localMessage)
-                return False, "Error in method "+ localMethodName +" call "
+            #callResult = self.get_instrument_id()
+            #if self.__check_method_execution("get_instrument_id") == False: 
+            #    localMessage="Error in method [{}] call \n".format(localMethodName)
+            #    self.__lc_msg(localMessage)
+            #    return False, "Error in method "+ localMethodName +" call "
             
-            self.__lc_msg("Step 5 ++++++++++++++++++++++++++")
+            #self.__lc_msg("Step 5 ++++++++++++++++++++++++++")
             
-            if declaredOntType == self.__ontType: 
-                localMessage="Instrument declared [{}] and found [{}] consistency verified".format(declaredOntType, self.__ontType)
-                self.__lc_msg(localMessage)
-            else:
-                localMessage="Instrument declared [{}] but found [{}] please verify DB data for id [{}]".format(declaredOntType, self.__ontType)
-                self.__lc_msg(localMessage)
-                return False, localMessage
+            #if declaredOntType == self.__ontType: 
+            #    localMessage="Instrument declared [{}] and found [{}] consistency verified".format(declaredOntType, self.__ontType)
+            #    self.__lc_msg(localMessage)
+            #else:
+            #    localMessage="Instrument declared [{}] but found [{}] please verify DB data for id [{}]".format(declaredOntType, self.__ontType)
+            #    self.__lc_msg(localMessage)
+            #    return False, localMessage
             
             self.__lc_msg("Step 6 ++++++++++++++++++++++++++")
             
