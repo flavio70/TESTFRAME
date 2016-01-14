@@ -375,7 +375,7 @@ class InstrumentONT(Equipment):
             
             self.__lc_msg("Step 8 ++++++++++++++++++++++++++")
             
-            callResult = self.get_currently_loaded_app(portId)
+            #callResult = self.get_currently_loaded_app(portId)
             #if self.__check_method_execution("get_currently_loaded_app") == False: 
             #    print("Error in method [{}] call \n".format(localMethodName))
             #    return False, "Error in method "+ localMethodName +" call "
@@ -447,7 +447,7 @@ class InstrumentONT(Equipment):
             callResult = self.unload_app(portId, myApplication)
             time.sleep(5)
             callResult = self.deselect_port(portId)    # uncomment to deselect the specified port
-            callResult = self.delete_session(self.__sessionName)
+            #callResult = self.delete_session(self.__sessionName)
 
         localMessage="[{}]: deinit_instrument: instrument correctly initialized".format(self.__ontType)
         self.__lc_msg(localMessage)
@@ -785,20 +785,20 @@ class InstrumentONT(Equipment):
 
     def delete_session(self, sessionName):  ### krepo added ###
         """ delete a <sessionName> session if present """
-        methodLocalName = self.__lc_current_method_name(embedKrepoInit=True)
+        methodLocalName = self.__lc_current_method_name(embedKrepoInit=False)
         # check if session is present  <-- removed because of ONT bad answer to :SESM:SES? command
-        # localCommand=":SESM:SES?"
-        # callResult = self.__send_cmd(localCommand)
-        # verifyResult = self.__verify_presence_in_csv_format_answer(callResult, sessionName)
-        # if not verifyResult[0]: # False
-        #     localMessage="Session [{}] not found: unable to delete it".format(sessionName)
-        #     self.__lc_msg(localMessage)
-        #     # self.__sessionName = None    # workaround for multiple port management with the same ** default ** session
-        #     self.__sessionName = sessionName  # workaround for multiple port management with the same ** default ** session
-        #     self.__method_failure(methodLocalName, None, "", localMessage)
-        #     return False, localMessage
-        # localMessage="Session [{}] found: delete".format(sessionName)
-        # self.__lc_msg(localMessage)
+        localCommand=":SESM:SES?"
+        callResult = self.__send_cmd(localCommand)
+        verifyResult = self.__verify_presence_in_csv_format_answer(callResult, sessionName)
+        if not verifyResult[0]: # False
+            localMessage="Session [{}] not found: unable to delete it".format(sessionName)
+            self.__lc_msg(localMessage)
+            # self.__sessionName = None    # workaround for multiple port management with the same ** default ** session
+            self.__sessionName = sessionName  # workaround for multiple port management with the same ** default ** session
+            self.__method_failure(methodLocalName, None, "", localMessage)
+            return False, localMessage
+        localMessage="Session [{}] found: delete".format(sessionName)
+        self.__lc_msg(localMessage)
 
         # remove session
         localCommand=":SESM:DEL"
@@ -1289,7 +1289,7 @@ class InstrumentONT(Equipment):
         #callResult = self.__remove_dust(rawCallResult[1]).replace(">","")
         callResult = self.__remove_dust(rawCallResult[1]).replace(">","").replace("\"","")
         if  callResult == "":
-            localMessage="No Application Currently Loaded[{}] PortId[{}]".format(callResult, portId)
+            localMessage="No Application Currently   Loaded[{}] PortId[{}]".format(callResult, portId)
             callRetCode = False
             self.__lc_msg(localMessage)
             self.__method_failure(methodLocalName, None, "", localMessage)
