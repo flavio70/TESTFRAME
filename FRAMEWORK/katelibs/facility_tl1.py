@@ -1005,7 +1005,16 @@ M 346 COMPLD
 ;
 """
 
-    mm = TL1message(msg7)
+    msg8 = """
+
+   PLEASE-SET-SID-CA200 31-08-06 09:40:55
+M  83 COMPLD
+   "STM1AU4-1-1-5-2-1,STM1AU4-1-1-28-2-1:2WAY:ACD=LOCAL:IS-NR"
+   /* RTRV-CRS-VC4::STM1AU4-1-1-5-2-1 [83] (536871024) */
+;
+"""
+
+    mm = TL1message(msg8)
     print(mm.decode("JSON"))
 
     sys.exit(0)
