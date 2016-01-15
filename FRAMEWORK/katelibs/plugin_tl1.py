@@ -357,7 +357,9 @@ class Plugin1850TL1():
         else:
             self.__trc_dbg("(re)CONNECTING TL1 (Event channel)...")
 
-            while int(time.time()) <= self.__time_mark:
+            end_timeout = time.time() + self.TL1_TIMEOUT
+
+            while int(time.time()) <= end_timeout:
                 try:
                     self.__if_eve = telnetlib.Telnet(self.__the_ip, self.__the_port, 5)
                     self.__trc_dbg("... TL1 INTERFACE for events ready.")
@@ -451,6 +453,8 @@ class Plugin1850TL1():
     def __thr_event_loop(self):
         """ INTERNAL USAGE
         """
+        collected_items = 0
+
         while True:
             with self.__thread_lock:
                 do_repeat = self.__do_event_loop
@@ -461,15 +465,15 @@ class Plugin1850TL1():
             tl1_response  = ""
 
             while True:
-                result_list = self.__if_eve.expect([b"\n\>", b"\n\;"], timeout=10)
-                msg_tmp = str(result_list[2], 'utf-8')
+                result_list = self.__if_eve.expect([b"\n\>", b"\n\;"], timeout=100)
 
                 if result_list[0] == -1:
                     # Timeout Detected
-                    timeout_detected = True
-                    break
-                else:
-                    timeout_detected = False
+                    print("timeout durante evento")
+                    continue
+
+                msg_tmp = str(result_list[2], 'utf-8')
+                print("[{}]".format(msg_tmp))
 
                 if msg_tmp.find("\r\n\n") == -1:
                     continue
@@ -491,10 +495,12 @@ class Plugin1850TL1():
 
             tl1_response = re.sub('(\r\n)+', "\r\n", tl1_response, 0)
 
-            if not timeout_detected:
-                if self.__enable_collect:
-                    msg_coded = TL1message(tl1_response)
-                    self.__f.writelines("{:s}\n".format(msg_coded.decode("JSON")))
+            if self.__enable_collect:
+                collected_items = collected_items + 1
+                print("EVENTO COLLEZIONATO #{}".format(collected_items))
+                print(tl1_response)
+                msg_coded = TL1message(tl1_response)
+                self.__f.writelines("{:s}\n".format(msg_coded.decode("JSON")))
 
 
     def __t_success(self, title, elapsed_time, out_text):

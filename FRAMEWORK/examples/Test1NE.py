@@ -27,6 +27,7 @@ from katelibs.instrumentONT     import InstrumentONT
 #from katelibs.instrumentIXIA     import InstrumentIXIA
 #from katelibs.instrumentSPIRENT  import InstrumentSPIRENT
 from katelibs.swp1850tss320     import SWP1850TSS
+from katelibs.facility_tl1      import *
 
 
 class Test(TestCase):
@@ -85,10 +86,8 @@ class Test(TestCase):
         test Setup Section implementation
         insert general SetUp code for your test below
         '''
-        #self.start_tps_block("EM", "1-2-3")
-        print("[P1] := {}".format(NE1.get_preset("P1")))
-        #NE1.tl1.event_collection_start()
-        #NE1.tl1.do("ACT-USER::admin:::Alcatel1;")
+        NE1.tl1.event_collection_start()
+        NE1.tl1.do("ACT-USER::admin:::Alcatel1;")
 
 
     def test_body(self):
@@ -96,8 +95,13 @@ class Test(TestCase):
         test Body Section implementation
         insert Main body code for your test below
         '''
-
-        NE1.tl1.do("RTRV-ASAP-PROF::ASAPEQPT-0;")
+        filt_is = TL1check()
+        filt_is.add_pst("IS")
+        ###NE1.tl1.do("ENT-EQPT::PP1GE-1-1-16::::PROVISIONEDTYPE=PP1GESY;")
+        NE1.tl1.do("ENT-EQPT::8XSO-1-1-14::::PROVISIONEDTYPE=8PSO,AINSMODE=NOWAIT;")
+        #NE1.tl1.do("ENT-EQPT::PP10GEX2-1-1-15::::PROVISIONEDTYPE=PP10GE2E;")
+        NE1.tl1.do_until("RTRV-EQPT::8XSO-1-1-14;", filt_is)
+        #NE1.tl1.do("RTRV-ASAP-PROF::ASAPEQPT-0;")
         #self.trc_inf(NE1.tl1.get_last_outcome())
 
     def test_cleanup(self):
@@ -105,6 +109,12 @@ class Test(TestCase):
         test Cleanup Section implementation
         insert CleanUp code for your test below
         '''
+        NE1.tl1.do("RMV-EQPT::8XSO-1-1-14;")
+        NE1.tl1.do("DLT-EQPT::8XSO-1-1-14;")
+        ###NE1.tl1.do("RMV-EQPT::PP1GE-1-1-16;")
+        ###NE1.tl1.do("DLT-EQPT::PP1GE-1-1-16;")
+        NE1.tl1.do("CANC-USER;")
+        NE1.tl1.event_collection_stop()
 
 
     def dut_cleanup(self):
