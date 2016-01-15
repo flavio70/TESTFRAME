@@ -14,6 +14,16 @@ import json
 
 
 
+class TL1EventScan():
+    """ TL1 Event collection scan
+    """
+
+    def __init__(self, event_file):
+        """ Constructor for Event Scanner
+        """
+        self.__file = event_file
+
+
 class TL1check():
     """ TL1 Message Scanner
     """
@@ -142,14 +152,14 @@ class TL1check():
 
                 if match_pst[0] and match_sst[0]:
 
-                    print("messaggio := {}".format(msg.get_cmd_attr_values(the_aid)))
-                    print(" da filtr := {}".format(self.__fld_l))
+                    #print("messaggio := {}".format(msg.get_cmd_attr_values(the_aid)))
+                    #print(" da filtr := {}".format(self.__fld_l))
+
                     for the_attr,the_val in msg.get_cmd_attr_values(the_aid).items():
 
                         match_attr_val = self.__evaluate_attr_val(the_attr, the_val, rule=fld)
 
                         if match_attr_val[0]:
-                            result = True
                             match_list.append(match_attr_val[1])
 
                     if match_pst[1] != {}:
@@ -160,6 +170,8 @@ class TL1check():
 
                 if match_list != []:
                     result_list[the_aid] = match_list
+
+            result = (len(result_list) > 0)
 
             return result, result_list
 
@@ -395,7 +407,13 @@ class TL1message():
                         for elem in words[2].split(','):
                             attr_val_list[elem.split('=')[0]] = elem.split('=')[1]
 
-                    row[ words[0] ] = {'VALUE' : attr_val_list, 'STATE' : words[3], 'PST' : words[3].split(',')[0].split('&'), 'SST' : words[3].split(',')[1].split('&')}
+                    if words[3].find(',') != -1:
+                        my_pst_list = words[3].split(',')[0].split('&')
+                        my_sst_list = words[3].split(',')[1].split('&')
+                    else:
+                        my_pst_list = words[3].split('&')
+                        my_sst_list = ""
+                    row[ words[0] ] = {'VALUE' : attr_val_list, 'STATE' : words[3], 'PST' : my_pst_list, 'SST' : my_sst_list}
 
                     self.__m_coded['R_BODY_OK'].update(row)
                 elif self.__m_coded['R_STATUS'] == "DENY":
@@ -565,7 +583,7 @@ class TL1message():
                     break
                 if self.__m_coded['R_STATUS'] == "COMPLD":
                     words = stripped_line.replace('"', '').split(':')
-                    print(words)
+
                     row = {}
                     positional = 1
                     attr_val_list = {}
@@ -594,9 +612,7 @@ class TL1message():
             Decompose an ASCII TL1 Message response to structured format
         """
         is_event = False
-        is_response_std = False
-        is_response_asap_prof = False
-        is_response_rtrv_cond = False
+        response_type = "std"
 
         for line in self.__m_plain.split('\n'):
             if line.strip() == "":
@@ -606,11 +622,11 @@ class TL1message():
 
             if marker == "M":
                 if   self.__m_plain.find("RTRV-ASAP-PROF") != -1:
-                    is_response_asap_prof = True
+                    response_type = "ASAP_PROF"
                 elif self.__m_plain.find("RTRV-COND") != -1:
-                    is_response_rtrv_cond = True
+                    response_type = "RTRV_COND"
                 else:
-                    is_response_std = True
+                    response_type = "STD"
                 self.__m_event = False
                 break
 
@@ -621,15 +637,15 @@ class TL1message():
 
         self.__m_coded = {}     # Reset internal coded message
 
-        if is_response_std:
+        if response_type == "STD":
             self.__encode_response_std()
             return
 
-        if is_response_asap_prof:
+        if response_type == "ASAP_PROF":
             self.__encode_response_asap_prof()
             return
 
-        if is_response_rtrv_cond:
+        if response_type == "RTRV_COND":
             self.__encode_response_rtrv_cond()
             return
 
@@ -989,7 +1005,16 @@ M 346 COMPLD
 ;
 """
 
-    mm = TL1message(msg7)
+    msg8 = """
+
+   PLEASE-SET-SID-CA200 31-08-06 09:40:55
+M  83 COMPLD
+   "STM1AU4-1-1-5-2-1,STM1AU4-1-1-28-2-1:2WAY:ACD=LOCAL:IS-NR"
+   /* RTRV-CRS-VC4::STM1AU4-1-1-5-2-1 [83] (536871024) */
+;
+"""
+
+    mm = TL1message(msg8)
     print(mm.decode("JSON"))
 
     sys.exit(0)

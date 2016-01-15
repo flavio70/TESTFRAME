@@ -104,23 +104,29 @@ class TestCase(object):
         parser.add_argument("--DUTClean", help="Run the DUTs Clean Up", action="store_true")
         args = parser.parse_args()
 
-        try:
+        # For debugging, change to False
+        if True:
+            try:
+                self.init()
+                self.run_test(args)
+                self.close()
+
+            except KFrameException as eee:
+                msg = "KATE FRAMEWORK EXCEPTION CAUGHT - {}".format(eee)
+                self.trc_err(msg)
+
+            except KUserException as eee:
+                msg = "KATE USER EXCEPTION CAUGHT - {}".format(eee)
+                self.trc_err(msg)
+                self.close()
+
+            except Exception as eee:
+                msg = "GENERIC EXCEPTION CAUGHT - {}".format(eee)
+                self.trc_err(msg)
+                self.close()
+        else:
             self.init()
             self.run_test(args)
-            self.close()
-
-        except KFrameException as eee:
-            msg = "KATE FRAMEWORK EXCEPTION CAUGHT - {}".format(eee)
-            self.trc_err(msg)
-
-        except KUserException as eee:
-            msg = "KATE USER EXCEPTION CAUGHT - {}".format(eee)
-            self.trc_err(msg)
-            self.close()
-
-        except Exception as eee:
-            msg = "GENERIC EXCEPTION CAUGHT - {}".format(eee)
-            self.trc_err(msg)
             self.close()
 
 
