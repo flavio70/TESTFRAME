@@ -558,7 +558,8 @@ if __name__ == "__main__":
     # 1        1           'LAG_1'                            2        enable
 
     cli._Plugin1850CLI__trc_inf(" 4. Show della LAG1 ")
-    cli.do("linkagg show lag1")
+    #cli.do("linkagg show lag1")
+    cli.do("linkagg show lag1", policy="COMPLD", condition="IfType: lag (162)")
     # 
     # Link Aggregation Info of lag1
     # -----------------------------
