@@ -113,8 +113,8 @@ class Test(TestCase):
         NE1.tl1.do("DLT-EQPT::8XSO-1-1-14;")
         ###NE1.tl1.do("RMV-EQPT::PP1GE-1-1-16;")
         ###NE1.tl1.do("DLT-EQPT::PP1GE-1-1-16;")
-        NE1.tl1.do("CANC-USER;")
         NE1.tl1.event_collection_stop()
+        NE1.tl1.do("CANC-USER;")
 
 
     def dut_cleanup(self):

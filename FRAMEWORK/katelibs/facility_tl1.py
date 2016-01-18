@@ -274,7 +274,6 @@ class TL1message():
                               list of 1 or more items - Dictionary:
                                  aid : AID or index of element (key for dictionary)
                                      'VALUE': sequence ATTR=Value
-                                     'STATE'  : Primary and Secondary state
                                      'PST'    : Primary State value list
                                      'SST'    : Secondary State value list
                 'R_BODY_KO' : Body Section (Only for failure command response)
@@ -413,7 +412,8 @@ class TL1message():
                     else:
                         my_pst_list = words[3].split('&')
                         my_sst_list = ""
-                    row[ words[0] ] = {'VALUE' : attr_val_list, 'STATE' : words[3], 'PST' : my_pst_list, 'SST' : my_sst_list}
+                    #row[ words[0] ] = {'VALUE' : attr_val_list, 'STATE' : words[3], 'PST' : my_pst_list, 'SST' : my_sst_list}
+                    row[ words[0] ] = {'VALUE' : attr_val_list, 'PST' : my_pst_list, 'SST' : my_sst_list}
 
                     self.__m_coded['R_BODY_OK'].update(row)
                 elif self.__m_coded['R_STATUS'] == "DENY":
@@ -759,6 +759,19 @@ class TL1message():
             return None
 
 
+    def get_cmd_response_size(self):
+        """ Return the number of valid rows for current TL1 Response
+            None if wrong parameters are supplied
+        """
+        if self.__m_event:
+            return None
+
+        if self.get_cmd_status() != (True, "COMPLD"):
+            return None
+
+        return len(self.__m_coded['R_BODY_OK'])
+
+
     def get_cmd_attr_value(self, aid, attr):
         """ for <ATTR,VALUE> response list: return value of specified attribute
             for positional response list: 'attr' indicate the positional index
@@ -1009,13 +1022,13 @@ M 346 COMPLD
 
    PLEASE-SET-SID-CA200 31-08-06 09:40:55
 M  83 COMPLD
-   "STM1AU4-1-1-5-2-1,STM1AU4-1-1-28-2-1:2WAY:ACD=LOCAL:IS-NR"
    /* RTRV-CRS-VC4::STM1AU4-1-1-5-2-1 [83] (536871024) */
 ;
 """
 
-    mm = TL1message(msg8)
+    mm = TL1message(msg7)
     print(mm.decode("JSON"))
+    print(mm.get_cmd_response_size())
 
     sys.exit(0)
 
