@@ -1020,13 +1020,13 @@ M 346 COMPLD
 
     msg8 = """
 
-   PLEASE-SET-SID-CA200 31-08-06 09:40:55
-M  83 COMPLD
-   /* RTRV-CRS-VC4::STM1AU4-1-1-5-2-1 [83] (536871024) */
+   PLEASE-SET-SID-CA200 31-08-10 15:53:53
+M 193 COMPLD
+   /* ED-PTF::MVC4-1-1-36-1::::CMDMDE=FRCD,LOSTRUCT=63xTU12 [193] (536870988) */
 ;
 """
 
-    mm = TL1message(msg7)
+    mm = TL1message(msg8)
     print(mm.decode("JSON"))
     print(mm.get_cmd_response_size())
 
