@@ -144,6 +144,9 @@ class Plugin1850TL1():
             self.__trc_error("An instance of TL1check is mandatory for policy=='COND'")
             return False
 
+        if cmd.find(';') == -1:
+            cmd = "{:s};".format(cmd)
+
         self.__last_cmd = cmd
         self.__time_mark = time.time() + timeout
 
