@@ -151,6 +151,18 @@ class TestCase(object):
         self.dut_cleanup() if args.DUTClean else self.skip_section('DUT Cleanup')
 
 
+    def add_success(self, ref_obj, title, elapsed_time, out_text):
+        
+        self.kenvironment.krepo.add_success(ref_obj, title, elapsed_time, out_text)
+    
+    def add_failure(self, ref_obj, title, elapsed_time, out_text, err_text, log_text=None):
+        
+        self.kenvironment.krepo.add_failure(ref_obj, title, elapsed_time, out_text, err_text, log_text)
+        
+    def add_skipped(self, ref_obj, title, elapsed_time, out_text, err_text, skip_text=None):
+        
+        self.kenvironment.krepo.add_skipped(ref_obj, title, elapsed_time, out_text, err_text, skip_text)
+
     def start_tps_block(self, dut_id, tps_area, tps_name):
         '''
         Start an official block containg all code related to aspecific TPS (Test Procedure)
