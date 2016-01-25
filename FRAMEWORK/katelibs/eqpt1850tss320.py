@@ -80,7 +80,7 @@ class Eqpt1850TSS320(Equipment):
 
 
     def clean_up(self):
-        self.tl1.thr_event_terminate()
+        self.tl1.cleanup()
         self.cli.disconnect()
         self.bm.clean_up()
 

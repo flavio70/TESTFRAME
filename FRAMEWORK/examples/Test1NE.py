@@ -98,9 +98,10 @@ class Test(TestCase):
         filt_is = TL1check()
         filt_is.add_pst("IS")
         ###NE1.tl1.do("ENT-EQPT::PP1GE-1-1-16::::PROVISIONEDTYPE=PP1GESY;")
-        NE1.tl1.do("ENT-EQPT::8XSO-1-1-14::::PROVISIONEDTYPE=8PSO,AINSMODE=NOWAIT;")
         #NE1.tl1.do("ENT-EQPT::PP10GEX2-1-1-15::::PROVISIONEDTYPE=PP10GE2E;")
+        NE1.tl1.do("ENT-EQPT::8XSO-1-1-14::::PROVISIONEDTYPE=8PSO,AINSMODE=NOWAIT;")
         NE1.tl1.do_until("RTRV-EQPT::8XSO-1-1-14;", filt_is)
+        
         #NE1.tl1.do("RTRV-ASAP-PROF::ASAPEQPT-0;")
         #self.trc_inf(NE1.tl1.get_last_outcome())
 
@@ -111,9 +112,13 @@ class Test(TestCase):
         '''
         NE1.tl1.do("RMV-EQPT::8XSO-1-1-14;")
         NE1.tl1.do("DLT-EQPT::8XSO-1-1-14;")
+        NE1.tl1.do("RTRV-EQPT::MDL-1-1-14;")
+        #  print(NE1.tl1.get_last_outcome())
         ###NE1.tl1.do("RMV-EQPT::PP1GE-1-1-16;")
         ###NE1.tl1.do("DLT-EQPT::PP1GE-1-1-16;")
         NE1.tl1.event_collection_stop()
+        import time
+        time.sleep(5)
         NE1.tl1.do("CANC-USER;")
 
 
@@ -123,6 +128,12 @@ class Test(TestCase):
         insert DUT CleanUp code for your test below
         '''
         self.trc_inf('@DUT CleanUP')
+
+        eve_size = int(NE1.tl1.event_collection_size("*", "8XSO-1-1-14"))
+        print("filtered events {}".format(eve_size))
+        if eve_size > 0:
+            for elem in NE1.tl1.event_collection_get("*", "8XSO-1-1-14"):
+                print("EVENT : {} - {}".format(elem.get_eve_type(), elem.get_eve_body()))
 
         #self.stop_tps_block("EM", "1-2-3")
 
@@ -142,5 +153,6 @@ if __name__ == "__main__":
     CTEST.run()
 
     #ONT6xx.clean_up()
-    #ONT5xx.clean_up()
+    #ONT5xx.clean_up():w
+
     NE1.clean_up()

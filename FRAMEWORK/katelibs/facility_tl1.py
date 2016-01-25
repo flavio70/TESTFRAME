@@ -13,15 +13,25 @@ import sys
 import json
 
 
-
-class TL1EventScan():
-    """ TL1 Event collection scan
+def is_autonomous_msg(code):
+    """ Return True if the specified code is any of:
+        *C  : autonomous critical alarm
+        **  : autonomous major alarm
+        *   : autonomous minor or warning alarm
+        A   : autonomous non-alarm event
+        I   " autonomous information message
     """
+    return (code == '*C' or code == '**' or code == '*' or code == 'A' or code == 'I')
 
-    def __init__(self, event_file):
-        """ Constructor for Event Scanner
-        """
-        self.__file = event_file
+
+def is_any_alarm(code):
+    """ Return True if the specified code is any of:
+        *C  : autonomous critical alarm
+        **  : autonomous major alarm
+        *   : autonomous minor or warning alarm
+    """
+    return (code == '*C' or code == '**' or code == '*')
+
 
 
 class TL1check():
@@ -266,7 +276,7 @@ class TL1message():
                 'C_SID'     : the equipment's SID
                 'C_DATE'    : timestamp (date)
                 'C_TIME'    : timestamp (time)
-                'C_CODE'    : 'M' / '*C' / '**' / '*' / 'A'
+                'C_CODE'    : 'M' / '*C' / '**' / '*' / 'A' / 'I'
                 'C_TAG'     : the message TAG
             - only for Commands Response:
                 'R_STATUS'  : COMPLD / DELAY / DENY / PRTL / RTRV
@@ -312,25 +322,31 @@ class TL1message():
 
             if f_ident:
                 words = line.split()
-                check_event = ( words[0] == '*C' or
-                                words[0] == '**' or
-                                words[0] == '*'  or
-                                words[0] == 'A'  )
-                if not check_event:
+                if not is_autonomous_msg(words[0]):
                     print("MESSAGGIO MALFORMATO")
                     return
 
                 self.__m_coded['C_CODE'] = words[0]
                 self.__m_coded['C_TAG']  = words[1]
-                self.__m_coded['S_VMM']  = words[2:]
+                self.__m_coded['S_VMM']  = " ".join(words[2:])
                 f_ident = False
                 continue
 
             if f_block:
                 # Event Response
-                words = line.strip().replace('"', '').split(':')
-                self.__m_coded['S_AID']  = words[0]
-                self.__m_coded['S_BODY'] = words[1].split(',')
+                print("EVENT {}".format(line.strip().replace('"', '')))
+                if is_any_alarm(self.__m_coded['C_CODE']):
+                    words = line.strip().replace('"', '').split(':')
+                    self.__m_coded['S_AID']  = words[0]
+                    self.__m_coded['S_BODY'] = words[1]
+                else:
+                    words = line.strip().replace('"', '')
+                    if words.count(':') == 5:
+                        self.__m_coded['S_AID'] = words.split(':')[2]
+                    elif words.count(':') == 1:
+                        self.__m_coded['S_AID'] = words.split(':')[0]
+                    self.__m_coded['S_BODY'] = words
+
                 f_block = False
                 continue
 
@@ -366,11 +382,8 @@ class TL1message():
 
             if f_ident:
                 words = line.split()
-                check_event = ( words[0] == '*C' or
-                                words[0] == '**' or
-                                words[0] == '*'  or
-                                words[0] == 'A'  )
-                if check_event:
+
+                if is_autonomous_msg(words[0]):
                     print("MESSAGGIO MALFORMATO")
                     return
 
@@ -412,7 +425,6 @@ class TL1message():
                     else:
                         my_pst_list = words[3].split('&')
                         my_sst_list = ""
-                    #row[ words[0] ] = {'VALUE' : attr_val_list, 'STATE' : words[3], 'PST' : my_pst_list, 'SST' : my_sst_list}
                     row[ words[0] ] = {'VALUE' : attr_val_list, 'PST' : my_pst_list, 'SST' : my_sst_list}
 
                     self.__m_coded['R_BODY_OK'].update(row)
@@ -459,11 +471,7 @@ class TL1message():
 
             if f_ident:
                 words = line.split()
-                check_event = ( words[0] == '*C' or
-                                words[0] == '**' or
-                                words[0] == '*'  or
-                                words[0] == 'A'  )
-                if check_event:
+                if is_autonomous_msg(words[0]):
                     print("MESSAGGIO MALFORMATO")
                     return
 
@@ -550,11 +558,7 @@ class TL1message():
 
             if f_ident:
                 words = line.split()
-                check_event = ( words[0] == '*C' or
-                                words[0] == '**' or
-                                words[0] == '*'  or
-                                words[0] == 'A'  )
-                if check_event:
+                if is_autonomous_msg(words[0]):
                     print("MESSAGGIO MALFORMATO")
                     return
 
@@ -620,6 +624,11 @@ class TL1message():
 
             marker = line.split()[0]
 
+            if is_autonomous_msg(marker):
+                is_event = True
+                self.__m_event = True
+                break
+
             if marker == "M":
                 if   self.__m_plain.find("RTRV-ASAP-PROF") != -1:
                     response_type = "ASAP_PROF"
@@ -628,11 +637,6 @@ class TL1message():
                 else:
                     response_type = "STD"
                 self.__m_event = False
-                break
-
-            if marker == '*C' or marker == '**' or marker == '*' or marker == 'A':
-                is_event = True
-                self.__m_event = True
                 break
 
         self.__m_coded = {}     # Reset internal coded message
@@ -684,7 +688,7 @@ class TL1message():
 
 
     def get_message_code(self):
-        """ Return the TL1 Message code as follow: "M" / "**" / "*C" / "*" / "A"
+        """ Return the TL1 Message code as follow: "M" / "**" / "*C" / "*" / "A" / "I"
         """
         return self.__m_coded['C_CODE']
 
@@ -822,6 +826,23 @@ class TL1message():
 
         return True, self.__m_coded['R_ERROR'], self.__m_coded['R_BODY_KO']
 
+
+    def get_eve_aid(self):
+        """ Get Event AID
+        """
+        return self.__m_coded['S_AID']
+
+
+    def get_eve_type(self):
+        """ Get Event Type content
+        """
+        return self.__m_coded['S_VMM']
+
+
+    def get_eve_body(self):
+        """ Get Event Body content
+        """
+        return self.__m_coded['S_BODY']
 
 
 
