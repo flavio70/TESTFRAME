@@ -334,7 +334,7 @@ class TL1message():
 
             if f_block:
                 # Event Response
-                print("EVENT {}".format(line.strip().replace('"', '')))
+                #print("EVENT {}".format(line.strip().replace('"', '')))
                 if is_any_alarm(self.__m_coded['C_CODE']):
                     words = line.strip().replace('"', '').split(':')
                     self.__m_coded['S_AID']  = words[0]
@@ -1174,3 +1174,4 @@ M 432 COMPLD
     print(filt.evaluate_msg(mm))
 
     print("FINE")
+

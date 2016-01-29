@@ -277,7 +277,9 @@ class TL1EventCollector():
             if self.__enable_collect:
                 num_of_events = num_of_events + 1
                 c_msg = TL1message(tl1_response)
-                self.__trc_inf("Event #{} [{}]".format(num_of_events, c_msg.get_message_code()))
+                self.__trc_inf("Event #{} [{}] [{}]".format(num_of_events,
+                                                            c_msg.get_message_code(),
+                                                            c_msg.get_eve_body()))
                 self.__append(c_msg)
                 self.__f.writelines("{:s}\n".format(c_msg.decode("JSON")))
 
@@ -547,7 +549,7 @@ class Plugin1850TL1():
                         result = True
                         break
 
-                time.sleep(1)
+                time.sleep(2)
             else:
                 error_msg = "TIMEOUT ({:d}s) DETECTED in do_until '{:s}'".format(timeout, cmd)
                 self.__trc_error(error_msg)
@@ -730,7 +732,8 @@ class Plugin1850TL1():
                 while str(self.__if_cmd.read_very_eager().strip(), 'utf-8') != "":
                     pass
                 return True
-            except Exception:
+            except Exception as eee:
+                self.__trc_dbg("exception in __cmd_read_all() - {}".format(eee))
                 self.__if_cmd = self.__cmd_connect()    # renewing interface
 
         return False
@@ -742,8 +745,10 @@ class Plugin1850TL1():
         for _ in (1,2):
             try:
                 self.__if_cmd.write(cmd.encode())
+                self.__trc_dbg("__cmd_write({})".format(cmd))
                 return True
-            except Exception:
+            except Exception as eee:
+                self.__trc_dbg("exception in __cmd_write() - {}".format(eee))
                 self.__if_cmd = self.__cmd_connect()    # renewing interface
 
         return False
@@ -752,12 +757,11 @@ class Plugin1850TL1():
     def __cmd_expect(self, key_list):
         """ INTERNAL USAGE
         """
-        for _ in (1,2):
-            try:
-                result_list = self.__if_cmd.expect(key_list)
-                return result_list
-            except Exception:
-                self.__if_cmd = self.__cmd_connect()    # renewing interface
+        try:
+            result_list = self.__if_cmd.expect(key_list, timeout=30)
+            return result_list
+        except Exception as eee:
+            self.__trc_dbg("Exception in __cmd_expect() - {} - ignoring".format(eee))
 
         return [],[],[]
 
@@ -790,12 +794,17 @@ class Plugin1850TL1():
     def __cmd_disconnect(self):
         """ INTERNAL USAGE
         """
+        #try:
+            #self.__do("CANC-USER;", "COMPLD")
+        #except Exception as eee:
+            #msg = "Error in disconnection - {:s}".format(str(eee))
+            #self.__trc_error(msg)
+            #raise KFrameException(msg)
         try:
-            self.__do("CANC-USER;", "COMPLD")
+            self.__trc_error("CLOSING TELNET SESSION")
+            self.__if_cmd.close()
         except Exception as eee:
-            msg = "Error in disconnection - {:s}".format(str(eee))
-            self.__trc_error(msg)
-            raise KFrameException(msg)
+            self.__trc_error("ERROR ON CLOSING TELNET SESSION")
 
         self.__if_cmd = None
 
