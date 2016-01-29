@@ -101,6 +101,7 @@ class Test(TestCase):
         #NE1.tl1.do("ENT-EQPT::PP10GEX2-1-1-15::::PROVISIONEDTYPE=PP10GE2E;")
         NE1.tl1.do("ENT-EQPT::8XSO-1-1-14::::PROVISIONEDTYPE=8PSO,AINSMODE=NOWAIT;")
         NE1.tl1.do_until("RTRV-EQPT::8XSO-1-1-14;", filt_is)
+        print("@@@@@  DOPO UNTIL   @@@@")
         
         #NE1.tl1.do("RTRV-ASAP-PROF::ASAPEQPT-0;")
         #self.trc_inf(NE1.tl1.get_last_outcome())
