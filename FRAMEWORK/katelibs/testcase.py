@@ -10,8 +10,8 @@
 import os
 import argparse
 
-from katelibs.kexception import KUserException, KFrameException
 from katelibs.kenviron import KEnvironment
+from katelibs.kexception import KUserException, KFrameException
 
 
 class TestCase(object):
@@ -24,6 +24,13 @@ class TestCase(object):
             filename : the test file name
         """
         self.kenvironment = KEnvironment(testfilename=filename)
+        self.__eqpt_list = []
+
+
+    def add_eqpt(self, eqpt):
+        """ Store reference to an equipment.
+        """
+        self.__eqpt_list.append(eqpt)
 
 
     def skip_section(self, run_section):
@@ -49,6 +56,8 @@ class TestCase(object):
         self.trc_inf('\nFinalizing  ...')
         self.kenvironment.clean_up()
         self.trc_inf('DONE \n')
+        for eqpt in self.__eqpt_list:
+            eqpt.clean_up()
 
 
     def dut_setup(self):
@@ -109,7 +118,6 @@ class TestCase(object):
             try:
                 self.init()
                 self.run_test(args)
-                self.close()
 
             except KFrameException as eee:
                 msg = "KATE FRAMEWORK EXCEPTION CAUGHT - {}".format(eee)
@@ -118,16 +126,16 @@ class TestCase(object):
             except KUserException as eee:
                 msg = "KATE USER EXCEPTION CAUGHT - {}".format(eee)
                 self.trc_err(msg)
-                self.close()
 
             except Exception as eee:
                 msg = "GENERIC EXCEPTION CAUGHT - {}".format(eee)
                 self.trc_err(msg)
-                self.close()
         else:
             self.init()
             self.run_test(args)
             self.close()
+
+        self.close()
 
 
     def run_test(self, args):
