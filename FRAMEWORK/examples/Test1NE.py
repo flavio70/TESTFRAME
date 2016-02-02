@@ -119,7 +119,8 @@ class Test(TestCase):
         ###NE1.tl1.do("DLT-EQPT::PP1GE-1-1-16;")
         NE1.tl1.event_collection_stop()
         import time
-        time.sleep(5)
+        #time.sleep(5)
+        #NE1.nonesiste()
         NE1.tl1.do("CANC-USER;")
 
 
@@ -139,21 +140,27 @@ class Test(TestCase):
         #self.stop_tps_block("EM", "1-2-3")
 
 
-#Please don't change the code below#
+
+
+#########################################################################
+# Please don't change the code below                                    #
+
 if __name__ == "__main__":
-    #initializing the Test object instance, do not remove
+
+    #####################################################################
+    # Initializing the Test object instance, do not remove              #
     CTEST = Test(__file__)
 
-    #initializing all local variable and constants used by Test object
+    #####################################################################
+    # Initializing all local variable and constants used by Test object #
+    # For current Topology, an instance for each Equipment and          #
+    # Instrument is defined below.                                      #
+    # The equipment references must be notified with CTEST.add_eqpt()   #
+
     NE1 = Eqpt1850TSS320('NE1', CTEST.kenvironment)
-    #ONT5xx = InstrumentONT('ONT5xx', CTEST.kenvironment)
-    #ONT6xx = InstrumentONT('ONT6xx', CTEST.kenvironment)
+    CTEST.add_eqpt(NE1)
 
-    # Run Test main flow
-    # Please don't touch this code
+    #####################################################################
+    # Run Test main flow                                                #
+
     CTEST.run()
-
-    #ONT6xx.clean_up()
-    #ONT5xx.clean_up():w
-
-    NE1.clean_up()

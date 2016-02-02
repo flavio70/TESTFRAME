@@ -187,8 +187,13 @@ class Plugin1850BM():
         """ TODO
         """
         self.__trc_dbg("CLEAN UP")
-        self.__tunnel[11].clean_up()
-        self.__tunnel[10].clean_up()
+
+        if self.__tunnel[11] is not None:
+            self.__tunnel[11].clean_up()
+
+        if self.__tunnel[10] is not None:
+            self.__tunnel[10].clean_up()
+
         self.__tunnel[11] = None
         self.__tunnel[10] = None
 
