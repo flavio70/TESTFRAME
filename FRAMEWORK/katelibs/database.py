@@ -25,6 +25,44 @@ from katelibs.DB_API_LIB.models import *
 
 
 
+
+
+
+def check_DB_Author(author):
+	""" check the presence of author  in the right table """
+	if author.strip() == '':return False
+	try:
+		cursor = connection.cursor()
+		cursor.execute("SELECT count(id) as myCount from auth_user WHERE username='"+author.strip()+"'")
+		row=cursor.fetchone()
+		if row[0]==0:
+			return False
+		else:
+			return True
+	except Exception as eee:
+		print(str(eee))
+		return False
+
+
+
+
+def check_DB_Topology(topology):
+	""" check the presence of topology  in the right table """
+	if topology.strip() == '':return False
+	try:
+		cursor = connection.cursor()
+		cursor.execute("SELECT count(title) as myCount from T_TOPOLOGY WHERE id_topology='"+topology.strip()+"'")
+		row=cursor.fetchone()
+		if row[0]==0:
+			return False
+		else:
+			return True
+	except Exception as eee:
+		print(str(eee))
+		return False
+
+
+
 def get_eqpt_nodes(node_list):
 	'''
 	get 'eqpt' type node id from a generic node list
@@ -46,7 +84,6 @@ def get_eqpt_nodes(node_list):
 		kprint_fail(str(eee))
 		return eqpt_list
 
-
 def lock_eqpt_nodes(node_list):
 	'''
 	try to lock the node_list changing the insue value
@@ -66,7 +103,6 @@ def lock_eqpt_nodes(node_list):
 	except Exception as eee:
 		kprint_fail(str(eee))
 		return res
-
 
 def unlock_eqpt_nodes(node_list):
 	'''
