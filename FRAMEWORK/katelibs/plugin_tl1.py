@@ -115,7 +115,7 @@ class TL1EventCollector():
             return []
 
 
-    def event_size(self, marker, aid=None):
+    def event_size_by_aid(self, marker, aid=None):
         """ Return then number of collected events for specified aid and type
             marker : '*C' / '**' / '*' / 'A' / 'I'
         """
@@ -134,7 +134,25 @@ class TL1EventCollector():
         return count
 
 
-    def event_get(self, marker, aid=None):
+    def event_size_by_cmd(self, marker, cmd=None):
+        """ Return then number of collected events for specified type and generated
+            from a cmd
+            marker : '*C' / '**' / '*' / 'A' / 'I'
+        """
+        collection = self.__get_events(None, marker)
+        if len(collection) == 0:
+            return 0
+
+        count = 0
+        for elem in collection:
+            the_body = elem.get_eve_body()
+            if the_body.find(cmd) != -1:
+                count = count + 1
+
+        return count
+
+
+    def event_get_by_aid(self, marker, aid=None):
         """ Return a list of collected events for specified aid and type
             marker : '*C' / '**' / '*' / 'A' / 'I'
         """
@@ -148,6 +166,24 @@ class TL1EventCollector():
         sublist = []
         for elem in collection:
             if elem.get_eve_aid() == aid:
+                sublist.append(elem)
+
+        return sublist
+
+
+    def event_get_by_cmd(self, marker, cmd):
+        """ Return a list of collected events for specified type and generated
+            from a cmd
+            marker : '*C' / '**' / '*' / 'A' / 'I'
+        """
+        collection = self.__get_events(None, marker)
+        if len(collection) == 0:
+            return []
+
+        sublist = []
+        for elem in collection:
+            the_body = elem.get_eve_body()
+            if the_body.find(cmd) != -1:
                 sublist.append(elem)
 
         return sublist
@@ -506,18 +542,26 @@ class Plugin1850TL1():
         self.__collector.event_stop()
 
 
-    def event_collection_size(self, marker, aid=None):
-        """ Return then number of collected events for specified aid and type
+    def event_collection_size(self, marker, aid=None, cmd=None):
+        """ Return then number of collected events for specified type
+            It is possible specify an AID or a CMD involved on event
             marker : '*C' / '**' / '*' / 'A' / 'I'
         """
-        return self.__collector.event_size(marker, aid)
+        if cmd is None:
+            return self.__collector.event_size_by_aid(marker, aid)
+        else:
+            return self.__collector.event_size_by_cmd(marker, cmd)
 
 
-    def event_collection_get(self, marker, aid=None):
-        """ Return a list of collected events for specified aid and type
+    def event_collection_get(self, marker, aid=None, cmd=None):
+        """ Return a list of collected events for specified type
+            It is possible specify an AID or a CMD involved on event
             marker : '*C' / '**' / '*' / 'A' / 'I'
         """
-        return self.__collector.event_get(marker, aid)
+        if cmd is None:
+            return self.__collector.event_get_by_aid(marker, aid)
+        else:
+            return self.__collector.event_get_by_cmd(marker, cmd)
 
 
     def do_until(self, cmd, cond, timeout=TL1_TIMEOUT):
