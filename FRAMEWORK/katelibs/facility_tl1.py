@@ -686,6 +686,87 @@ class TL1message():
                 break
 
 
+    def __encode_response_rtrv_no_status(self):
+        """ INTERNAL USAGE
+        """
+        f_header = True
+        f_ident  = True
+        f_block  = True
+
+        f_skip_n = 0
+
+        for line in self.__m_plain.split('\n'):
+            if f_skip_n > 0:
+                # Skip one or more lines
+                f_skip_n = f_skip_n - 1
+                continue
+
+            if f_header:
+                if line.strip() == "":
+                    continue
+
+                self.__m_coded['C_SID']  = " ".join(line.split()[:-2]).replace('"', '')
+                self.__m_coded['C_DATE'] = line.split()[-2]
+                self.__m_coded['C_TIME'] = line.split()[-1]
+                f_header = False
+                continue
+
+            if f_ident:
+                words = line.split()
+
+                if is_autonomous_msg(words[0]):
+                    print("MESSAGGIO MALFORMATO")
+                    return
+
+                self.__m_coded['C_CODE']    = words[0]
+                self.__m_coded['C_TAG']     = words[1]
+                self.__m_coded['R_STATUS']  = words[2]
+                self.__m_coded['R_BODY_OK'] = {}
+                self.__m_coded['R_BODY_KO'] = []
+                self.__m_coded['R_ERROR']   = ""
+                f_ident = False
+                continue
+
+            if f_block:
+                # Command Response
+                stripped_line = line.strip()
+                if stripped_line == '>':
+                    f_skip_n = 2    # Long response - skip next 2 lines
+                    continue
+                if ( stripped_line.find('/*') != -1                                     and
+                     stripped_line.find("[{:s}]".format(self.__m_coded['C_TAG'])) != -1 and
+                     stripped_line.find('*/') != -1                                     ):
+                    # REMARK found - closing encoding
+                    tmp = stripped_line.replace("/* ","")
+                    tmp = tmp[:tmp.find(":")]
+                    self.__m_coded['R_BODY_CMD'] = tmp
+                    break
+                if self.__m_coded['R_STATUS'] == "COMPLD":
+                    words = stripped_line.replace('"', '').split(':')
+                    row = {}
+                    print(words)
+                    attr_val_list = {}
+                    if words[2] != "":
+                        for elem in words[2].split(','):
+                            attr_val_list[elem.split('=')[0]] = elem.split('=')[1]
+
+                    row[ words[0] ] = {'VALUE' : attr_val_list }
+
+                    self.__m_coded['R_BODY_OK'].update(row)
+                elif self.__m_coded['R_STATUS'] == "DENY":
+                    if len(stripped_line) == 4:
+                        self.__m_coded['R_ERROR'] = stripped_line
+                    else:
+                        self.__m_coded['R_BODY_KO'].append(stripped_line)
+                else:
+                    print("[{:s}] NON ANCORA GESTITO".format(self.__m_coded['R_STATUS']))
+                continue
+
+            if line == ';':
+                # TERMINATOR found - closing encoding
+                break
+
+
     def __encode(self):
         """ INTERNAL USAGE
             Decompose an ASCII TL1 Message response to structured format
@@ -711,6 +792,8 @@ class TL1message():
                     response_type = "RTRV_COND"
                 elif self.__m_plain.find("ENT-CRS") != -1:
                     response_type = "ENT_CRS"
+                elif self.__m_plain.find("RTRV-LOPOOL") != -1:
+                    response_type = "RTRV_LOPOOL"
                 else:
                     response_type = "STD"
                 self.__m_event = False
@@ -730,8 +813,8 @@ class TL1message():
             self.__encode_response_rtrv_cond()
             return
 
-        if response_type == "RTRV_COND":
-            self.__encode_response_rtrv_cond()
+        if response_type == "RTRV_LOPOOL":
+            self.__encode_response_rtrv_no_status()
             return
 
         if response_type == "ENT_CRS":
@@ -1126,16 +1209,71 @@ M 346 COMPLD
 
     msg8 = """
 
-   PLEASE-SET-SID-CA200 31-08-16 15:40:10
-M 432 COMPLD
-   "STM64AU4-1-1-7-1-1,MVC4-1-1-36-1"
-   /* ENT-CRS-VC4::STM64AU4-1-1-7-1-1,LOPOOL-1-1-1 [432] (536870951) */
+   PLEASE-SET-SID-CA200 31-08-26 08:50:54
+M 695 COMPLD
+   "LOPOOL-1-1-1::TOTALVC4=56,FREEVC4=56"
+   "MVC4-1-1-36-1::CONSTATE=UNUSED"
+   "MVC4-1-1-36-2::CONSTATE=UNUSED"
+   "MVC4-1-1-36-3::CONSTATE=UNUSED"
+   "MVC4-1-1-36-4::CONSTATE=UNUSED"
+   "MVC4-1-1-36-5::CONSTATE=UNUSED"
+   "MVC4-1-1-36-6::CONSTATE=UNUSED"
+   "MVC4-1-1-36-7::CONSTATE=UNUSED"
+   "MVC4-1-1-36-8::CONSTATE=UNUSED"
+   "MVC4-1-1-36-9::CONSTATE=UNUSED"
+   "MVC4-1-1-36-10::CONSTATE=UNUSED"
+   "MVC4-1-1-36-11::CONSTATE=UNUSED"
+   "MVC4-1-1-36-12::CONSTATE=UNUSED"
+   "MVC4-1-1-36-13::CONSTATE=UNUSED"
+   "MVC4-1-1-36-14::CONSTATE=UNUSED"
+   "MVC4-1-1-36-15::CONSTATE=UNUSED"
+   "MVC4-1-1-36-16::CONSTATE=UNUSED"
+   "MVC4-1-1-36-17::CONSTATE=UNUSED"
+   "MVC4-1-1-36-18::CONSTATE=UNUSED"
+   "MVC4-1-1-36-19::CONSTATE=UNUSED"
+   "MVC4-1-1-36-20::CONSTATE=UNUSED"
+   "MVC4-1-1-36-21::CONSTATE=UNUSED"
+   "MVC4-1-1-36-22::CONSTATE=UNUSED"
+   "MVC4-1-1-36-23::CONSTATE=UNUSED"
+   "MVC4-1-1-36-24::CONSTATE=UNUSED"
+   "MVC4-1-1-36-25::CONSTATE=UNUSED"
+   "MVC4-1-1-36-26::CONSTATE=UNUSED"
+   "MVC4-1-1-36-27::CONSTATE=UNUSED"
+   "MVC4-1-1-36-28::CONSTATE=UNUSED"
+   "MVC4-1-1-36-29::CONSTATE=UNUSED"
+   "MVC4-1-1-36-30::CONSTATE=UNUSED"
+   "MVC4-1-1-36-31::CONSTATE=UNUSED"
+   "MVC4-1-1-36-32::CONSTATE=UNUSED"
+   "MVC4-1-1-36-41::CONSTATE=UNUSED"
+   "MVC4-1-1-36-42::CONSTATE=UNUSED"
+   "MVC4-1-1-36-43::CONSTATE=UNUSED"
+   "MVC4-1-1-36-44::CONSTATE=UNUSED"
+   "MVC4-1-1-36-45::CONSTATE=UNUSED"
+   "MVC4-1-1-36-46::CONSTATE=UNUSED"
+   "MVC4-1-1-36-47::CONSTATE=UNUSED"
+   "MVC4-1-1-36-48::CONSTATE=UNUSED"
+   "MVC4-1-1-36-49::CONSTATE=UNUSED"
+   "MVC4-1-1-36-50::CONSTATE=UNUSED"
+   "MVC4-1-1-36-51::CONSTATE=UNUSED"
+   "MVC4-1-1-36-52::CONSTATE=UNUSED"
+   "MVC4-1-1-36-53::CONSTATE=UNUSED"
+   "MVC4-1-1-36-54::CONSTATE=UNUSED"
+   "MVC4-1-1-36-55::CONSTATE=UNUSED"
+   "MVC4-1-1-36-56::CONSTATE=UNUSED"
+   "MVC4-1-1-36-57::CONSTATE=UNUSED"
+   "MVC4-1-1-36-58::CONSTATE=UNUSED"
+   "MVC4-1-1-36-59::CONSTATE=UNUSED"
+   "MVC4-1-1-36-60::CONSTATE=UNUSED"
+   "MVC4-1-1-36-61::CONSTATE=UNUSED"
+   "MVC4-1-1-36-62::CONSTATE=UNUSED"
+   "MVC4-1-1-36-63::CONSTATE=UNUSED"
+   "MVC4-1-1-36-64::CONSTATE=UNUSED"
+   /* RTRV-LOPOOL [695] (536871101) */
 ;
 """
 
     mm = TL1message(msg8)
     print(mm.decode("JSON"))
-    print(mm.get_cmd_response_size())
 
     sys.exit(0)
 
