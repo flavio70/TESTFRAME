@@ -1,4 +1,12 @@
 #!/usr/bin/env python  
+"""
+Script used to retrieve and store Remote Inventory information from all reachable
+cards
+
+@Script: scan_eqpt.py
+@AUTHOR: C.Ghelfi
+@DATE  : 03/12/2015
+"""
 
 import os
 import sys
