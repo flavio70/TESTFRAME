@@ -1,4 +1,11 @@
 #!/usr/bin/env python  
+"""
+Script used to retrieve equipment informations from KATE DB
+
+@Script: KateEqptReport.py
+@AUTHOR: C.Ghelfi
+@DATE  : 16/09/2015
+"""
 
 import os
 import argparse
