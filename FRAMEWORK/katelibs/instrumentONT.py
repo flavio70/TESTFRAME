@@ -72,7 +72,8 @@ class InstrumentONT(Equipment):
         self.__labelToPortId        = dict()           # used to get back /x/y/z port from user portId)
         self.StmToOc={"STM0":"OC1", "STM1":"OC3","STM4":"OC12","STM16":"OC48","STM64":"OC192"}
         self.OcToStm={"OC1":"STM0", "OC3":"STM1","OC12":"STM4","OC48":"STM16","OC192":"STM64"}
-        self.VcToAu={"VC11":"AU4_C11", "VC12":"AU4_C12", "VC2":"NOTSUPPORTED", "VC3":"AU3_C3", "VC4":"AU4_C4", "VC4_4C":"AU4_4C", "VC4_16C":"AU4_16C", "VC4_64C":"AU4_64C"}
+        #self.VcToAu={"VC11":"AU4_C11", "VC12":"AU4_C12", "VC2":"NOTSUPPORTED", "VC3":"AU3_C3", "VC4":"AU4_C4", "VC4_4C":"AU4_4C", "VC4_16C":"AU4_16C", "VC4_64C":"AU4_64C"}
+        self.VcToAu={"VC11":"AU4_C11", "VC12":"AU4_C12", "VC2":"NOTSUPPORTED", "VC3":"AU4_C3", "VC4":"AU4_C4", "VC4_4C":"AU4_4C", "VC4_16C":"AU4_16C", "VC4_64C":"AU4_64C"}
         self.E_TAG = "-10"
 
         super().__init__(label, self.__prs.get_id(label))
@@ -1626,13 +1627,13 @@ class InstrumentONT(Equipment):
             Starts a measurement.. """
         methodLocalName = self.__lc_current_method_name(embedKrepoInit=True)
         portId = self.__recover_port_to_use(portId)
-        if self.__ontType  == "5xx":
-            pass
-        else:
-            localMessage="start_measurement: Command supported by ONT-5xx only "
-            self.__lc_msg(localMessage)
-            self.__method_failure(methodLocalName, None, "", localMessage)
-            return False, localMessage
+        #if self.__ontType  == "5xx":
+        #    pass
+        #else:
+        #    localMessage="start_measurement: Command supported by ONT-5xx only "
+        #    self.__lc_msg(localMessage)
+        #    self.__method_failure(methodLocalName, None, "", localMessage)
+        #    return False, localMessage
 
         if portId == "":
             localMessage = "start_measurement error: portId  [{}] not valid (empty value)".format(portId)
@@ -1654,13 +1655,13 @@ class InstrumentONT(Equipment):
         """ Halts a running measurement. """
         methodLocalName = self.__lc_current_method_name(embedKrepoInit=True)
         portId = self.__recover_port_to_use(portId)
-        if self.__ontType  == "5xx":
-            pass
-        else:
-            localMessage="{}:Command supported by ONT-5xx only ".format(methodLocalName)
-            self.__lc_msg(localMessage)
-            self.__method_failure(methodLocalName, None, "", localMessage)
-            return False, localMessage
+        #if self.__ontType  == "5xx":
+        #    pass
+        #else:
+        #    localMessage="{}:Command supported by ONT-5xx only ".format(methodLocalName)
+        #    self.__lc_msg(localMessage)
+        #    self.__method_failure(methodLocalName, None, "", localMessage)
+        #    return False, localMessage
         if portId == "":
             localMessage = "{} error: portId  [{}] not valid (empty value)".format(methodLocalName,portId)
             self.__lc_msg(localMessage)

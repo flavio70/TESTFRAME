@@ -131,11 +131,25 @@ class Test(TestCase):
         '''
         self.trc_inf('@DUT CleanUP')
 
-        eve_size = int(NE1.tl1.event_collection_size("*", "8XSO-1-1-14"))
-        print("filtered events {}".format(eve_size))
+        eve_size = int(NE1.tl1.event_collection_size("A", aid="8XSO-1-1-14"))
+        print("filtered events for 8XSO-1-1-14 : {}".format(eve_size))
         if eve_size > 0:
-            for elem in NE1.tl1.event_collection_get("*", "8XSO-1-1-14"):
-                print("EVENT : {} - {}".format(elem.get_eve_type(), elem.get_eve_body()))
+            for elem in NE1.tl1.event_collection_get("A", aid="8XSO-1-1-14"):
+                print("  EVENT : {} - {}".format(elem.get_eve_type(), elem.get_eve_body()))
+
+        eve_size = int(NE1.tl1.event_collection_size("A", cmd="RMV-EQPT"))
+        print("filtered events for RMV-EQPT : {}".format(eve_size))
+        if eve_size > 0:
+            for elem in NE1.tl1.event_collection_get("A", cmd="RMV-EQPT"):
+                print("  EVENT : {} - {}".format(elem.get_eve_type(), elem.get_eve_body()))
+
+
+        eve_size = int(NE1.tl1.event_collection_size("A", aid="8XSO-1-1-14", cmd="RMV-EQPT"))
+        print("filtered events for 8XSO-1-1-14 and RMV-EQPT: {}".format(eve_size))
+        if eve_size > 0:
+            for elem in NE1.tl1.event_collection_get("A", aid="8XSO-1-1-14", cmd="RMV-EQPT"):
+                print("  EVENT : {} - {}".format(elem.get_eve_type(), elem.get_eve_body()))
+
 
         #self.stop_tps_block("EM", "1-2-3")
 
