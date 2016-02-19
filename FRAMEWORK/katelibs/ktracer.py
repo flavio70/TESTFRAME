@@ -71,16 +71,22 @@ class KTracer():
 
         try:
             insp = inspect.stack()
+            print(insp)
             for i in range(len(insp)):
+                print(i)
                 # Searching on current stack frame for this function calling
                 if insp[i][4][0].find("k_tracer_error(") != -1:
+                    print("trovato")
                     stack_elem = insp[i + level]
+                    #print(stack_elem[0])
+                    #print(stack_elem[0].get_label())
                     context_mod = os.path.basename(stack_elem[1])
                     context_row = stack_elem[2]
                     context_fun = stack_elem[3]
                     break
 
             label = "{}:{}({})".format(context_mod, context_row, context_fun)
+            print(label)
         except:
             label = "FRAMEWORK"
 
