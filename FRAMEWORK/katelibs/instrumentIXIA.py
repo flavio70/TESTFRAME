@@ -2,19 +2,17 @@
 """
 ###############################################################################
 #
-# MODULE:  InstrumentONT.py
+# MODULE:  instrumentIXIA.py
 #
 # AUTHOR:  L.Cutilli
 #
-# DATE  :  16/10/2015
+# DATE  :  18/02/2016
 #
 #
-# DETAILS: Python management module of the following test equipments:
-#          - 5xx... Ont-50, Ont-506, Ont-512
-#          - 6xx... Ont-601
+# DETAILS: Python management module for IXIA test equipments
 #
-# MODULE: InstrumentONT.py  created to drive the connections and common low-level operations
-#                           involving JDSU Optical Network Tester ONT-50/506/512/601
+# MODULE: instrumentIXIA.py
+#                          
 #
 ###############################################################################
 """
@@ -32,9 +30,9 @@ from katelibs.equipment import Equipment
 from katelibs.kenviron import KEnvironment
 from katelibs.kunit import Kunit
 from katelibs.database import *
+from katelibs.IxNetwork import *
 
-
-class InstrumentONT(Equipment):
+class InstrumentIXIA(Equipment):
 
     def __init__(self, label, kenv):
         """ label   : equipment name used on Report file
@@ -47,56 +45,141 @@ class InstrumentONT(Equipment):
         self.__prs                  = kenv.kprs        # Presets for running environment
         # Session
         self.__ontType              = None             #  Specify 5xx for Ont50,506,512  6xx for Ont 601
-        self.__sessionName          = "Session5xx_KATE"    #  To be changed: meaningfuls only for  5xx 
+        self.__sessionName          = "Session_KATE"   #  To be changed: meaningfuls only for  5xx 
         # Initizalization flag:
-        # Inside init_instrument() call: True if previous step ok, 
-        # after: each method called inside "test_body" section must found this flag to True to be executed
-        self.__lastCallSuccess      = False            #  track if the last call was successfully executed (not to set in case of skip)
         self.__calledMethodList     = []               #  used to track all method called
         self.__calledMethodStatus   = dict()           #  used to track all method called and last execution result
-        # Connection
-        self.__ontUser              = None             #  Ont session authentication user
-        self.__ontPassword          = None             #  Ont session user's password
-        self.__ontIpAddress         = None             #  OntXXX IP address
-        self.__ontTelnetPort        = 5001             #  OntXXX telnet port (default 5001)
-        self.__telnetConnection     = None             #  Handler of the established telnet connection
-        self.__pingRetryNumber      = 1                #  Retry number for -c ping option
-        self.__telnetExpectedPrompt = [b'> ']          #  it must be specified as keys LIST...
-        self.__telnetTimeout        = 2
-        # Ont command execution
-        self.__ontSleepTimeForRetry = 0.5              # one retry every 0.5 second
-        self.__ontCmdMaxRetry       = 120              # max 120 retries
-        # Application Port Socket
-        self.__portToSocketMap      = dict()           # OntXXX port telnet socket
-        self.__portConnection       = dict()           # OntXXX port telnet socket ID (used to send messages to port)
-        self.__labelToPortId        = dict()           # used to get back /x/y/z port from user portId)
-        self.StmToOc={"STM0":"OC1", "STM1":"OC3","STM4":"OC12","STM16":"OC48","STM64":"OC192"}
-        self.OcToStm={"OC1":"STM0", "OC3":"STM1","OC12":"STM4","OC48":"STM16","OC192":"STM64"}
-        #self.VcToAu={"VC11":"AU4_C11", "VC12":"AU4_C12", "VC2":"NOTSUPPORTED", "VC3":"AU3_C3", "VC4":"AU4_C4", "VC4_4C":"AU4_4C", "VC4_16C":"AU4_16C", "VC4_64C":"AU4_64C"}
-        self.VcToAu={"VC11":"AU4_C11", "VC12":"AU4_C12", "VC2":"NOTSUPPORTED", "VC3":"AU4_C3", "VC4":"AU4_C4", "VC4_4C":"AU4_4C", "VC4_16C":"AU4_16C", "VC4_64C":"AU4_64C"}
-        self.E_TAG = "-10"
+        # Bridge Connection
+        self.__bridgeIpAddress      = "151.98.40.136"  # ixnetwork server address       
+        self.__bridgePort           = 8009             # ixnetwork server port
+        self.__bridgeHandler        = None             # none before init
 
-        super().__init__(label, self.__prs.get_id(label))
-        self.__get_instrument_info_from_db(self.__prs.get_id(label)) # inizializza i dati di IP, tipo di ONT..dal DB
+
+        # Don't deleter the following lines
+        #super().__init__(label, self.__prs.get_id("IXIA1"))
+        #self.__get_instrument_info_from_db(self.__prs.get_id(label)) # inizializza i dati di IP, tipo di ONT..dal DB
         #self.init_ont_type()  # inizializza i dati di IP, tipo di ONT..leggendo da strumento
-        
-        self.__ontUser        = self.__prs.get_elem(self.get_label(), 'USER')
-        self.__ontPassword    = self.__prs.get_elem(self.get_label(), 'PWD')
-        self.__ontApplication = self.__prs.get_elem(self.get_label(), 'APPL')
-        # Unique 5xx sessionName generation bound to start date&time (UTC)  Comment next row if a single static name needed
+ 
+        #self.__ontUser        = self.__prs.get_elem(self.get_label(), 'USER')
+        #self.__ontPassword    = self.__prs.get_elem(self.get_label(), 'PWD')
+        #self.__ontApplication = self.__prs.get_elem(self.get_label(), 'APPL')
         #self.__sessionName          = "Session__" + datetime.datetime.utcnow().strftime("%d%b_%H%M%S") + "__UTC"
+
+
+
+    #
+    #   BRIDGE CONNECTION MANAGEMENT
+    #
+    def connect_bridge(self):       ### krepo added ###
+        """ connect_bridge(self)
+            Purpose:
+                create a bridge connection: it must be called one time only @ test/dut setup
+            Return tuple:
+                ("True|False" , "answer_string"  )
+                True.............connection success
+                False............connection failed
+                answer_string....message for humans, to better understand 
+                                 what happened in the processing flow  
+        """
+        methodLocalName = self.__lc_current_method_name(embedKrepoInit=True)
+        if self.__bridgeHandler != None:
+            localMessage="BridgeHandler [{}] already allocated. Disconnect before!".format(self.__bridgeHandler)
+            self.__trc_err(localMessage) 
+            return False, localMessage
+        self.__bridgeHandler=IxNet()
+        try:
+            answerBridge = self.__bridgeHandler.connect(self.__bridgeIpAddress,'-port', self.__bridgePort) # use default port 8009
+        except: 
+            self.__bridgeHandler = None
+            localMessage="Bridge connection failed: check ixNetwork server @ [{}] port [{}]".format(self.__bridgeIpAddress,self.__bridgePort)
+            self.__trc_err(localMessage) 
+            return False, localMessage
+        if answerBridge != "::ixNet::OK":
+            self.__bridgeHandler = None
+            localMessage="Bridge connect() answer not expected:[{}] instead of [::ixNet::OK]".format(answerBridge)
+            self.__trc_err(localMessage) 
+            return False, localMessage
+        localMessage="BridgeHandler.connect [{}]".format(answerBridge)
+        self.__trc_inf(localMessage) 
+        return True, localMessage
+
+
+
+    def disconnect_bridge(self):       ### krepo added ###
+        """ disconnect_bridge(self)
+            Purpose:
+                remove a bridge connection  it must be called one time only @ test/dut cleanup
+            Return tuple:
+                ("True|False" , "answer_string"  )
+                True.............disconnec success
+                False............connection failed
+                answer_string....message for humans, to better understand 
+                                 what happened in the processing flow  
+        """
+        methodLocalName = self.__lc_current_method_name(embedKrepoInit=True)
+        if self.__bridgeHandler == None:
+            localMessage="BridgeHandler [{}] already disconnected. Nothing to do!".format(self.__bridgeHandler)
+            self.__trc_err(localMessage) 
+            return False, localMessage
+        try:
+            answerBridge = self.__bridgeHandler.disconnect() 
+            self.__bridgeHandler = None
+        except: 
+            localMessage="Bridge disconnect failed: check ixNetwork server @ [{}] port [{}]".format(self.__bridgeIpAddress,self.__bridgePort)
+            self.__trc_err(localMessage) 
+            return False, localMessage
+        if answerBridge != "::ixNet::OK":
+            self.__bridgeHandler = None
+            localMessage="Bridge disconnect() answer not expected:[{}] instead of [::ixNet::OK]".format(answerBridge)
+            self.__trc_err(localMessage) 
+            return False, localMessage
+        localMessage="BridgeHandler.disconnect [{}]".format(answerBridge)
+        self.__trc_inf(localMessage) 
+        return True, localMessage
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
     def clean_up(self):
         """ INTERNAL USAGE
         """
-        print("clean_up called [{}]".format(self.__ontType))
+        self.__trc_inf("clean_up called [{}]".format(self.__ontType))
 
 
     #     
     # Krepo-related     
     #    
+    def __trc_dbg(self, msg):
+        """ INTERNAL USAGE
+        """
+        self.__kenv.ktrc.k_tracer_debug(msg, level=1)
+
+
+    def __trc_inf(self, msg):
+        """ INTERNAL USAGE
+        """
+        self.__kenv.ktrc.k_tracer_info(msg, level=1)
+
+
+    def __trc_err(self, msg):
+        """ INTERNAL USAGE
+        """
+        self.__kenv.ktrc.k_tracer_error(msg, level=1)
+
+
     def __t_success(self, title, elapsed_time, out_text):
         """ INTERNAL USAGE
         """
@@ -253,7 +336,7 @@ class InstrumentONT(Equipment):
             myApplication="New-Application"
 
             # 6xx init
-            #tester = InstrumentONT(localUser,localPwd,localOntIpAddress, krepo=r)
+            #tester = InstrumentIXIA(localUser,localPwd,localOntIpAddress, krepo=r)
             #callResult = self.connect() # moved outside if case
             #if self.__check_method_execution("connect") == False: 
             #    localMessage="Error in method [{}] call \n".format(localMethodName)
@@ -305,7 +388,7 @@ class InstrumentONT(Equipment):
         else:                         # ONT-5xx Init
             # 5xx init
             myApplication="SdhBert"
-            #tester = InstrumentONT(localUser,localPwd, krepo=r)
+            #tester = InstrumentIXIA(localUser,localPwd, krepo=r)
             
             #callResult = self.connect()   # moved outside if case
             #if self.__check_method_execution("connect") == False: 
@@ -536,15 +619,15 @@ class InstrumentONT(Equipment):
     #
     def __del__(self):
         self.__lc_msg("Function: __del__")
-        if self.__telnetConnection:
-            localMessage = "Telnet connection open: close now"
-            self.__lc_msg(localMessage)
-            self.__telnetConnection.close()
-            return True, localMessage
-        else:
-            localMessage = "Telnet connection not openened: skip close"
-            self.__lc_msg(localMessage)
-            return False, localMessage
+        #if self.__telnetConnection:
+        localMessage = "Telnet connection open: close now"
+        #    self.__lc_msg(localMessage)
+        #    self.__telnetConnection.close()
+        #    return True, localMessage
+        #else:
+        #    localMessage = "Telnet connection not openened: skip close"
+        #    self.__lc_msg(localMessage)
+        return False, localMessage
 
 
 
@@ -751,6 +834,34 @@ class InstrumentONT(Equipment):
 
         self.__method_success(methodLocalName, None, localMessage)
         return localResult
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -4092,7 +4203,7 @@ class InstrumentONT(Equipment):
 if __name__ == "__main__":   #now use this part
     print(" ")
     print("========================================")
-    print("ontXXXDriver DB-Integrated testing debug")
+    print("ixiaDriver DB-Integrated testing debug")
     print("========================================")
     #localUser="preint" ghelfi
     #localPwd="preint"  ghelfi
@@ -4100,29 +4211,17 @@ if __name__ == "__main__":   #now use this part
     # DA AMBIENTE DI ESECUZIONE:
     currDir,fileName = os.path.split(os.path.realpath(__file__))
     xmlReport = currDir + '/test-reports/TestSuite.'+ fileName
+    print("{}".format(xmlReport))
     r = Kunit(xmlReport)
     r.frame_open(xmlReport)
 
     # PREINIT VARS (from file or ad-hoc class):
-    # 5xx
-    localUser_5xx="Automation"
-    localPwd_5xx="Automation"
-    portId_5xx="/0/1/1"
-    myApplication1_5xx="SdhBert"
-    myApplication2_5xx="SonetBert"
-
-    # 6xx
-    localUser_6xx="Automation"
-    localPwd_6xx="Automation"
-    portId_6xx="/0/1/1"
-    myApplication1_6xx="New-Application"
-
 
   
-    tester_5xx = InstrumentONT("tester_5xx", ID=20, krepo=r)
-    tester_6xx = InstrumentONT("tester_6xx", ID=21, krepo=r)
-    tester_5xx.init_instrument(portId_5xx)
-    tester_6xx.init_instrument(portId_6xx)
+    #tester_5xx = InstrumentIXIA("tester_5xx", ID=20, krepo=r)
+    #tester_6xx = InstrumentIXIA("tester_6xx", ID=21, krepo=r)
+    #tester_5xx.init_instrument(portId_5xx)
+    #tester_6xx.init_instrument(portId_6xx)
 
 
 
@@ -4136,516 +4235,20 @@ if __name__ == "__main__":   #now use this part
 
 
 
-    tester_5xx.deinit_instrument( portId_5xx)
-    tester_6xx.deinit_instrument( portId_6xx)
+    #tester_5xx.deinit_instrument( portId_5xx)
+    #tester_6xx.deinit_instrument( portId_6xx)
 
  
 
     print(" ")
     print("========================================")
-    print("ontXXXDriver DB-Integrated -- END --    ")
+    print("ixiaDriver DB-Integrated -- END --    ")
     print("========================================")
     print(" ")
 
 
     r.frame_close()
 
-
-
-
-#######################################################################
-#
-#   MODULE TEST - Test sequences used fot ONT5xx testing
-#
-#######################################################################
-if __name__ == "__main__xxx":   #now skip this part
-    print(" ")
-    print("=============================")
-    print("ontXXXDriver 5xx module debug")
-    print("=============================")
-    #localUser="preint" ghelfi
-    #localPwd="preint"  ghelfi
-
-    xmlReport = currDir + '/test-reports/TestSuite.'+ fileName
-    r = Kunit(xmlReport)
-    r.frame_open(xmlReport)
-
-    localUser="Automation"
-    localPwd="Automation"
-    portId1="/0/1/1"
-    portId2="/0/2/1"
-    portId3="/0/3/1"
-    myApplication1="SdhBert"
-    myApplication2="SonetBert"
-
-    tester = InstrumentONT(localUser,localPwd, krepo=r)
-    callResult = tester.connect()
-    print("tester.connect result: [{}]".format(callResult))
-
-    callResult = tester.create_session(self.__sessionName)
-    print("tester.create_session result: [{}]".format(callResult))
-
-    #    callResult = tester.wait_ops_completed()
-    #    print("tester.wait_ops_completed result: [{}]".format(callResult))
-
-    callResult = tester.select_port(portId1)
-    print("tester.select_port result: [{}]".format(callResult))
-    callResult = tester.select_port(portId2)
-    print("tester.select_port result: [{}]".format(callResult))
-    callResult = tester.select_port(portId3)
-    print("tester.select_port result: [{}]".format(callResult))
-    callResult = tester.get_selected_ports("")
-    print("tester.get_selected_ports result: [{}]".format(callResult))
-    callResult = tester.get_instrument_id()
-    print("tester.get_instrument_id result: [{}]".format(callResult))
-
-    #    callResult = tester.get_last_error()
-    #    print("tester.get_last_error result: [{}]".format(callResult))
-    #    callResult = tester.get_available_ports()
-    #    print("tester.get_available_ports result: [{}]".format(callResult))
-
-    #    callResult = tester.reboot_slot(portId1)
-    #    print("*********** callResult: [{}]".format(callResult))
-    #    time.sleep(20)
-
-    #callResult = tester.init_ont_type()
-    #print("tester.init_ont_type result: [{}]".format(callResult))
-    #callResult = tester.print_ont_type()  # uncomment to check the detected Ont Type
-
-    callResult = tester.init_port_to_socket_map()
-    print("tester.init_port_to_socket_map result: [{}]".format(callResult))
-    #tester.print_port_to_socket_map() # uncomment to check if map is initialized
-
-    callResult = tester.open_port_channel(portId1)
-    print("tester.open_port_channel result: [{}]".format(callResult))
-
-    callResult = tester.get_currently_loaded_app(portId1)
-    print("tester.get_currently_loaded_app result: [{}]".format(callResult))
-
-    callResult = tester.load_app(portId1, myApplication1)
-    print("tester.load_app result: [{}]".format(callResult))
-
-    #callResult = tester.get_set_measurement_time(portId1, 0)
-    #print("tester.get_set_measurement_time result: [{}]".format(callResult))
-    #callResult = tester.get_set_measurement_time(portId1, 123456)
-    #print("tester.get_set_measurement_time result: [{}]".format(callResult))
-    #callResult = tester.get_set_measurement_time(portId1, 0)
-    #print("tester.get_set_measurement_time result: [{}]".format(callResult))
-    #callResult = tester.retrieve_optical_alarms(portId1)
-    #print("tester.retrieve_optical_alarms result: [{}]".format(callResult))
-    #callResult = tester.retrieve_ho_alarms(portId1)
-    #print("tester.retrieve_ho_alarms result: [{}]".format(callResult))
-    #callResult = tester.retrieve_lo_alarms(portId1)
-    #print("tester.retrieve_lo_alarms result: [{}]".format(callResult))
-    #callResult = tester.get_set_wavelenght(portId1,"W1310")
-    #print("tester.get_set_wavelenght result: [{}]".format(callResult))
-    #callResult = tester.get_set_wavelenght(portId1,"")
-    #print("tester.get_set_wavelenght result: [{}]".format(callResult))
-    #callResult = tester.get_set_laser_status(portId1,"ON")
-    #print("tester.get_set_laser_status result: [{}]".format(callResult))
-    #callResult = tester.get_set_laser_status(portId1,"")
-    #print("tester.get_set_laser_status result: [{}]".format(callResult))
-    #callResult = tester.get_set_rx_bit_rate(portId1,"")
-    #print("tester.get_set_rx_bit_rate result: [{}]".format(callResult))
-    #callResult = tester.get_set_rx_bit_rate(portId1,"STM1")
-    #print("tester.get_set_rx_bit_rate result: [{}]".format(callResult))
-    #callResult = tester.get_set_clock_reference_source(portId1,"")
-    #print("tester.get_set_clock_reference_source result: [{}]".format(callResult))
-    #callResult = tester.get_set_clock_reference_source(portId1,"RX")
-    #print("tester.get_set_clock_reference_source result: [{}]".format(callResult))
-    #callResult = tester.get_set_rx_bit_rate(portId1,"STM16")
-    #print("tester.get_set_rx_bit_rate result: [{}]".format(callResult))
-    #callResult = tester.get_set_tx_bit_rate(portId1,"STM16")
-    #print("tester.get_set_tx_bit_rate result: [{}]".format(callResult))
-    #callResult = tester.get_set_rx_measure_channel(portId1,"1")
-    #print("tester.get_set_rx_measure_channel result: [{}]".format(callResult))
-    #callResult = tester.get_set_rx_channel_mapping_size(portId1,"VC12")
-    #print("tester.get_set_rx_channel_mapping_size result: [{}]".format(callResult))
-    #callResult = tester.get_set_rx_lo_measure_channel(portId1,"4")
-    #print("tester.get_set_rx_lo_measure_channel result: [{}]".format(callResult))
-    #callResult = tester.get_set_alarm_insertion_type(portId1,"LOF")
-    #print("tester.get_set_alarm_insertion_type result: [{}]".format(callResult))
-    #callResult = tester.get_set_alarmed_frames_number(portId1,"222")
-    #print("tester.get_set_alarmed_frames_number result: [{}]".format(callResult))
-    #callResult = tester.get_set_not_alarmed_frames_number(portId1,"444")
-    #print("tester.get_set_not_alarmed_frames_number result: [{}]".format(callResult))
-    #callResult = tester.get_set_alarm_activation(portId1,"")
-    #print("tester.get_set_alarm_activation result: [{}]".format(callResult))
-    #callResult = tester.get_set_alarm_activation(portId1,"OFF")
-    #print("tester.get_set_alarm_activation result: [{}]".format(callResult))
-    #callResult = tester.get_set_alarm_insertion_mode(portId1,"BURST_CONT")
-    #print("tester.get_set_alarm_insertion_mode result: [{}]".format(callResult))
-    #callResult = tester.get_set_alarm_insertion_type(portId1,"")
-    #print("tester.get_set_alarm_insertion_type result: [{}]".format(callResult))
-    #callResult = tester.get_set_num_errored_burst_frames(portId1,"7")
-    #print("tester.get_set_num_errored_burst_frames result: [{}]".format(callResult))
-    #callResult = tester.get_set_num_not_errored_burst_frames(portId1,"")
-    #print("tester.get_set_num_not_errored_burst_frames result: [{}]".format(callResult))
-    #callResult = tester.get_set_num_not_errored_burst_frames(portId1,"300")
-    #print("tester.get_set_num_not_errored_burst_frames result: [{}]".format(callResult))
-    #callResult = tester.get_set_error_activation(portId1,"ON")
-    #print("tester.get_set_error_activation result: [{}]".format(callResult))
-    #callResult = tester.get_set_error_insertion_mode(portId1,"ONCE")
-    #print("tester.get_set_error_insertion_mode result: [{}]".format(callResult))
-    #callResult = tester.get_set_error_insertion_type(portId1,"FAS")
-    #print("tester.get_set_error_insertion_type result: [{}]".format(callResult))
-    #callResult = tester.get_set_error_insertion_type(portId1,"RSBIP")
-    #print("tester.get_set_error_insertion_type result: [{}]".format(callResult))
-    #callResult = tester.get_set_tx_bit_rate(portId1,"STM16")
-    #print("tester.get_set_tx_bit_rate result: [{}]".format(callResult))
-    #callResult = tester.get_set_tx_measure_channel(portId1,"")
-    #print("tester.get_set_tx_measure_channel result: [{}]".format(callResult))
-    #callResult = tester.get_set_tx_measure_channel(portId1,"7")
-    #print("tester.get_set_tx_measure_channel result: [{}]".format(callResult))
-    #callResult = tester.get_set_rx_channel_mapping_size(portId1,"VC12")
-    #print("tester.get_set_rx_channel_mapping_size result: [{}]".format(callResult))
-    #callResult = tester.get_set_tx_channel_mapping_size(portId1,"VC12")
-    #print("tester.get_set_tx_channel_mapping_size result: [{}]".format(callResult))
-
-
-    #print("\n\n\n\n\nTESTING SECTION START *************************************")
-    #input("press enter to continue...\n")
-
-    #callResult = tester.get_set_rx_lo_measure_channel(portId1,"4")
-    #print("tester.get_set_rx_lo_measure_channel result: [{}]".format(callResult))
-    #input("press enter to continue...\n")
-    #callResult = tester.get_set_tx_lo_measure_channel(portId1,"5")
-    #print("tester.get_set_tx_lo_measure_channel result: [{}]".format(callResult))
-    #input("press enter to continue...\n")
-
-
-
-    print("\n\n\n\n\nTESTING SECTION STOP *************************************")
-    #input("press enter to continue...")
-
-    callResult = tester.retrieve_ho_alarms(portId1)
-    print("tester.retrieve_ho_alarms result: [{}]".format(callResult))
-    callResult = tester.retrieve_lo_alarms(portId1)
-    print("tester.retrieve_lo_alarms result: [{}]".format(callResult))
-
-    callResult = tester.retrieve_ho_lo_alarms(portId1)
-    print("tester.retrieve_ho_lo_alarms result: [{}]".format(callResult))
-
-
-
-    callResult = tester.unload_app(portId1, myApplication1)
-    print("tester.unload_app result: [{}]".format(callResult))
-    callResult = tester.deselect_port(portId1)    # uncomment to deselect the specified port
-    print("tester.deselect_port result: [{}]".format(callResult))
-    callResult = tester.deselect_port(portId2)   # uncomment to deselect the specified port
-    print("tester.deselect_port result: [{}]".format(callResult))
-    callResult = tester.deselect_port(portId3)   # uncomment to deselect the specified port
-    print("tester.deselect_port result: [{}]".format(callResult))
-
-    callResult = tester.delete_session(self.__sessionName)
-    print("tester.delete_session result: [{}]".format(callResult))
-
-    print(" ")
-    print("=============================")
-    print("ontXXXDriver 5xx -- END--")
-    print("=============================")
-    print(" ")
-
-    r.frame_close()
-
-    #sys.exit()
-
-
-
-
-
-
-
-#######################################################################
-#
-#   MODULE TEST - Test sequences used for ONT6xx testing
-#
-#######################################################################
-if __name__ == "__main__xxx":
-    print(" ")
-    print("=============================")
-    print("ontXXXDriver 6xx module debug")
-    print("=============================")
-
-    currDir,fileName = os.path.split(os.path.realpath(__file__))
-    xmlReport = currDir + '/test-reports/TestSuite.'+ fileName
-    r = Kunit(xmlReport)
-    r.frame_open(xmlReport)
-
-
-    localUser="Automation"
-    localPwd="Automation"
-    localOntIpAddress="135.221.123.147"
-    portId1="/0/1/1"
-    portId2=""
-    portId3="/0/3/1"
-    myApplication1="New-Application"
-    mySigStructType1="PHYS_SDH"
-
-    tester = InstrumentONT(localUser,localPwd,localOntIpAddress, krepo=r)
-    callResult = tester.connect()
-    print("tester.connect result: [{}]".format(callResult))
-
-    callResult = tester.open_port_channel(portId1)
-    print("tester.open_port_channel result: [{}]".format(callResult))
-    callResult = tester.unload_app(portId1, myApplication1)
-    print("tester.unload_app result: [{}]".format(callResult))
-    callResult = tester.get_currently_loaded_app(portId1)
-    print("tester.get_currently_loaded_app result: [{}]".format(callResult))
-    callResult = tester.load_app(portId1, myApplication1)
-    print("tester.load_app result: [{}]".format(callResult))
-    callResult = tester.set_current_signal_structure(portId1, mySigStructType1)
-    print("tester.set_current_signal_structure result: [{}]".format(callResult))
-    #callResult = tester.get_set_tx_bit_rate(portId1,"STM16")
-    #print("tester.get_set_tx_bit_rate result: [{}]".format(callResult))
-    #callResult = tester.get_set_rx_bit_rate(portId1,"STM16")
-    #print("tester.get_set_rx_bit_rate result: [{}]".format(callResult))
-    #callResult = tester.get_set_clock_reference_source(portId1,"LOCAL")
-    #print("tester.get_set_clock_reference_source result: [{}]".format(callResult))
-    #callResult = tester.get_set_clock_reference_source(portId1,"RX")
-    #print("tester.get_set_clock_reference_source result: [{}]".format(callResult))
-    # ### get_set_wavelenght under testing ###
-    #callResult = tester.get_set_wavelenght(portId1,"1310")
-    #print("tester.get_set_wavelenght result: [{}]".format(callResult))
-    #input("press enter to continue...")
-    #callResult = tester.get_set_wavelenght(portId1,"1550")
-    #print("tester.get_set_wavelenght result: [{}]".format(callResult))
-    #input("press enter to continue...")
-
-    # Laser ON/OFF
-    #callResult = tester.get_set_laser_status(portId1,"ON")
-    #print("tester.get_set_laser_status result: [{}]".format(callResult))
-    #callResult = tester.retrieve_optical_alarms(portId1)
-    #print("tester.retrieve_optical_alarms result: [{}]".format(callResult))
-    #input("press enter to continue...")
-    #callResult = tester.get_set_laser_status(portId1,"OFF")
-    #print("tester.get_set_laser_status result: [{}]".format(callResult))
-
-
-    callResult = tester.get_set_tx_bit_rate(portId1,"STM64")
-    print("tester.get_set_tx_bit_rate result: [{}]".format(callResult))
-    callResult = tester.get_set_rx_bit_rate(portId1,"STM64")
-    print("tester.get_set_rx_bit_rate result: [{}]".format(callResult))
-    callResult = tester.get_set_clock_reference_source(portId1,"LOCAL")
-    print("tester.get_set_clock_reference_source result: [{}]".format(callResult))
-    callResult = tester.retrieve_optical_alarms(portId1)
-    print("tester.retrieve_optical_alarms result: [{}]".format(callResult))
-    callResult = tester.retrieve_ho_lo_alarms(portId1)
-    print("tester.retrieve_ho_lo_alarms result: [{}]".format(callResult))
-
-    #callResult = tester.get_set_rx_channel_mapping_size(portId1,"VC4")
-    #print("tester.get_set_rx_channel_mapping_size result: [{}]".format(callResult))
-    #callResult = tester.get_set_tx_channel_mapping_size(portId1,"VC4")
-    #print("tester.get_set_tx_channel_mapping_size result: [{}]".format(callResult))
-
-    #callResult = tester.get_set_alarmed_frames_number(portId1,"222")
-    #print("tester.get_set_alarmed_frames_number result: [{}]".format(callResult))
-    #callResult = tester.get_set_not_alarmed_frames_number(portId1,"444")
-    #print("tester.get_set_not_alarmed_frames_number result: [{}]".format(callResult))
-
-    #callResult = tester.get_set_alarm_insertion_mode(portId1,"BURST_CONT")
-    #print("tester.get_set_alarm_insertion_mode result: [{}]".format(callResult))
-
-    #callResult = tester.get_set_alarm_insertion_type(portId1,"LOF")
-    #print("tester.get_set_alarm_insertion_type result: [{}]".format(callResult))
-
-    #callResult = tester.get_set_alarm_activation(portId1,"OFF")
-    #print("tester.get_set_alarm_activation result: [{}]".format(callResult))
-    #callResult = tester.get_set_alarm_activation(portId1,"ON")
-    #print("tester.get_set_alarm_activation result: [{}]".format(callResult))
-    #callResult = tester.get_set_num_errored_burst_frames(portId1,"7")
-    #print("tester.get_set_num_errored_burst_frames result: [{}]".format(callResult))
-    #callResult = tester.get_set_num_errored_burst_frames(portId1,"")
-    #print("tester.get_set_num_errored_burst_frames result: [{}]".format(callResult))
-    #callResult = tester.get_set_num_not_errored_burst_frames(portId1,"")
-    #print("tester.get_set_num_not_errored_burst_frames result: [{}]".format(callResult))
-    #callResult = tester.get_set_num_not_errored_burst_frames(portId1,"300")
-    #print("tester.get_set_num_not_errored_burst_frames result: [{}]".format(callResult))
-    # not working
-    #callResult = tester.get_set_rx_channel_mapping_size(portId1,"VC11")
-    #print("tester.get_set_rx_channel_mapping_size result: [{}]".format(callResult))
-    # not working
-    #callResult = tester.get_set_rx_channel_mapping_size(portId1,"VC12")
-    #print("tester.get_set_rx_channel_mapping_size result: [{}]".format(callResult))
-    #callResult = tester.get_set_error_insertion_mode(portId1,"")
-    #print("tester.get_set_error_insertion_mode result: [{}]".format(callResult))
-    #callResult = tester.get_set_error_insertion_mode(portId1,"NONE")
-    #print("tester.get_set_error_insertion_mode result: [{}]".format(callResult))
-    #callResult = tester.get_set_error_insertion_mode(portId1,"ONCE")
-    #print("tester.get_set_error_insertion_mode result: [{}]".format(callResult))
-    #callResult = tester.get_set_error_insertion_mode(portId1,"RATE")
-    #print("tester.get_set_error_insertion_mode result: [{}]".format(callResult))
-    #callResult = tester.get_set_error_insertion_mode(portId1,"BURST_ONCE")
-    #print("tester.get_set_error_insertion_mode result: [{}]".format(callResult))
-    #callResult = tester.get_set_error_insertion_mode(portId1,"BURST_CONT")
-    #print("tester.get_set_error_insertion_mode result: [{}]".format(callResult))
-    #callResult = tester.get_set_error_insertion_mode(portId1,"RATE_BURST_ONCE")
-    #print("tester.get_set_error_insertion_mode result: [{}]".format(callResult))
-    #callResult = tester.get_set_error_insertion_mode(portId1,"RATE_BURST_CONT")
-    #print("tester.get_set_error_insertion_mode result: [{}]".format(callResult))
-    #callResult = tester.get_set_error_insertion_type(portId1,"FAS")
-    #print("tester.get_set_error_insertion_type result: [{}]".format(callResult))
-    #callResult = tester.get_set_error_insertion_type(portId1,"RSBIP")
-    #print("tester.get_set_error_insertion_type result: [{}]".format(callResult))
-    #callResult = tester.get_set_error_insertion_type(portId1,"")
-    #print("tester.get_set_error_insertion_type result: [{}]".format(callResult))
-    #callResult = tester.get_set_error_rate(portId1,"0.00001")
-    #print("tester.get_set_error_rate result: [{}]".format(callResult))
-    #callResult = tester.get_set_error_rate(portId1,"0.00005")
-    #print("tester.get_set_error_rate result: [{}]".format(callResult))
-    #callResult = tester.get_set_error_rate(portId1,"0.000006")
-    #print("tester.get_set_error_rate result: [{}]".format(callResult))
-    #callResult = tester.get_set_error_rate(portId1,"0.000007")
-    #print("tester.get_set_error_rate result: [{}]".format(callResult))
-    #callResult = tester.get_set_error_activation(portId1,"")
-    #print("tester.get_set_error_activation result: [{}]".format(callResult))
-    #input("press enter to continue...")
-    #callResult = tester.get_set_error_activation(portId1,"ON")
-    #print("tester.get_set_error_activation result: [{}]".format(callResult))
-    #input("press enter to continue...")
-    #callResult = tester.get_set_error_activation(portId1,"OFF")
-    #print("tester.get_set_error_activation result: [{}]".format(callResult))
-    #input("press enter to continue...")
-    #callResult = tester.get_set_error_activation(portId1,"")
-    #print("tester.get_set_error_activation result: [{}]".format(callResult))
-    #input("press enter to continue...")
-    #callResult = tester.get_set_tx_lo_measure_channel(portId1,"")
-    #print("tester.get_set_tx_lo_measure_channel result: [{}]".format(callResult))
-    #callResult = tester.get_set_tx_lo_measure_channel(portId1,"1.1.1.1")
-    #print("tester.get_set_tx_lo_measure_channel result: [{}]".format(callResult))
-    #callResult = tester.get_set_tx_lo_measure_channel(portId1,"2.1.1.1")
-    #print("tester.get_set_tx_lo_measure_channel result: [{}]".format(callResult))
-    #callResult = tester.get_set_tx_lo_measure_channel(portId1,"3.1.1.1")
-    #print("tester.get_set_tx_lo_measure_channel result: [{}]".format(callResult))
-    #callResult = tester.get_set_tx_lo_measure_channel(portId1,"7.1.1.1")
-    #print("tester.get_set_tx_lo_measure_channel result: [{}]".format(callResult))
-    #callResult = tester.get_set_rx_lo_measure_channel(portId1,"")
-    #print("tester.get_set_rx_lo_measure_channel result: [{}]".format(callResult))
-    #callResult = tester.get_set_rx_lo_measure_channel(portId1,"1.1.1.1")
-    #print("tester.get_set_rx_lo_measure_channel result: [{}]".format(callResult))
-    #callResult = tester.get_set_rx_lo_measure_channel(portId1,"2.1.1.1")
-    #print("tester.get_set_rx_lo_measure_channel result: [{}]".format(callResult))
-    #callResult = tester.get_set_rx_lo_measure_channel(portId1,"3.1.1.1")
-    #print("tester.get_set_rx_lo_measure_channel result: [{}]".format(callResult))
-    #callResult = tester.get_set_rx_lo_measure_channel(portId1,"4.1.1.1")
-    #print("tester.get_set_rx_lo_measure_channel result: [{}]".format(callResult))
-
-    #callResult = tester.get_set_background_channels_fill_mode(portId1,"")
-    #print("tester.get_set_background_channels_fill_mode result: [{}]".format(callResult))
-    #callResult = tester.get_set_background_channels_fill_mode(portId1,"FIX")
-    #print("tester.get_set_background_channels_fill_mode result: [{}]".format(callResult))
-    #callResult = tester.get_set_background_channels_fill_mode(portId1,"COPY")
-    #print("tester.get_set_background_channels_fill_mode result: [{}]".format(callResult))
-    #callResult = tester.get_set_tx_au_path_J1_trace_mode(portId1,"")
-    #print("tester.get_set_tx_au_path_J1_trace_mode result: [{}]".format(callResult))
-    #callResult = tester.get_set_tx_au_path_J1_trace_mode(portId1,"OFF")
-    #print("tester.get_set_tx_au_path_J1_trace_mode result: [{}]".format(callResult))
-    #callResult = tester.get_set_tx_au_path_J1_trace_mode(portId1,"TRC16")
-    #print("tester.get_set_tx_au_path_J1_trace_mode result: [{}]".format(callResult))
-    #callResult = tester.get_set_tx_au_path_J1_trace_mode(portId1,"TRC64")
-    #print("tester.get_set_tx_au_path_J1_trace_mode result: [{}]".format(callResult))
-
-    #callResult = tester.get_set_au_path_trace_rx_channel(portId1,"")
-    #print("tester.get_set_au_path_trace_rx_channel result: [{}]".format(callResult))
-    #callResult = tester.get_set_au_path_trace_rx_channel(portId1,"OFF")
-    #print("tester.get_set_tx_au_path_J1_trace_mode result: [{}]".format(callResult))
-    #callResult = tester.get_set_au_path_trace_rx_channel(portId1,"TRC16")
-    #print("tester.get_set_tx_au_path_J1_trace_mode result: [{}]".format(callResult))
-    #callResult = tester.get_set_au_path_trace_tx_channel(portId1,"")
-    #print("tester.get_set_au_path_trace_tx_channel result: [{}]".format(callResult))
-    #callResult = tester.get_set_au_path_trace_tx_channel(portId1,"OFF")
-    #print("tester.get_set_au_path_trace_tx_channel result: [{}]".format(callResult))
-    #callResult = tester.get_set_au_path_trace_tx_channel(portId1,"TRC64")
-    #print("tester.get_set_au_path_trace_tx_channel result: [{}]".format(callResult))
-
-    #callResult = tester.get_set_au_path_trace_rx_TR16_string(portId1,"")
-    #print("tester.get_set_au_path_trace_rx_TR16_string result: [{}]".format(callResult))
-    #input("press enter to continue...")
-    #callResult = tester.get_set_au_path_trace_rx_TR16_string(portId1,"MILANO")
-    #print("tester.get_set_au_path_trace_rx_TR16_string result: [{}]".format(callResult))
-    #input("press enter to continue...")
-    #callResult = tester.get_set_au_path_trace_rx_TR16_string(portId1,"CINISELLO BALSAMO")
-    #print("tester.get_set_au_path_trace_rx_TR16_string result: [{}]".format(callResult))
-    #input("press enter to continue...")
-    #callResult = tester.get_set_au_path_trace_rx_TR16_string(portId1,"MONZA")
-    #print("tester.get_set_au_path_trace_rx_TR16_string result: [{}]".format(callResult))
-    #input("press enter to continue...")
-    #callResult = tester.get_set_au_path_trace_rx_TR16_string(portId1,"LONGONE AL SEGRINO")
-    #print("tester.get_set_au_path_trace_rx_TR16_string result: [{}]".format(callResult))
-    #input("press enter to continue...")
-    #callResult = tester.get_set_au_path_trace_tx_TR16_string(portId1,"")
-    #print("tester.get_set_au_path_trace_tx_TR16_string result: [{}]".format(callResult))
-    #input("press enter to continue...")
-    #callResult = tester.get_set_au_path_trace_tx_TR16_string(portId1,"MILANO")
-    #print("tester.get_set_au_path_trace_tx_TR16_string result: [{}]".format(callResult))
-    #input("press enter to continue...")
-    #callResult = tester.get_set_au_path_trace_tx_TR16_string(portId1,"CINISELLO BALSAMO")
-    #print("tester.get_set_au_path_trace_tx_TR16_string result: [{}]".format(callResult))
-    #input("press enter to continue...")
-    #callResult = tester.get_set_au_path_trace_tx_TR16_string(portId1,"MONZA")
-    #print("tester.get_set_au_path_trace_tx_TR16_string result: [{}]".format(callResult))
-    #input("press enter to continue...")
-    #callResult = tester.get_set_au_path_trace_tx_TR16_string(portId1,"LONGONE AL SEGRINO")
-    #print("tester.get_set_au_path_trace_tx_TR16_string result: [{}]".format(callResult))
-    #input("press enter to continue...")
-
-    callResult = tester.get_set_au_path_trace_tx_channel(portId1,"TRC16")
-    print("tester.get_set_au_path_trace_tx_channel result: [{}]".format(callResult))
-
-    callResult = tester.get_set_tx_bit_rate(portId1,"STM64")
-    print("tester.get_set_tx_bit_rate result: [{}]".format(callResult))
-    callResult = tester.get_set_rx_bit_rate(portId1,"STM64")
-    print("tester.get_set_rx_bit_rate result: [{}]".format(callResult))
-
-
-    print("\n\n\n\n\nTESTING SECTION START *************************************")
-    #input("press enter to continue...")
-
-
-
-
-    callResult = tester.get_set_rx_channel_mapping_size(portId1,"VC12")
-    print("tester.get_set_rx_channel_mapping_size result: [{}]".format(callResult))
-    #input("press enter to continue...")
-
-    #callResult = tester.get_set_rx_channel_mapping_size(portId1,"VC3")
-    #print("tester.get_set_rx_channel_mapping_size result: [{}]".format(callResult))
-    #input("press enter to continue...")
-
-    #callResult = tester.get_set_rx_channel_mapping_size(portId1,"VC4")
-    #print("tester.get_set_rx_channel_mapping_size result: [{}]".format(callResult))
-    #input("press enter to continue...")
-
-    #callResult = tester.get_set_rx_channel_mapping_size(portId1,"VC4_4C")
-    #print("tester.get_set_rx_channel_mapping_size result: [{}]".format(callResult))
-    #input("press enter to continue...")
-
-    #callResult = tester.get_set_rx_channel_mapping_size(portId1,"VC4_16C")
-    #print("tester.get_set_rx_channel_mapping_size result: [{}]".format(callResult))
-    #input("press enter to continue...")
-
-    callResult = tester.get_set_rx_channel_mapping_size(portId1,"VC4_64C")
-    print("tester.get_set_rx_channel_mapping_size result: [{}]".format(callResult))
-    #input("press enter to continue...")
-
-    #callResult = tester.get_set_rx_channel_mapping_size(portId1,"")
-    #print("tester.get_set_rx_channel_mapping_size result: [{}]".format(callResult))
-    #input("press enter to continue...")
-
-
-    #print("\n\n\n\n\nTESTING SECTION STOP *************************************")
-    #input("press enter to continue...")
-
-
-    callResult = tester.unload_app(portId1, myApplication1)
-    print("tester.unload_app result: [{}]".format(callResult))
-    print(" ")
-    print("=============================")
-    print("ontXXXDriver 6xx -- END--")
-    print("=============================")
-    print(" ")
-
-    r.frame_close()
     
     #sys.exit()
 
