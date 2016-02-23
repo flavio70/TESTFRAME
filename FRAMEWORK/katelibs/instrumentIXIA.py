@@ -25,6 +25,7 @@ import getpass
 import inspect
 import telnetlib
 import datetime
+import socket
 
 from katelibs.equipment import Equipment
 from katelibs.kenviron import KEnvironment
@@ -52,18 +53,46 @@ class InstrumentIXIA(Equipment):
         # Bridge Connection
         self.__bridgeIpAddress      = "151.98.40.136"  # ixnetwork server address       
         self.__bridgePort           = 8009             # ixnetwork server port
+        self.__pingRetryNumber      = 1                #  Retry number for -c ping option
         self.__bridgeHandler        = None             # none before init
+        # Chassis Connection
+        self.__chassisIpAddress      = None             # ixia instrument (chassis) address       
+        self.__chassisHandler        = None             # none before init
 
+        #Data model (DM) main hooks
+        self.__DM_ROOT              = None                       
+        #self.__DM_EVENTSCHEDULER    = None                       
+        #self.__DM_GLOBALS           = None                       
+        #self.__DM_VPORT             = None                       
+        #self.__DM_AVAILABLEHARDWARE = None                       
+        #self.__DM_STATISTICS        = None                       
+        #self.__DM_TESTCONFIGURATION = None                       
+        #self.__DM_TRAFFIC           = None                       
+        
+        #Chassis-specific Data model (DM)  
+        self.__DM_CHASSIS           = None                       
+        self.__DM_CARDLIST          = dict()                        
+        self.__DM_PORTLIST          = dict()                        
 
         # Don't deleter the following lines
-        #super().__init__(label, self.__prs.get_id("IXIA1"))
-        #self.__get_instrument_info_from_db(self.__prs.get_id(label)) # inizializza i dati di IP, tipo di ONT..dal DB
-        #self.init_ont_type()  # inizializza i dati di IP, tipo di ONT..leggendo da strumento
- 
-        #self.__ontUser        = self.__prs.get_elem(self.get_label(), 'USER')
-        #self.__ontPassword    = self.__prs.get_elem(self.get_label(), 'PWD')
-        #self.__ontApplication = self.__prs.get_elem(self.get_label(), 'APPL')
-        #self.__sessionName          = "Session__" + datetime.datetime.utcnow().strftime("%d%b_%H%M%S") + "__UTC"
+        super().__init__(label, self.__prs.get_id(label))
+        self.__get_instrument_info_from_db(self.__prs.get_id(label)) # inizializza i dati di IP, tipo di Strumento ecc... dal DB
+
+
+
+    #
+    #   USEFUL FUNC & TOOLS
+    #
+    def __is_reachable(self):
+        self.__lc_msg("Function: __is_reachable")
+        cmd = "ping -c {} {:s}".format(self.__pingRetryNumber,self.__bridgeIpAddress)
+        if os.system(cmd) == 0:
+            localMessage = "IP Address [{}]: answer received".format(self.__bridgeIpAddress)
+            self.__lc_msg(localMessage)
+            return True, localMessage
+        localMessage = "IP Address [{}]: no answer received".format(self.__bridgeIpAddress)
+        self.__lc_msg(localMessage)
+        return False, localMessage
 
 
 
@@ -82,6 +111,13 @@ class InstrumentIXIA(Equipment):
                                  what happened in the processing flow  
         """
         methodLocalName = self.__lc_current_method_name(embedKrepoInit=True)
+        bridgePingCheck = self.__is_reachable() 
+        #print (bridgePingCheck)
+        if bridgePingCheck[0] == False:
+            localMessage="Bridge not pingable [{}]!".format(self.__bridgeIpAddress)
+            self.__lc_msg(localMessage)
+            self.__method_failure(methodLocalName, None, "", localMessage)
+            return False, localMessage
         if self.__bridgeHandler != None:
             localMessage="BridgeHandler [{}] already allocated. Disconnect before!".format(self.__bridgeHandler)
             self.__trc_err(localMessage) 
@@ -93,14 +129,30 @@ class InstrumentIXIA(Equipment):
             self.__bridgeHandler = None
             localMessage="Bridge connection failed: check ixNetwork server @ [{}] port [{}]".format(self.__bridgeIpAddress,self.__bridgePort)
             self.__trc_err(localMessage) 
+            self.__method_failure(methodLocalName, None, "", localMessage)
             return False, localMessage
         if answerBridge != "::ixNet::OK":
             self.__bridgeHandler = None
             localMessage="Bridge connect() answer not expected:[{}] instead of [::ixNet::OK]".format(answerBridge)
             self.__trc_err(localMessage) 
+            self.__method_failure(methodLocalName, None, "", localMessage)
             return False, localMessage
         localMessage="BridgeHandler.connect [{}]".format(answerBridge)
         self.__trc_inf(localMessage) 
+        pippo=self.__bridgeHandler.getNull() 
+        pippo=self.__bridgeHandler.getVersion() 
+        print("self.__DM_ROOT  BEFORE [{}]<=====================".format(self.__DM_ROOT ))
+        #Data Model Initialization
+        self.__DM_ROOT              = self.__bridgeHandler.getRoot()                      
+        print("self.__DM_ROOT  AFTER  [{}]<=====================".format(self.__DM_ROOT ))
+        #self.__DM_EVENTSCHEDULER    = None                       
+        #self.__DM_GLOBALS           = None                       
+        #self.__DM_VPORT             = None                       
+        #self.__DM_AVAILABLEHARDWARE = None                       
+        #self.__DM_STATISTICS        = None                       
+        #self.__DM_TESTCONFIGURATION = None                       
+        #self.__DM_TRAFFIC           = None                       
+        self.__method_success(methodLocalName, None, localMessage)
         return True, localMessage
 
 
@@ -120,6 +172,7 @@ class InstrumentIXIA(Equipment):
         if self.__bridgeHandler == None:
             localMessage="BridgeHandler [{}] already disconnected. Nothing to do!".format(self.__bridgeHandler)
             self.__trc_err(localMessage) 
+            self.__method_failure(methodLocalName, None, "", localMessage)
             return False, localMessage
         try:
             answerBridge = self.__bridgeHandler.disconnect() 
@@ -127,15 +180,166 @@ class InstrumentIXIA(Equipment):
         except: 
             localMessage="Bridge disconnect failed: check ixNetwork server @ [{}] port [{}]".format(self.__bridgeIpAddress,self.__bridgePort)
             self.__trc_err(localMessage) 
+            self.__method_failure(methodLocalName, None, "", localMessage)
             return False, localMessage
         if answerBridge != "::ixNet::OK":
             self.__bridgeHandler = None
             localMessage="Bridge disconnect() answer not expected:[{}] instead of [::ixNet::OK]".format(answerBridge)
             self.__trc_err(localMessage) 
+            self.__method_failure(methodLocalName, None, "", localMessage)
             return False, localMessage
         localMessage="BridgeHandler.disconnect [{}]".format(answerBridge)
         self.__trc_inf(localMessage) 
+        self.__method_success(methodLocalName, None, localMessage)
         return True, localMessage
+
+
+
+    #
+    #   CHASSIS CONNECTION MANAGEMENT
+    #
+    def add_chassis(self):       ### krepo added ###
+        """ add_bridge(self)
+            Purpose:
+                create a chassis 
+            Return tuple:
+                ("True|False" , "answer_string"  )
+                True.............chassis add success
+                False............chassis add failed
+                answer_string....message for humans, to better understand 
+                                 what happened in the processing flow  
+        """
+        methodLocalName = self.__lc_current_method_name(embedKrepoInit=True)
+        # Parameters check
+        if self.__chassisHandler != None:
+            localMessage="Chassis [{}] already added. Remove before!".format(self.__chassisHandler)
+            self.__trc_err(localMessage) 
+            self.__method_failure(methodLocalName, None, "", localMessage)
+            return False, localMessage
+        try:
+            socket.inet_aton(self.__chassisIpAddress)
+        except socket.error:
+            localMessage="Chassis address [{}] NOT valid".format(self.__chassisIpAddress)
+            self.__trc_err(localMessage) 
+            self.__method_failure(methodLocalName, None, "", localMessage)
+            return False, localMessage
+        # Perform operation  
+        try:
+            self.__chassisHandler = self.__bridgeHandler.add(self.__bridgeHandler.getRoot()+'availableHardware', 'chassis', '-hostname', self.__chassisIpAddress)
+            self.__bridgeHandler.commit()
+        except: 
+            self.__bridgeHandler = None
+            localMessage="Chassis connection failed: check instrument status @ [{}]".format(self.__chassisIpAddress)
+            self.__trc_err(localMessage) 
+            self.__method_failure(methodLocalName, None, "", localMessage)
+            return False, localMessage
+        #print("*** DEBUG 07")  
+        localMessage="SUCCESS: add_chassis [{}]".format(self.__chassisHandler)
+        self.__trc_inf(localMessage) 
+        self.__method_success(methodLocalName, None, localMessage)
+        return True, localMessage
+
+
+
+    def init_chassis_card_list(self):       ### krepo added ###
+        """ init_chassis_card_list(self)
+            Purpose:
+                initializes the self.__DM_CARDLIST dictionary of the card plugged into the chassis 
+            Return tuple:
+                ("True|False" , "answer_string"  )
+                True.............dictionary updated
+                False............dictionary not updated
+                answer_string....message for humans, to better understand 
+                                 what happened in the processing flow  
+        """
+        methodLocalName = self.__lc_current_method_name(embedKrepoInit=True)
+        # Parameters check
+        if self.__chassisHandler == None:
+            localMessage="Cardlist not updated not added. Add chassis [{}] before!".format(self.__chassisHandler)
+            self.__trc_err(localMessage) 
+            self.__method_failure(methodLocalName, None, "", localMessage)
+            return False, localMessage
+        tmpList = list(self.__bridgeHandler.getList( self.__chassisHandler,'card').replace("]","").replace("[","").split(","))
+        for elementTmp in tmpList:
+            keyTemp=elementTmp.replace("'","").split("card:")[1]
+            print ("[{}][{}][{}][{}]".format(keyTemp,type(keyTemp),elementTmp,type(elementTmp)))
+            self.__DM_CARDLIST[keyTemp]=elementTmp
+        localMessage="SUCCESS: card list updated"
+        self.__trc_inf(localMessage) 
+        self.__method_success(methodLocalName, None, localMessage)
+        return True, localMessage
+
+
+
+    def init_chassis_port_list(self):       ### krepo added ###
+        """ init_chassis_port_list(self)
+            Purpose:
+                initializes the self.__DM_PORTLIST dictionary of the ports physically available in the chassis 
+            Return tuple:
+                ("True|False" , "answer_string"  )
+                True.............dictionary updated
+                False............dictionary not updated
+                answer_string....message for humans, to better understand 
+                                 what happened in the processing flow  
+        """
+        methodLocalName = self.__lc_current_method_name(embedKrepoInit=True)
+        # Parameters check
+        if self.__chassisHandler == None:
+            localMessage="Port not updated. Add chassis [{}] before!".format(self.__chassisHandler)
+            self.__trc_err(localMessage) 
+            self.__method_failure(methodLocalName, None, "", localMessage)
+            return False, localMessage
+        cardNumber=len(self.__DM_CARDLIST.keys())  
+        if cardNumber == 0:
+            localMessage="Port not updated. Call init_chassis_card_list [{}] before!"
+            self.__trc_err(localMessage) 
+            self.__method_failure(methodLocalName, None, "", localMessage)
+            return False, localMessage
+        print ("scansione card/...")
+       
+        for currentKey in self.__DM_CARDLIST.keys():
+            currentCard= self.__DM_CARDLIST[currentKey]  
+            print (currentKey ," ->  ", currentCard)
+             
+        
+        
+        
+        
+        localMessage="Found [{}] card".format(cardNumber)
+        #print (self.__DM_CARDLIST)
+        self.__trc_inf(localMessage) 
+  
+        localMessage="SUCCESS: port list updated"
+        self.__trc_inf(localMessage) 
+        self.__method_success(methodLocalName, None, localMessage)
+        return True, localMessage
+
+
+
+
+ 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -161,7 +365,20 @@ class InstrumentIXIA(Equipment):
 
     #     
     # Krepo-related     
-    #    
+    #   
+
+    def __get_instrument_info_from_db(self, ID):
+        tabEqpt  = TEquipment
+        # get Equipment Type ID for selected ID (i.e. 50 (for ONT506))
+        #instr_type_id = tabEqpt.objects.get(id_equipment=ID).t_equip_type_id_type.id_type
+        # get Equipment Type Name for selected ID (i.e. ONT506)
+        instr_type_name = tabEqpt.objects.get(id_equipment=ID).t_equip_type_id_type.name
+        instr_ip = self.__get_net_info(ID)
+        self.__chassisIpAddress  = instr_ip
+        localMessage = "__get_instrument_info_from_db: instrument type specified : Instrument:[{}] IpAddr[{}]".format(instr_type_name,instr_ip)
+        self.__trc_err(localMessage) 
+        return  
+
     def __trc_dbg(self, msg):
         """ INTERNAL USAGE
         """
@@ -269,37 +486,6 @@ class InstrumentIXIA(Equipment):
                     return r.ip
 
         return str(None)
-
-
-    def __get_instrument_info_from_db(self, ID):
-        tabEqpt  = TEquipment
-        # get Equipment Type ID for selected ID (i.e. 50 (for ONT506))
-        #instr_type_id = tabEqpt.objects.get(id_equipment=ID).t_equip_type_id_type.id_type
-        # get Equipment Type Name for selected ID (i.e. ONT506)
-        instr_type_name = tabEqpt.objects.get(id_equipment=ID).t_equip_type_id_type.name
-        instr_ip = self.__get_net_info(ID)
-
-        self.__ontIpAddress = instr_ip
-        
-        #if   instr_type_name == "ONT50":
-        #    self.__ontType = "5xx"
-        #elif instr_type_name == "ONT506":
-        #    self.__ontType = "5xx"
-        #elif instr_type_name == "ONT512":
-        #    self.__ontType = "5xx"
-        #elif instr_type_name == "ONT601":
-        #    self.__ontType = "6xx"
-        #else:
-        #    localMessage = "__get_instrument_info_from_db error: Unknown instrument type for the specified ID. ID [{}] Instrument[{}] IpAddr[{}]".format(ID,instr_type_name,instr_ip)
-        #    print(localMessage) 
-        #    self.__lc_msg(localMessage)
-        #    return  
-        
-        #localMessage = "__get_instrument_info_from_db: instrument type specified :ID [{}] Instrument:[{}] IpAddr[{}]".format(ID,instr_type_name,instr_ip)
-        localMessage = "__get_instrument_info_from_db: instrument type specified : Instrument:[{}] IpAddr[{}]".format(instr_type_name,instr_ip)
-        print(localMessage) 
-        self.__lc_msg(localMessage)
-        return  
  
 
 
@@ -627,19 +813,6 @@ class InstrumentIXIA(Equipment):
         #else:
         #    localMessage = "Telnet connection not openened: skip close"
         #    self.__lc_msg(localMessage)
-        return False, localMessage
-
-
-
-    def __is_reachable(self):
-        self.__lc_msg("Function: __is_reachable")
-        cmd = "ping -c {} {:s}".format(self.__pingRetryNumber,self.__ontIpAddress)
-        if os.system(cmd) == 0:
-            localMessage = "IP Address [{}]: answer received".format(self.__ontIpAddress)
-            self.__lc_msg(localMessage)
-            return True, localMessage
-        localMessage = "IP Address [{}]: no answer received".format(self.__ontIpAddress)
-        self.__lc_msg(localMessage)
         return False, localMessage
 
 
