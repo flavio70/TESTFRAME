@@ -162,12 +162,13 @@ class TL1check():
 
                 if match_pst[0] and match_sst[0]:
 
-                    #print("messaggio := {}".format(msg.get_cmd_attr_values(the_aid)))
-                    #print(" da filtr := {}".format(self.__fld_l))
+                    print("messaggio := {}".format(msg.get_cmd_attr_values(the_aid)))
+                    print(" da filtr := {}".format(self.__fld_l))
 
                     for the_attr,the_val in msg.get_cmd_attr_values(the_aid).items():
 
                         match_attr_val = self.__evaluate_attr_val(the_attr, the_val, rule=fld)
+                        print("<{},{}> : {}".format(the_attr,the_val, match_attr_val))
 
                         if match_attr_val[0]:
                             match_list.append(match_attr_val[1])
@@ -244,9 +245,13 @@ class TL1check():
         if rule == 'OR':
             for attr, values in self.__fld_l.items():
                 if attr == the_attr:
-                    for val in values:
-                        if val == the_val:
-                            return True, "{:s}={:s}".format(attr, val)
+                    if isinstance(values, list):
+                        for val in list(values):
+                            if val == the_val:
+                                return True, "{:s}={:s}".format(attr, val)
+                    else:
+                        if values == the_val:
+                            return True, "{:s}={:s}".format(attr, values)
         else:
             pass
 
