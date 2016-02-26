@@ -162,8 +162,8 @@ class TL1check():
 
                 if match_pst[0] and match_sst[0]:
 
-                    print("messaggio := {}".format(msg.get_cmd_attr_values(the_aid)))
-                    print(" da filtr := {}".format(self.__fld_l))
+                    #print("messaggio := {}".format(msg.get_cmd_attr_values(the_aid)))
+                    #print(" da filtr := {}".format(self.__fld_l))
 
                     for the_attr,the_val in msg.get_cmd_attr_values(the_aid).items():
 
