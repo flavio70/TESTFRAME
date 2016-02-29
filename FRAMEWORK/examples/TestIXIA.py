@@ -73,8 +73,37 @@ class Test(TestCase):
         insert Main body code for your test below
         '''
         IXIA.add_chassis()
-        IXIA.init_chassis_card_list()
-        IXIA.init_chassis_port_list()
+        IXIA.clear_slot_ownership(9)
+        #IXIA.init_chassis_cards_handle_list()
+        #IXIA.init_chassis_ports_handle_list()
+        #IXIA.get_card_handler(9)
+        #IXIA.get_slot_port_handle_list(9)
+        #IXIA.clear_port_ownership(9,1)
+        #IXIA.clear_port_ownership(9,44)
+        #IXIA.add_vport(9,12)
+        #IXIA.add_vport(9,1)
+        #IXIA.remove_vport(9,12)
+        #IXIA.remove_vport(9,1)
+        #IXIA.remove_vport(9,2)
+        #IXIA.add_vport(9,1)
+        #IXIA.add_vport(9,1) 
+        #print (risultato)
+  
+
+        IXIA.create_vport(9,1)
+        IXIA.create_vport(9,2)
+        IXIA.create_vport(9,3)
+        IXIA.create_vport(9,4)
+        IXIA.create_vport(9,5)
+        IXIA.create_vport(9,6)
+
+
+        IXIA.connect_vport_to_physical_port(9,1)
+        IXIA.connect_vport_to_physical_port(9,2)
+        IXIA.connect_vport_to_physical_port(9,3)
+        IXIA.connect_vport_to_physical_port(9,4)
+        IXIA.connect_vport_to_physical_port(9,5)
+        IXIA.connect_vport_to_physical_port(9,6)
 
 
 

@@ -39,7 +39,6 @@ class InstrumentIXIA(Equipment):
         """ label   : equipment name used on Report file
             kenv    : instance of KEnvironment (initialized by K@TE FRAMEWORK)
         """
- 
         # Enviroment
         self.__kenv                 = kenv             # Kate Environment
         self.__krepo                = kenv.krepo       # result report (Kunit class instance)
@@ -54,13 +53,14 @@ class InstrumentIXIA(Equipment):
         self.__bridgeIpAddress      = "151.98.40.136"  # ixnetwork server address       
         self.__bridgePort           = 8009             # ixnetwork server port
         self.__pingRetryNumber      = 1                #  Retry number for -c ping option
-        self.__bridgeHandler        = None             # none before init
+        self.__maxPortNumberForCard = 32               #  Retry number for -c ping option
+        self.__IXN        = None             # none before init
         # Chassis Connection
         self.__chassisIpAddress      = None             # ixia instrument (chassis) address       
         self.__chassisHandler        = None             # none before init
-
         #Data model (DM) main hooks
-        self.__DM_ROOT              = None                       
+        self.__DM_ROOT               = None                       
+        self.__DM_NULL               = None                       
         #self.__DM_EVENTSCHEDULER    = None                       
         #self.__DM_GLOBALS           = None                       
         #self.__DM_VPORT             = None                       
@@ -68,20 +68,39 @@ class InstrumentIXIA(Equipment):
         #self.__DM_STATISTICS        = None                       
         #self.__DM_TESTCONFIGURATION = None                       
         #self.__DM_TRAFFIC           = None                       
-        
         #Chassis-specific Data model (DM)  
         self.__DM_CHASSIS           = None                       
         self.__DM_CARDLIST          = dict()                        
         self.__DM_PORTLIST          = dict()                        
-
-        # Don't deleter the following lines
+        self.__DM_VPORTLIST         = dict()                        
+        # !!! Don't delete the following lines !!!
         super().__init__(label, self.__prs.get_id(label))
         self.__get_instrument_info_from_db(self.__prs.get_id(label)) # inizializza i dati di IP, tipo di Strumento ecc... dal DB
-
-
+           
 
     #
     #   USEFUL FUNC & TOOLS
+    #
+    # 
+    # __ret_func: to return and print the correct messaging in one single rows
+    #
+    def __ret_func(self, TFRetcode=True, MsgLevel="none", localMessage="Put here the string to print"  ):       ### krepo noy added ###
+        methodLocalName = self.__lc_caller_method_name()      
+        if MsgLevel == "error":
+            self.__trc_err(localMessage) 
+        elif MsgLevel == "none":
+            pass  
+        else:
+            self.__trc_inf(localMessage) 
+        if TFRetcode == True:
+            self.__method_success(methodLocalName, None, localMessage)
+        else:
+            self.__method_failure(methodLocalName, None, "", localMessage)
+        return TFRetcode, localMessage
+
+
+    # 
+    # __is_reachable: to check if a machine is reacheable
     #
     def __is_reachable(self):
         self.__lc_msg("Function: __is_reachable")
@@ -95,12 +114,11 @@ class InstrumentIXIA(Equipment):
         return False, localMessage
 
 
-
     #
     #   BRIDGE CONNECTION MANAGEMENT
     #
     def connect_bridge(self):       ### krepo added ###
-        """ connect_bridge(self)
+        """ connect_bridge(self) - Hint: first call to use
             Purpose:
                 create a bridge connection: it must be called one time only @ test/dut setup
             Return tuple:
@@ -114,51 +132,26 @@ class InstrumentIXIA(Equipment):
         bridgePingCheck = self.__is_reachable() 
         #print (bridgePingCheck)
         if bridgePingCheck[0] == False:
-            localMessage="Bridge not pingable [{}]!".format(self.__bridgeIpAddress)
-            self.__lc_msg(localMessage)
-            self.__method_failure(methodLocalName, None, "", localMessage)
-            return False, localMessage
-        if self.__bridgeHandler != None:
-            localMessage="BridgeHandler [{}] already allocated. Disconnect before!".format(self.__bridgeHandler)
-            self.__trc_err(localMessage) 
-            return False, localMessage
-        self.__bridgeHandler=IxNet()
+            return self.__ret_func(False,"error","Bridge not pingable [{}]!".format(self.__bridgeIpAddress))
+        if self.__IXN != None:
+            return self.__ret_func(False,"error", "BridgeHandler [{}] already allocated. Disconnect before!".format(self.__IXN))
+        self.__IXN=IxNet()
         try:
-            answerBridge = self.__bridgeHandler.connect(self.__bridgeIpAddress,'-port', self.__bridgePort) # use default port 8009
+            answerBridge = self.__IXN.connect(self.__bridgeIpAddress,'-port', self.__bridgePort) # use default port 8009
         except: 
-            self.__bridgeHandler = None
-            localMessage="Bridge connection failed: check ixNetwork server @ [{}] port [{}]".format(self.__bridgeIpAddress,self.__bridgePort)
-            self.__trc_err(localMessage) 
-            self.__method_failure(methodLocalName, None, "", localMessage)
-            return False, localMessage
+            self.__IXN = None
+            return self.__ret_func(False,"error", "Bridge connection failed: check ixNetwork server @ [{}] port [{}]".format(self.__bridgeIpAddress,self.__bridgePort))
         if answerBridge != "::ixNet::OK":
-            self.__bridgeHandler = None
-            localMessage="Bridge connect() answer not expected:[{}] instead of [::ixNet::OK]".format(answerBridge)
-            self.__trc_err(localMessage) 
-            self.__method_failure(methodLocalName, None, "", localMessage)
-            return False, localMessage
-        localMessage="BridgeHandler.connect [{}]".format(answerBridge)
-        self.__trc_inf(localMessage) 
-        pippo=self.__bridgeHandler.getNull() 
-        pippo=self.__bridgeHandler.getVersion() 
-        print("self.__DM_ROOT  BEFORE [{}]<=====================".format(self.__DM_ROOT ))
+            self.__IXN = None
+            return self.__ret_func(False,"error", "Bridge connect() answer not expected:[{}] instead of [::ixNet::OK]".format(answerBridge))
         #Data Model Initialization
-        self.__DM_ROOT              = self.__bridgeHandler.getRoot()                      
-        print("self.__DM_ROOT  AFTER  [{}]<=====================".format(self.__DM_ROOT ))
-        #self.__DM_EVENTSCHEDULER    = None                       
-        #self.__DM_GLOBALS           = None                       
-        #self.__DM_VPORT             = None                       
-        #self.__DM_AVAILABLEHARDWARE = None                       
-        #self.__DM_STATISTICS        = None                       
-        #self.__DM_TESTCONFIGURATION = None                       
-        #self.__DM_TRAFFIC           = None                       
-        self.__method_success(methodLocalName, None, localMessage)
-        return True, localMessage
-
+        self.__DM_ROOT              = self.__IXN.getRoot()     
+        self.__DM_NULL              = self.__IXN.getNull()    
+        return self.__ret_func(True,"success", "BridgeHandler.connect [{}] - self.__DM_ROOT now [{}]".format(answerBridge,self.__DM_ROOT) )
 
 
     def disconnect_bridge(self):       ### krepo added ###
-        """ disconnect_bridge(self)
+        """ disconnect_bridge(self)  - Hint: first call to use 
             Purpose:
                 remove a bridge connection  it must be called one time only @ test/dut cleanup
             Return tuple:
@@ -169,35 +162,59 @@ class InstrumentIXIA(Equipment):
                                  what happened in the processing flow  
         """
         methodLocalName = self.__lc_current_method_name(embedKrepoInit=True)
-        if self.__bridgeHandler == None:
-            localMessage="BridgeHandler [{}] already disconnected. Nothing to do!".format(self.__bridgeHandler)
-            self.__trc_err(localMessage) 
-            self.__method_failure(methodLocalName, None, "", localMessage)
-            return False, localMessage
+        if self.__IXN == None:
+            return self.__ret_func(False,"error", "BridgeHandler [{}] already disconnected. Nothing to do!".format(self.__IXN))
         try:
-            answerBridge = self.__bridgeHandler.disconnect() 
-            self.__bridgeHandler = None
+            answerBridge = self.__IXN.disconnect() 
+            self.__IXN = None
         except: 
-            localMessage="Bridge disconnect failed: check ixNetwork server @ [{}] port [{}]".format(self.__bridgeIpAddress,self.__bridgePort)
-            self.__trc_err(localMessage) 
-            self.__method_failure(methodLocalName, None, "", localMessage)
-            return False, localMessage
+            return self.__ret_func(False,"error", "Bridge disconnect failed: check ixNetwork server @ [{}] port [{}]".format(self.__bridgeIpAddress,self.__bridgePort))
         if answerBridge != "::ixNet::OK":
-            self.__bridgeHandler = None
-            localMessage="Bridge disconnect() answer not expected:[{}] instead of [::ixNet::OK]".format(answerBridge)
-            self.__trc_err(localMessage) 
-            self.__method_failure(methodLocalName, None, "", localMessage)
-            return False, localMessage
-        localMessage="BridgeHandler.disconnect [{}]".format(answerBridge)
-        self.__trc_inf(localMessage) 
-        self.__method_success(methodLocalName, None, localMessage)
-        return True, localMessage
-
+            self.__IXN = None
+            return self.__ret_func(False,"error", "Bridge disconnect() answer not expected:[{}] instead of [::ixNet::OK]".format(answerBridge))
+        return self.__ret_func(True,"success", "BridgeHandler.disconnect [{}]".format(answerBridge) )
 
 
     #
     #   CHASSIS CONNECTION MANAGEMENT
     #
+    def __init_chassis_cards_handle_list(self):       ### krepo added ###
+        """ __init_chassis_cards_handle_list(self) - Hint: internal use  
+            Purpose:
+                initializes the self.__DM_CARDLIST dictionary of the card plugged into the chassis 
+        """
+        methodLocalName = self.__lc_current_method_name()
+        if self.__chassisHandler == None:
+            return False,"error", "Port list not updated: add chassis before!" 
+        tmpList = list(self.__IXN.getList( self.__chassisHandler,'card').replace("]","").replace("[","").split(","))
+        for elementTmp in tmpList:
+            keyTemp=elementTmp.replace("'","").split("card:")[1]
+            self.__DM_CARDLIST[keyTemp]=elementTmp.replace("'","")   
+        cardNumber=len(self.__DM_CARDLIST.keys())  
+        return  True,"success", "SUCCESS: card list updated. Total cards found: [{}]".format(cardNumber) 
+
+
+    def __init_chassis_ports_handle_list(self):       ### krepo added ###
+        """ __init_chassis_ports_handle_list(self) - Hint: internal use  
+            Purpose:
+                initializes the self.__DM_PORTLIST dictionary of the ports physically available in the chassis 
+        """
+        methodLocalName = self.__lc_current_method_name()
+        if self.__chassisHandler == None:
+            return  False,"error", "Port list not updated: add chassis before!" 
+        if len(self.__DM_CARDLIST.keys())  == 0:
+            return  False,"error", "Port list not updated: call init_chassis_cards_handle_list before!"  
+        for currentKey in self.__DM_CARDLIST.keys():
+            currentCard = self.__DM_CARDLIST[currentKey]  
+            tmpList = list(self.__IXN.getList(currentCard,'port').replace("]","").replace("[","").split(","))
+            for elementTmp in tmpList:
+                keyTemp=elementTmp.replace("'","").split("port:")[1]
+                keyTempNew="{}/{}".format(currentKey,keyTemp)
+                self.__DM_PORTLIST[keyTempNew]=elementTmp.replace("'","") 
+        portNumber=len(self.__DM_PORTLIST.keys())  
+        return True,"success", "SUCCESS: port list updated. Total ports found: [{}]".format(portNumber)      
+    
+    
     def add_chassis(self):       ### krepo added ###
         """ add_bridge(self)
             Purpose:
@@ -210,41 +227,322 @@ class InstrumentIXIA(Equipment):
                                  what happened in the processing flow  
         """
         methodLocalName = self.__lc_current_method_name(embedKrepoInit=True)
-        # Parameters check
         if self.__chassisHandler != None:
-            localMessage="Chassis [{}] already added. Remove before!".format(self.__chassisHandler)
-            self.__trc_err(localMessage) 
-            self.__method_failure(methodLocalName, None, "", localMessage)
-            return False, localMessage
+            return self.__ret_func(False,"error", "Chassis [{}] already added. Remove before!".format(self.__chassisHandler))
         try:
             socket.inet_aton(self.__chassisIpAddress)
         except socket.error:
-            localMessage="Chassis address [{}] NOT valid".format(self.__chassisIpAddress)
-            self.__trc_err(localMessage) 
-            self.__method_failure(methodLocalName, None, "", localMessage)
-            return False, localMessage
-        # Perform operation  
+            return self.__ret_func(False,"error", "Chassis address [{}] NOT valid".format(self.__chassisIpAddress))
+
+        self.__IXN.execute('newConfig') 
         try:
-            self.__chassisHandler = self.__bridgeHandler.add(self.__bridgeHandler.getRoot()+'availableHardware', 'chassis', '-hostname', self.__chassisIpAddress)
-            self.__bridgeHandler.commit()
+            chassisTmp = self.__IXN.add(self.__IXN.getRoot()+'availableHardware', 'chassis', '-hostname', self.__chassisIpAddress)
+            self.__IXN.commit()
+            self.__chassisHandler = self.__IXN.remapIds(chassisTmp).replace("['","").replace("']","")
         except: 
-            self.__bridgeHandler = None
-            localMessage="Chassis connection failed: check instrument status @ [{}]".format(self.__chassisIpAddress)
-            self.__trc_err(localMessage) 
-            self.__method_failure(methodLocalName, None, "", localMessage)
+            self.__IXN = None
+            return self.__ret_func(False,"error", "Chassis connection failed: check instrument status @ [{}]".format(self.__chassisIpAddress))
+        self.__init_chassis_cards_handle_list() 
+        self.__init_chassis_ports_handle_list()  
+        return self.__ret_func(True,"success", "SUCCESS: add_chassis [{}]".format(self.__chassisHandler) )
+
+
+    def get_card_handler(self, slotNo):   ### krepo not added ###
+        """ get_card_handler()  return the slot handler - Hint: internal use """
+        #methodLocalName = self.__lc_current_method_name()
+        slotNo=str(slotNo)
+        localHandler=self.__DM_CARDLIST.get(slotNo, None)
+        #self.__trc_inf("Slot[{}] CardHandler [{}] ".format(slotNo,localHandler))   
+        return localHandler
+
+
+    def get_port_handler(self, slotNo, portNo):   ### krepo not added ###
+        """ get_port_handler()  return the port handler - Hint: internal use """
+        #methodLocalName = self.__lc_current_method_name()
+        keyTemp="{}/{}".format(str(slotNo),str(portNo))
+        localHandler=self.__DM_PORTLIST.get(keyTemp, None)
+        #self.__trc_inf("Port[{}] PortHandler [{}] ".format(keyTemp,localHandler))   
+        return localHandler
+
+
+    def clear_port_ownership(self, slotNo, portNo):   ### krepo not added ###
+        """ clear_port_ownership()  release the ownership of a port - Hint: to use in single port management """
+        methodLocalName = self.__lc_current_method_name()
+        porthandler = self.get_port_handler( slotNo, portNo)
+        if not porthandler:
+            localMessage="WARNING: port handler [{}/{}] NOT FOUND".format(slotNo, portNo)
+            self.__trc_inf(localMessage)
             return False, localMessage
-        #print("*** DEBUG 07")  
-        localMessage="SUCCESS: add_chassis [{}]".format(self.__chassisHandler)
-        self.__trc_inf(localMessage) 
-        self.__method_success(methodLocalName, None, localMessage)
-        return True, localMessage
+        self.__trc_inf("Port handler [{}/{}] FOUND: [{}]".format(slotNo, portNo,porthandler))
+        try:
+            #self.__IXN.execute('clearOwnership', ixChassisObj+'/card:'+cardNumber+'/port:'+portNumber)
+            self.__IXN.execute('clearOwnership', porthandler)
+        except Exception as excMsg:
+            return False,"ERROR: unable to remove port [{}/{}] ownership exception [{}]".format(slotNo, portNo,excMsg)  
+        localMessage= "SUCCESS: ownership removed for port [{}/{}] ".format(slotNo, portNo)  
+        self.__trc_inf(localMessage)
+        return True,localMessage
 
 
+    def clear_slot_ownership(self, slotNo):   ### krepo not added ###
+        """ clear_slot_ownership()  release the ownership of all the ports of the card plugged in the specified slot - Hint: to use in initial slot setup """
+        methodLocalName = self.__lc_current_method_name()
+        for portNo in range(1,(self.__maxPortNumberForCard+1)):
+            localResult = self.clear_port_ownership(slotNo, portNo)
+        return True
 
-    def init_chassis_card_list(self):       ### krepo added ###
-        """ init_chassis_card_list(self)
+
+    def __check_answer(self, ixNetAnswer):   ### krepo not added ###
+        if ixNetAnswer == "::ixNet::OK":
+            return True
+        else:
+            return False
+ 
+
+    def create_vport(self, slotNo, portNo):   ### krepo added ###
+        """  create_vport(self, slotNo, portNo)
             Purpose:
-                initializes the self.__DM_CARDLIST dictionary of the card plugged into the chassis 
+                create a vport 
+            Return tuple:
+                ("True|False" , "answer_string"  )
+                True.............chassis add success
+                False............chassis add failed
+                answer_string....message for humans, to better understand 
+                                 what happened in the processing flow  
+            BE CARE: SPECIAL NOTES 
+                After a vport creation, you MUST connect the vport to the physical port.
+                The connection process is very slow (almost 40 seconds...)
+                so it's better to split the port creation process into 3 phases.
+                This method realizes the step 1 of the following process:
+                -->1... CREATE ALL THE VPORTS you need (loop of create_vport(self, slotNo, portNo))
+                   2... connect ALL the ports (loop of connect_vport_to_physical_port(self, slotNo, portNo))
+                   3... verify ALL ports status before proceed
+                so that the amount of time needed is reduced to 40 seconds for ALL the ports
+                Please avoid to execute (create + connect) process in a loop for each port because 
+                this way to proceed could fail.
+        """
+        methodLocalName = self.__lc_current_method_name(embedKrepoInit=True)
+        if (not slotNo) or (not portNo):
+            localMessage="ERROR: null portNo or slot"
+            return self.__ret_func(False,"error",localMessage)
+        keyTempNew="{}/{}".format(slotNo,portNo) 
+        localPortHandler = self.__DM_PORTLIST.get(keyTempNew, None)
+        if not localPortHandler:
+            localMessage="WARNING: port handler [{}/{}] NOT FOUND".format(slotNo, portNo)
+            return self.__ret_func(False,"error",localMessage)
+        vport1   = self.__IXN.add(self.__DM_ROOT, 'vport')
+        retCode1 = self.__IXN.commit()
+        if not self.__check_answer(retCode1):
+            localMessage="WARNING: unable to add [{}] or commit [{}] new vport".format(vport1, retCode1)
+            return self.__ret_func(False,"error",localMessage)
+        vport1   = self.__IXN.remapIds(vport1).replace("['","").replace("']","")
+        retCode1 = self.__IXN.commit()
+        if not self.__check_answer(retCode1):
+            localMessage="WARNING: unable to remapIds [{}] or commit [{}] new vport".format(vport1, retCode1)
+            return self.__ret_func(False,"error",localMessage)
+        # Update vportlist with new vport 
+        self.__DM_VPORTLIST[keyTempNew]=vport1 
+        return self.__ret_func(True,"success", "SUCCESS: vport [{}] created ".format(keyTempNew))
+
+
+    def connect_vport_to_physical_port(self, slotNo, portNo):   ### krepo added ###
+        """  connect_vport_to_physical_port(self, slotNo, portNo)
+            Purpose:
+                connect a vport to it's specific physical port
+            Return tuple:
+                ("True|False" , "answer_string"  )
+                True.............chassis add success
+                False............chassis add failed
+                answer_string....message for humans, to better understand 
+                                 what happened in the processing flow  
+            BE CARE: SPECIAL NOTES 
+                Use this procedure to connect all the vports to theirs physical ports
+                ONLY AFTER the whole vport set creation  
+                This method realizes the step 2 of the following process:
+                   1... create ALL the vports you need (loop of create_vport(self, slotNo, portNo))
+                -->2... CONNECT ALL THE PORTS (loop of connect_vport_to_physical_port(self, slotNo, portNo))
+                   3... verify ALL ports status before proceed
+                so that the amount of time needed is reduced to 40 seconds for ALL the ports
+                Please avoid to execute (create + connect) process in a loop for each port because 
+                this way to proceed could fail.
+        """
+        methodLocalName = self.__lc_current_method_name(embedKrepoInit=True)
+        if (not slotNo) or (not portNo):
+            localMessage="ERROR: null portNo or slot"
+            return self.__ret_func(False,"error",localMessage)
+        keyTempNew="{}/{}".format(slotNo,portNo) 
+        localPortHandler = self.__DM_PORTLIST.get(keyTempNew, None)
+        if not localPortHandler:
+            localMessage="WARNING: port handler [{}/{}] NOT FOUND".format(slotNo, portNo)
+            return self.__ret_func(False,"error",localMessage)
+        localVPortHandler = self.__DM_VPORTLIST.get(keyTempNew, None)
+        if not localVPortHandler:
+            localMessage="WARNING: vport handler [{}/{}] NOT FOUND".format(slotNo, portNo)
+            return self.__ret_func(False,"error",localMessage)
+        try:
+            localMessage="INFO: [{}/{}]  trying to connect vport[{}] to port[{}]".format(slotNo, portNo, localPortHandler, localVPortHandler)
+            retCode1 = self.__IXN.setAttribute(localVPortHandler, '-connectedTo', localPortHandler)
+            retCode2 = self.__IXN.commit()
+        except Exception as excMsg:
+            return self.__ret_func(False,"error", "ERROR: exception [{}]".format(excMsg)  )
+
+        if (not self.__check_answer(retCode1)) or (not self.__check_answer(retCode2)) :
+            localMessage="ERROR: [{}/{}] unable to connect vport to port retCode1[{}] to retCode2[{}]".format(slotNo, portNo, retCode1, retCode2)
+            return self.__ret_func(False,"error",localMessage)
+        # Update vportlist with new vport 
+        return self.__ret_func(True,"success", "SUCCESS: vport and port [{}/{}] connected".format(slotNo, portNo))
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    def get_slot_port_handle_list(self, slotNo):   ### krepo not added ###
+        for portNo in range(1,(self.__maxPortNumberForCard+1)):
+            handlerPort = self.get_port_handler(slotNo, portNo)
+            if  handlerPort:
+                print  (handlerPort)
+            pass    
+        return True
+
+
+
+
+
+
+
+
+
+
+
+    def add_vport0(self, cardNumber, portNumber):       ### krepo added ###
+        """ add_vport(self, cardNumber, portNumber)
+            Purpose:
+                add a vport, and put its handler in the self.__DM_VPORTLIST dictionary.
+                the key to use to retrieve the handler is in the form "cardnumber/portnumber",
+                eg:  self.__DM_VPORTLIST[1/2]  
+            Return tuple:
+                ("True|False" , "answer_string"  )
+                True.............dictionary updated
+                False............dictionary not updated
+                answer_string....message for humans, to better understand 
+                                 what happened in the processing flow  
+        """
+        methodLocalName = self.__lc_current_method_name(embedKrepoInit=True)
+        if self.__chassisHandler == None:
+            return self.__ret_func(False,"error", "Port list not updated.Add chassis before!")
+        if len(self.__DM_CARDLIST.keys())  == 0:
+            return self.__ret_func(False,"error", "Port list not updated.Call init_chassis_cards_handle_list before!" )
+        if len(self.__DM_PORTLIST.keys())   == 0:
+            return self.__ret_func(False,"error", "Port list not updated.Call init_chassis_ports_handle_list() before!" )
+
+        keyTempNew="{}/{}".format(cardNumber,portNumber) 
+        try:
+            localPortHandler = self.__DM_PORTLIST[keyTempNew]
+            vport1     = self.__IXN.add(self.__DM_ROOT, 'vport')
+            retCode1   = self.__IXN.commit()
+            vport1     = self.__IXN.remapIds(vport1).replace("['","").replace("']","")
+            retCode2   = self.__IXN.commit()
+            if "OK" not in retCode1:
+                return self.__ret_func(False,"error", "ERROR: error in commit!" )
+            portAddress="{}/card:{}/port:{}".format(self.__chassisHandler,cardNumber,portNumber)  
+            self.__trc_inf("portAddress[{}]  ".format(portAddress))   
+            print("ORIGINAL CHASSIS HANDLER:[{}]".format(self.__chassisHandler))
+            mychassis = self.__IXN.add(self.__IXN.getRoot()+'availableHardware', 'chassis', '-hostname', self.__chassisIpAddress)
+            #print("vport1     :[{}]".format(vport1))
+            self.__DM_VPORTLIST[keyTempNew]=vport1 
+        except:
+            return self.__ret_func(False,"error", "ERROR: Port handler not found for port [{}]".format(keyTempNew))
+        try:
+            retCode1 = self.__IXN.setAttribute(vport1, '-connectedTo', portAddress)
+        except Exception as excMsg:
+            return self.__ret_func(False,"error", "ERROR: exception [{}]".format(excMsg)  )
+        try:
+            retCode2 = self.__IXN.commit()
+        except Exception as excMsg:
+            localMessage="ERROR: exception [{}]".format(excMsg)    
+            self.__trc_inf(localMessage) 
+            if "has already been assigned" in localMessage:
+                vPortToKill = str(excMsg).split("already been assigned to /")  
+                vPortToKill = vPortToKill[1]
+                #print ("vPortToKill  [{}]".format(vPortToKill))
+                vPortHandler2Kill = vport1.split("/")[0]+"/"+vPortToKill
+                print ("vPortHandler2Kill  [{}]".format(vPortHandler2Kill))
+                print("exists vPortHandler2Kill  [{}]".format(self.__IXN.exists(vPortHandler2Kill)))
+                retCode1 = self.__IXN.setAttribute(vPortHandler2Kill, '-connectedTo', self.__DM_NULL )
+                retCode2 = self.__IXN.commit()
+                print("exists BEFORE REMOVE RETCODE [{}]".format(self.__IXN.exists(vPortHandler2Kill)))
+                retCode3 = self.__IXN.remove(vPortHandler2Kill)
+                retCode4 = self.__IXN.commit()
+                print("exists BEFORE REMOVE RETCODE [{}]".format(self.__IXN.exists(vPortHandler2Kill)))
+            try:
+                #time.sleep(10)
+                retCode1 = self.__IXN.setAttribute(vport1, '-connectedTo', portAddress)
+                retCode2 = self.__IXN.commit()
+            except Exception as excMsg:
+                localMessage="ERROR: exception [{}]".format(excMsg)    
+                self.__trc_inf(localMessage) 
+            # to remove. here just to try to remove 
+            #self.__DM_VPORTLIST[keyTempNew]=vport1 
+            return self.__ret_func(False,"error", localMessage )
+        if ("OK" not in retCode1) or ("OK" not in retCode2):
+            return self.__ret_func(False,"error",  "ERROR: error in port[{}] -connectedTo vport[{}]".format(localPortHandler,vport1)  )
+        return self.__ret_func(True,"success", "SUCCESS: port[{}] added for handler [{}]".format(keyTempNew,vport1)  )
+
+
+
+    def add_vport2(self, cardNumber, portNumber):       ### krepo added ###
+        """ add_vport2(self, cardNumber, portNumber)
+            Purpose:
+                add a vport, and put its handler in the self.__DM_VPORTLIST dictionary.
+                the key to use to retrieve the handler is in the form "cardnumber/portnumber",
+                eg:  self.__DM_VPORTLIST[1/2]  
             Return tuple:
                 ("True|False" , "answer_string"  )
                 True.............dictionary updated
@@ -254,70 +552,135 @@ class InstrumentIXIA(Equipment):
         """
         methodLocalName = self.__lc_current_method_name(embedKrepoInit=True)
         # Parameters check
-        if self.__chassisHandler == None:
-            localMessage="Cardlist not updated not added. Add chassis [{}] before!".format(self.__chassisHandler)
+        if (self.__chassisHandler == None) or (len(self.__DM_CARDLIST.keys())==0) or (len(self.__DM_PORTLIST.keys()) == 0 ) :
+            return self.__ret_func(False,"error", "Config error:dictionary lists not updated!" )
+        keyTempNew="{}/{}".format(cardNumber,portNumber) 
+        if keyTempNew in self.__DM_PORTLIST.keys():
+            localPortHandler = self.__DM_PORTLIST[keyTempNew]
+            vport1     = self.__IXN.add(self.__DM_ROOT, 'vport')
+            retCode1   = self.__IXN.commit()
+            vport1     = self.__IXN.remapIds(vport1).replace("['","").replace("']","")
+            retCode2   = self.__IXN.commit()
+            if "OK" not in retCode1:
+                return self.__ret_func(False,"error", "ERROR: error in commit" )
+            portAddress="{}/card:{}/port:{}".format(self.__chassisHandler,cardNumber,portNumber)  
+            self.__trc_inf("portAddress[{}]  ".format(portAddress))   
+            print("ORIGINAL CHASSIS HANDLER:[{}]".format(self.__chassisHandler))
+            mychassis = self.__IXN.add(self.__IXN.getRoot()+'availableHardware', 'chassis', '-hostname', self.__chassisIpAddress)
+            #print("vport1     :[{}]".format(vport1))
+            self.__DM_VPORTLIST[keyTempNew]=vport1 
+        else:
+            return self.__ret_func(False,"error", "ERROR: key [{}] not found in __DM_PORTLIST".format(keyTempNew) )
+        try:
+            retCode1 = self.__IXN.setAttribute(vport1, '-connectedTo', portAddress)
+        except Exception as excMsg:
+            return self.__ret_func(False,"error","ERROR: exception [{}]".format(excMsg) )
+        try:
+            retCode2 = self.__IXN.commit()
+        except Exception as excMsg:
+            localMessage="ERROR: exception [{}]".format(excMsg)    
+            self.__trc_inf(localMessage) 
+            if "has already been assigned" in localMessage:
+                vPortToKill = str(excMsg).split("already been assigned to /")  
+                vPortToKill = vPortToKill[1]
+                #print ("vPortToKill  [{}]".format(vPortToKill))
+                vPortHandler2Kill = vport1.split("/")[0]+"/"+vPortToKill
+                print ("vPortHandler2Kill  [{}]".format(vPortHandler2Kill))
+                print("exists vPortHandler2Kill  [{}]".format(self.__IXN.exists(vPortHandler2Kill)))
+                retCode1 = self.__IXN.setAttribute(vPortHandler2Kill, '-connectedTo', self.__DM_NULL )
+                retCode2 = self.__IXN.commit()
+                print("exists BEFORE REMOVE RETCODE [{}]".format(self.__IXN.exists(vPortHandler2Kill)))
+                retCode3 = self.__IXN.remove(vPortHandler2Kill)
+                retCode4 = self.__IXN.commit()
+                print("exists BEFORE REMOVE RETCODE [{}]".format(self.__IXN.exists(vPortHandler2Kill)))
+            try:
+                retCode1 = self.__IXN.setAttribute(vport1, '-connectedTo', portAddress)
+                retCode2 = self.__IXN.commit()
+            except Exception as excMsg:
+                localMessage="ERROR: exception [{}]".format(excMsg)    
+                self.__trc_inf(localMessage) 
             self.__trc_err(localMessage) 
             self.__method_failure(methodLocalName, None, "", localMessage)
             return False, localMessage
-        tmpList = list(self.__bridgeHandler.getList( self.__chassisHandler,'card').replace("]","").replace("[","").split(","))
-        for elementTmp in tmpList:
-            keyTemp=elementTmp.replace("'","").split("card:")[1]
-            print ("[{}][{}][{}][{}]".format(keyTemp,type(keyTemp),elementTmp,type(elementTmp)))
-            self.__DM_CARDLIST[keyTemp]=elementTmp
-        localMessage="SUCCESS: card list updated"
-        self.__trc_inf(localMessage) 
-        self.__method_success(methodLocalName, None, localMessage)
-        return True, localMessage
+        if ("OK" not in retCode1) or ("OK" not in retCode2):
+            return self.__ret_func(False,"error", "ERROR: error in port[{}] -connectedTo vport[{}]".format(localPortHandler,vport1)    )
+        return self.__ret_func(True,"success", "SUCCESS: port[{}] added for handler [{}]".format(keyTempNew,vport1)     )
+ 
+ 
+ 
 
 
 
-    def init_chassis_port_list(self):       ### krepo added ###
-        """ init_chassis_port_list(self)
-            Purpose:
-                initializes the self.__DM_PORTLIST dictionary of the ports physically available in the chassis 
-            Return tuple:
-                ("True|False" , "answer_string"  )
-                True.............dictionary updated
-                False............dictionary not updated
-                answer_string....message for humans, to better understand 
-                                 what happened in the processing flow  
-        """
-        methodLocalName = self.__lc_current_method_name(embedKrepoInit=True)
-        # Parameters check
-        if self.__chassisHandler == None:
-            localMessage="Port not updated. Add chassis [{}] before!".format(self.__chassisHandler)
-            self.__trc_err(localMessage) 
-            self.__method_failure(methodLocalName, None, "", localMessage)
-            return False, localMessage
-        cardNumber=len(self.__DM_CARDLIST.keys())  
-        if cardNumber == 0:
-            localMessage="Port not updated. Call init_chassis_card_list [{}] before!"
-            self.__trc_err(localMessage) 
-            self.__method_failure(methodLocalName, None, "", localMessage)
-            return False, localMessage
-        print ("scansione card/...")
-       
-        for currentKey in self.__DM_CARDLIST.keys():
-            currentCard= self.__DM_CARDLIST[currentKey]  
-            print (currentKey ," ->  ", currentCard)
-             
-        
-        
-        
-        
-        localMessage="Found [{}] card".format(cardNumber)
-        #print (self.__DM_CARDLIST)
-        self.__trc_inf(localMessage) 
-  
-        localMessage="SUCCESS: port list updated"
-        self.__trc_inf(localMessage) 
-        self.__method_success(methodLocalName, None, localMessage)
-        return True, localMessage
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
 
  
+
+    def remove_vport(self, cardNumber, portNumber):       ### krepo added ###
+        """ remove_vport(self, cardNumber, portNumber)
+            Purpose:
+                remove a vport and its handler from the self.__DM_VPORTLIST dictionary.
+                eg:  self.__DM_VPORTLIST[1/2]  
+            Return tuple:
+                ("True|False" , "answer_string"  )
+                True.............dictionary updated
+                False............dictionary not updated
+                answer_string....message for humans, to better understand 
+                                 what happened in the processing flow  
+        """
+        methodLocalName = self.__lc_current_method_name(embedKrepoInit=True)
+        # Parameters check
+        if self.__chassisHandler == None:
+            return self.__ret_func(False,"error", "Port list not updated.Add chassis before!")
+        if len(self.__DM_CARDLIST.keys())  == 0:
+            return self.__ret_func(False,"error", "Port list not updated.Call init_chassis_cards_handle_list before!" )
+        if len(self.__DM_PORTLIST.keys())   == 0:
+            return self.__ret_func(False,"error", "Port list not updated.Call init_chassis_ports_handle_list() before!" )
+
+
+        keyTempNew="{}/{}".format(cardNumber,portNumber) 
+        try:
+            localvPortHandler = self.__DM_PORTLIST[keyTempNew]
+        except:
+            return self.__ret_func(False,"error", "ERROR: Port handler not found for port [{}]".format(keyTempNew)  )
+       
+        try:
+            retCode1 = self.__IXN.setAttribute(localvPortHandler, '-connectedTo', self.__DM_NULL )
+            retCode2 = self.__IXN.commit()
+        except Exception as excMsg:
+            localMessage="ERROR: exception [{}]".format(excMsg)    
+            self.__trc_err(localMessage) 
+
+       
+        try:
+            print("exists BEFORE REMOVE RETCODE [{}]".format(self.__IXN.exists(localvPortHandler)))
+            retCode3 = self.__IXN.remove(localvPortHandler)
+            retCode4 = self.__IXN.commit()
+            print("REMOVE RETCODE [{}]".format(retCode3))
+            print("COMMIT AFTER REMOVE RETCODE [{}]".format(retCode4))
+            print("exists AFTER REMOVE RETCODE [{}]".format(self.__IXN.exists(localvPortHandler)))
+        except Exception as excMsg:
+            return self.__ret_func(False,"error", "ERROR: exception [{}]".format(excMsg)    )
+
+        if ("OK" not in retCode3) or ("OK" not in retCode4):
+            return self.__ret_func(False,"error",  "ERROR:  port[{}] not removed for handler [{}]".format(keyTempNew,localvPortHandler)  )
+        del self.__DM_VPORTLIST[keyTempNew]
+        return self.__ret_func(True, "success", "SUCCESS: WWW port[{}] removed for handler [{}]".format(keyTempNew,localvPortHandler)   )
 
 
 
@@ -776,7 +1139,24 @@ class InstrumentIXIA(Equipment):
         #else:
         #   insert HERE the new logging method (still in progress...)   
         print ("\n[[[ @@@@ [{}] Method Call ... Krepo[{}]   @@@ ]]] ".format(methodName,embedKrepoInit))
+        if self.__krepo and embedKrepoInit == True:
+            self.__krepo.start_time()
+        return methodName 
 
+
+    def __lc_caller_method_name(self, embedKrepoInit=False):
+        # Print current the method who calls this  
+        # 
+        # specify embedKrepoInit=True to enable the embedded  __krepo.start_time() call
+        # 
+        # methodName = inspect.stack()[0][3]  # <-- current method name: __lc_current_method_name)
+        #
+        methodName = inspect.stack()[2][3]   # <-- two levels of call
+        #if __name__ == "__main__":
+        #    print ("\n[[[ @@@@ [{}] Method Call ... Krepo[{}]   @@@ ]]] ".format(methodName,embedKrepoInit))
+        #else:
+        #   insert HERE the new logging method (still in progress...)   
+        print ("\n[[[ ++++ [{}] Method Call ... Krepo[{}]   ++++ ]]] ".format(methodName,embedKrepoInit))
         if self.__krepo and embedKrepoInit == True:
             self.__krepo.start_time()
         return methodName 
