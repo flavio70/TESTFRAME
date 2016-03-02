@@ -72,14 +72,19 @@ class Test(TestCase):
         test Body Section implementation
         insert Main body code for your test below
         '''
+        # Step #0 - Add chassis and clear ownership of all the ports of the used card(9, in this case)
         IXIA.add_chassis()
         IXIA.clear_slot_ownership(9)
+
         #IXIA.init_chassis_cards_handle_list()
         #IXIA.init_chassis_ports_handle_list()
         #IXIA.get_card_handler(9)
         #IXIA.get_slot_port_handle_list(9)
+        
+        # Step #0.A - Clear ownership of a specific port via (slot,port) coordinates   
         #IXIA.clear_port_ownership(9,1)
         #IXIA.clear_port_ownership(9,44)
+
         #IXIA.add_vport(9,12)
         #IXIA.add_vport(9,1)
         #IXIA.remove_vport(9,12)
@@ -88,22 +93,34 @@ class Test(TestCase):
         #IXIA.add_vport(9,1)
         #IXIA.add_vport(9,1) 
         #print (risultato)
+
   
+        #IXIA.create_vport(9,3)
+        #IXIA.create_vport(9,4)
+        #IXIA.create_vport(9,5)
+        #IXIA.create_vport(9,6)
+        #IXIA.connect_vport_to_physical_port(9,3)
+        #IXIA.connect_vport_to_physical_port(9,4)
+        #IXIA.connect_vport_to_physical_port(9,5)
+        #IXIA.connect_vport_to_physical_port(9,6)
 
+        # Step #1 - Create all the vports before 
         IXIA.create_vport(9,1)
-        IXIA.create_vport(9,2)
-        IXIA.create_vport(9,3)
         IXIA.create_vport(9,4)
-        IXIA.create_vport(9,5)
-        IXIA.create_vport(9,6)
 
-
+        # Step #2 - Connect all the vports to physical ports after 
         IXIA.connect_vport_to_physical_port(9,1)
-        IXIA.connect_vport_to_physical_port(9,2)
-        IXIA.connect_vport_to_physical_port(9,3)
         IXIA.connect_vport_to_physical_port(9,4)
-        IXIA.connect_vport_to_physical_port(9,5)
-        IXIA.connect_vport_to_physical_port(9,6)
+        
+        #IXIA.create_vport_interface(9,1,"porta 9/1")
+        #IXIA.create_vport_interface(9,4,"porta 9/4")
+        #IXIA.set_vport_parameters(9,1)
+        #IXIA.set_vport_parameters(9,4)
+        
+        # Step #3 - Check all ports state before preceed  
+        IXIA.get_port_status(9,1)
+        IXIA.get_port_status(9,4)
+
 
 
 

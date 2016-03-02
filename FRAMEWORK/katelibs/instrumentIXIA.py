@@ -54,6 +54,7 @@ class InstrumentIXIA(Equipment):
         self.__bridgePort           = 8009             # ixnetwork server port
         self.__pingRetryNumber      = 1                #  Retry number for -c ping option
         self.__maxPortNumberForCard = 32               #  Retry number for -c ping option
+        self.__checkPortUpRetries   = 60               #  Retry number for -c ping option
         self.__IXN        = None             # none before init
         # Chassis Connection
         self.__chassisIpAddress      = None             # ixia instrument (chassis) address       
@@ -73,6 +74,7 @@ class InstrumentIXIA(Equipment):
         self.__DM_CARDLIST          = dict()                        
         self.__DM_PORTLIST          = dict()                        
         self.__DM_VPORTLIST         = dict()                        
+        self.__DM_VPORTINTERFACE    = dict()                        
         # !!! Don't delete the following lines !!!
         super().__init__(label, self.__prs.get_id(label))
         self.__get_instrument_info_from_db(self.__prs.get_id(label)) # inizializza i dati di IP, tipo di Strumento ecc... dal DB
@@ -297,7 +299,31 @@ class InstrumentIXIA(Equipment):
             return True
         else:
             return False
- 
+
+
+
+    def set_vport_parameters(self, slotNo, portNo, portType="fiber"):   ### krepo not added ###
+        """  set_vport_parameters(self, slotNo, portNo)
+            Purpose:
+               set the port parameters to a predefined state (fiber+autoneg)
+        """
+        methodLocalName = self.__lc_current_method_name(embedKrepoInit=True)
+        keyTempNew="{}/{}".format(slotNo,portNo) 
+        localVPortHandler = self.__DM_VPORTLIST.get(keyTempNew, None)
+        if not localVPortHandler:
+            localMessage="WARNING: port handler [{}/{}] NOT FOUND".format(slotNo, portNo)
+            return  False,"error",localMessage 
+        tempPortParameterPath="{}/l1Config/ethernet".format(localVPortHandler)  
+        try:
+            retCode1 = self.__IXN.setMultiAttribute(tempPortParameterPath, '-autoNegotiate', 'True', '-media', 'fiber' , '-loopback', 'False' , '-enablePPM' ,'False' , '-autoInstrumentation', 'endOfFrame' , '-speed' ,'speed100fd' , '-flowControlDirectedAddress', '01 80 C2 00 00 01' ,'-ppm', '0' , '-enabledFlowControl', 'True')
+            retCode2 = self.__IXN.commit()
+        except Exception as excMsg:
+            return self.__ret_func(False,"error", "ERROR: exception [{}]".format(excMsg)  )
+        #print ("tempPortParameterPath param====================================================")
+        #print (self.__IXN.help(tempPortParameterPath))
+        return  True, "SUCCESS: set_vport_parameters [{}] created ".format(keyTempNew) 
+
+
 
     def create_vport(self, slotNo, portNo):   ### krepo added ###
         """  create_vport(self, slotNo, portNo)
@@ -342,7 +368,48 @@ class InstrumentIXIA(Equipment):
             return self.__ret_func(False,"error",localMessage)
         # Update vportlist with new vport 
         self.__DM_VPORTLIST[keyTempNew]=vport1 
+        #print ("__DM_PORTLIST param====================================================")
+        #print (self.__IXN.help(self.__DM_PORTLIST[keyTempNew]))
+        #print ("__DM_VPORTLIST param====================================================")
+        #print (self.__IXN.help(self.__DM_VPORTLIST[keyTempNew]))
+        
+        self.set_vport_parameters(slotNo, portNo)
         return self.__ret_func(True,"success", "SUCCESS: vport [{}] created ".format(keyTempNew))
+
+
+ 
+
+
+
+
+
+
+
+    def create_vport_interface(self, slotNo, portNo, templateName):   ### krepo not added ###
+        methodLocalName = self.__lc_current_method_name(embedKrepoInit=True)
+        keyTempNew="{}/{}".format(slotNo,portNo) 
+        localVPortHandler = self.__DM_VPORTLIST.get(keyTempNew, None)
+        if not localVPortHandler:
+            localMessage="WARNING: port handler [{}/{}] NOT FOUND".format(slotNo, portNo)
+            return  False,"error",localMessage 
+        localPortInterface = self.__IXN.add(localVPortHandler, 'interface')
+        addPortInterfaceResult = self.__IXN.setMultiAttribute(localPortInterface, '-enabled', 'True', '-description', templateName )
+        retCode1 = self.__IXN.commit()
+        if not self.__check_answer(retCode1):
+            localMessage="WARNING: unable to setMultiAttribute to portInterface[{}] ->[{}]".format(addPortInterfaceResult, retCode1)
+            return False,"error",localMessage 
+        localPortInterface   = self.__IXN.remapIds(localPortInterface).replace("['","").replace("']","")
+        retCode1 = self.__IXN.commit()
+        if not self.__check_answer(retCode1):
+            localMessage="WARNING: unable to remapIds [{}] or commit [{}] new vport".format(vport1, retCode1)
+            return False,"error",localMessage 
+        # Update vportlist with new vport 
+        self.__DM_VPORTINTERFACE[keyTempNew]=localPortInterface 
+        #print (self.__IXN.help(localPortInterface))
+        #print ("__DM_VPORTINTERFACE param====================================================")
+        #print (self.__IXN.help(self.__DM_VPORTINTERFACE[keyTempNew]))
+        return  True, "SUCCESS: create_vport_interface [{}] created ".format(keyTempNew) 
+
 
 
     def connect_vport_to_physical_port(self, slotNo, portNo):   ### krepo added ###
@@ -385,7 +452,6 @@ class InstrumentIXIA(Equipment):
             retCode2 = self.__IXN.commit()
         except Exception as excMsg:
             return self.__ret_func(False,"error", "ERROR: exception [{}]".format(excMsg)  )
-
         if (not self.__check_answer(retCode1)) or (not self.__check_answer(retCode2)) :
             localMessage="ERROR: [{}/{}] unable to connect vport to port retCode1[{}] to retCode2[{}]".format(slotNo, portNo, retCode1, retCode2)
             return self.__ret_func(False,"error",localMessage)
@@ -393,7 +459,36 @@ class InstrumentIXIA(Equipment):
         return self.__ret_func(True,"success", "SUCCESS: vport and port [{}/{}] connected".format(slotNo, portNo))
 
 
+    def get_port_status(self, slotNo, portNo):   ### krepo added ###
+        """   get_port_status(self, slotNo, portNo)    
+            Purpose:
+              retrieve the port status and wait until port became UP
+            Return tuple:
+               ("True|False" , "answer_string"  )
+                True.............port UP and ready
+                False............Port not ready after self.__checkPortUpRetries retries (1 retry every second)
+                answer_string....message for humans, to better understand  what happened in the processing flow  
+        
+        """
+        methodLocalName = self.__lc_current_method_name(embedKrepoInit=True)
+        if (not slotNo) or (not portNo):
+            localMessage="ERROR: null portNo or slot"
+            return self.__ret_func(False,"error",localMessage)
+        keyTempNew="{}/{}".format(slotNo,portNo) 
 
+        localVPortHandler = self.__DM_VPORTLIST.get(keyTempNew, None)
+        if localVPortHandler == None:
+            localMessage="ERROR: port [{}] not found in VPORTLIST".format(keyTempNew)
+            return self.__ret_func(False,"error",localMessage)
+        print("localVPortHandler [{}]".format(localVPortHandler))
+    
+        for x in range(0,self.__checkPortUpRetries):
+            assignedPortState = self.__IXN.getAttribute(localVPortHandler,'-state')
+            print("After [{}] sec: assignedPortState [{}]".format(x,assignedPortState))
+            if assignedPortState == "up": 
+                break
+            time.sleep(1)
+        return self.__ret_func(True,"success", "SUCCESS: vport and port [{}/{}] connected".format(slotNo, portNo))
 
 
 
