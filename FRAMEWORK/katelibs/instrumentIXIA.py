@@ -494,12 +494,12 @@ class InstrumentIXIA(Equipment):
 
 
     def create_vport_interface(self, slotNo, portNo, description = None , ipAddress = None, ipGetaway = None, macAddress = None):   ### krepo added ###
-        '''Method
-               create_vport_interface(self, slotNo, portNo, description = "k@te protocol interface" , ipAddress = None, ipGetaway = None, macAddress = None):   ### krepo added ###
-           Purpose:
-               create an ethernet interface with the specified parameters
+        ''' Method
+                create_vport_interface(self, slotNo, portNo, description = None , ipAddress = None, ipGetaway = None, macAddress = None)   
+            Purpose:
+                create an ethernet interface with the specified parameters
             Return tuple:
-               ("True|False" , "answer_string"  )
+                ("True|False" , "answer_string"  )
                 True.............port UP and ready
                 False............Port not ready after self.__checkPortUpRetries retries (1 retry every second)
                 answer_string....message for humans, to better understand  what happened in the processing flow  
