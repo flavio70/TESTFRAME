@@ -108,7 +108,7 @@ class Test(TestCase):
         IXIA.create_vport(9,1)
         IXIA.create_vport(9,4)
 
-        # Step #2 - Connect all the vports to physical ports after 
+        # Step #2 - Connect all the vports to physical ports just after that all vports have been created
         IXIA.connect_vport_to_physical_port(9,1)
         IXIA.connect_vport_to_physical_port(9,4)
         
@@ -117,12 +117,14 @@ class Test(TestCase):
         #IXIA.set_vport_parameters(9,1)
         #IXIA.set_vport_parameters(9,4)
         
-        # Step #3 - Check all ports state before preceed  
+        # Step #3 - Check all ports state before preceed (max 60 sec pause for each method call) 
         IXIA.get_port_status(9,1)
         IXIA.get_port_status(9,4)
 
-
-
+        # Step #4 - Create all ports interfaces here (ip/mac/gw) 
+        IXIA.create_vport_interface(9, 1, ipAddress = "1.1.1.1")
+        IXIA.create_vport_interface(9, 4, ipAddress = "1.1.1.4",ipGetaway = "1.1.1.2")
+ 
 
     def test_cleanup(self):
         '''

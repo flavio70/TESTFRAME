@@ -69,12 +69,19 @@ class InstrumentIXIA(Equipment):
         #self.__DM_STATISTICS        = None                       
         #self.__DM_TESTCONFIGURATION = None                       
         #self.__DM_TRAFFIC           = None                       
-        #Chassis-specific Data model (DM)  
+        #Chassis-specific Data model  
         self.__DM_CHASSIS           = None                       
         self.__DM_CARDLIST          = dict()                        
         self.__DM_PORTLIST          = dict()                        
         self.__DM_VPORTLIST         = dict()                        
-        self.__DM_VPORTINTERFACE    = dict()                        
+        self.__DM_VPORTINTERFACE    = dict()         
+        
+        #Port-specific Data model   
+        self.__DM_PORT_IP_ADDRESS   = dict()                       
+        self.__DM_PORT_IP_GETAWAY   = dict()                       
+        self.__DM_PORT_MAC_ADDRESS  = dict()                       
+        self.__DM_PORT_IPV4IFACE_OBJ= dict()                       
+       
         # !!! Don't delete the following lines !!!
         super().__init__(label, self.__prs.get_id(label))
         self.__get_instrument_info_from_db(self.__prs.get_id(label)) # inizializza i dati di IP, tipo di Strumento ecc... dal DB
@@ -372,44 +379,8 @@ class InstrumentIXIA(Equipment):
         #print (self.__IXN.help(self.__DM_PORTLIST[keyTempNew]))
         #print ("__DM_VPORTLIST param====================================================")
         #print (self.__IXN.help(self.__DM_VPORTLIST[keyTempNew]))
-        
         self.set_vport_parameters(slotNo, portNo)
         return self.__ret_func(True,"success", "SUCCESS: vport [{}] created ".format(keyTempNew))
-
-
- 
-
-
-
-
-
-
-
-    def create_vport_interface(self, slotNo, portNo, templateName):   ### krepo not added ###
-        methodLocalName = self.__lc_current_method_name(embedKrepoInit=True)
-        keyTempNew="{}/{}".format(slotNo,portNo) 
-        localVPortHandler = self.__DM_VPORTLIST.get(keyTempNew, None)
-        if not localVPortHandler:
-            localMessage="WARNING: port handler [{}/{}] NOT FOUND".format(slotNo, portNo)
-            return  False,"error",localMessage 
-        localPortInterface = self.__IXN.add(localVPortHandler, 'interface')
-        addPortInterfaceResult = self.__IXN.setMultiAttribute(localPortInterface, '-enabled', 'True', '-description', templateName )
-        retCode1 = self.__IXN.commit()
-        if not self.__check_answer(retCode1):
-            localMessage="WARNING: unable to setMultiAttribute to portInterface[{}] ->[{}]".format(addPortInterfaceResult, retCode1)
-            return False,"error",localMessage 
-        localPortInterface   = self.__IXN.remapIds(localPortInterface).replace("['","").replace("']","")
-        retCode1 = self.__IXN.commit()
-        if not self.__check_answer(retCode1):
-            localMessage="WARNING: unable to remapIds [{}] or commit [{}] new vport".format(vport1, retCode1)
-            return False,"error",localMessage 
-        # Update vportlist with new vport 
-        self.__DM_VPORTINTERFACE[keyTempNew]=localPortInterface 
-        #print (self.__IXN.help(localPortInterface))
-        #print ("__DM_VPORTINTERFACE param====================================================")
-        #print (self.__IXN.help(self.__DM_VPORTINTERFACE[keyTempNew]))
-        return  True, "SUCCESS: create_vport_interface [{}] created ".format(keyTempNew) 
-
 
 
     def connect_vport_to_physical_port(self, slotNo, portNo):   ### krepo added ###
@@ -468,7 +439,6 @@ class InstrumentIXIA(Equipment):
                 True.............port UP and ready
                 False............Port not ready after self.__checkPortUpRetries retries (1 retry every second)
                 answer_string....message for humans, to better understand  what happened in the processing flow  
-        
         """
         methodLocalName = self.__lc_current_method_name(embedKrepoInit=True)
         if (not slotNo) or (not portNo):
@@ -490,50 +460,134 @@ class InstrumentIXIA(Equipment):
             time.sleep(1)
         return self.__ret_func(True,"success", "SUCCESS: vport and port [{}/{}] connected".format(slotNo, portNo))
 
+ 
+
+    def create_vport_interface_old(self, slotNo, portNo, templateName):   ### krepo not added ###
+        #methodLocalName = self.__lc_current_method_name()
+        #keyTempNew="{}/{}".format(slotNo,portNo) 
+        #localVPortHandler = self.__DM_VPORTLIST.get(keyTempNew, None)
+        #if not localVPortHandler:
+            #localMessage="WARNING: port handler [{}/{}] NOT FOUND".format(slotNo, portNo)
+            #return  False,"error",localMessage 
+        #localPortInterface = self.__IXN.add(localVPortHandler, 'interface')
+        #addPortInterfaceResult = self.__IXN.setMultiAttribute(localPortInterface, '-enabled', 'True', '-description', templateName )
+        #retCode1 = self.__IXN.commit()
+        #if not self.__check_answer(retCode1):
+            #localMessage="WARNING: unable to setMultiAttribute to portInterface[{}] ->[{}]".format(addPortInterfaceResult, retCode1)
+            #return False,"error",localMessage 
+        localPortInterface   = self.__IXN.remapIds(localPortInterface).replace("['","").replace("']","")
+        retCode1 = self.__IXN.commit()
+        if not self.__check_answer(retCode1):
+            localMessage="WARNING: unable to remapIds [{}] or commit [{}] new vport".format(vport1, retCode1)
+            return False,"error",localMessage 
+        # Update vportlist with new vport 
+        self.__DM_VPORTINTERFACE[keyTempNew]=localPortInterface 
+        #print (self.__IXN.help(localPortInterface))
+        #print ("__DM_VPORTINTERFACE param====================================================")
+        #print (self.__IXN.help(self.__DM_VPORTINTERFACE[keyTempNew]))
+        return  True, "SUCCESS: create_vport_interface [{}] created ".format(keyTempNew) 
+
+ 
 
 
 
 
 
+    def create_vport_interface(self, slotNo, portNo, description = None , ipAddress = None, ipGetaway = None, macAddress = None):   ### krepo added ###
+        '''Method
+               create_vport_interface(self, slotNo, portNo, description = "k@te protocol interface" , ipAddress = None, ipGetaway = None, macAddress = None):   ### krepo added ###
+           Purpose:
+               create an ethernet interface with the specified parameters
+            Return tuple:
+               ("True|False" , "answer_string"  )
+                True.............port UP and ready
+                False............Port not ready after self.__checkPortUpRetries retries (1 retry every second)
+                answer_string....message for humans, to better understand  what happened in the processing flow  
+        '''
+        self.__lc_current_method_name(embedKrepoInit=True)
+        keyTempNew="{}/{}".format(slotNo,portNo) 
+        localVPortHandler = self.__DM_VPORTLIST.get(keyTempNew, None)
+        if not localVPortHandler:
+            localMessage="ERROR: port handler [{}/{}] NOT FOUND".format(slotNo, portNo)
+            return  self.__ret_func(False,"error", localMessage)
+        try:
+            localPortInterface = self.__IXN.add(localVPortHandler, 'interface')
+            if description == None:
+                description = "Protocol interface port [{}]".format(keyTempNew)
+            addPortInterfaceResult = self.__IXN.setMultiAttribute(localPortInterface, '-enabled', 'True', '-description', description)
+            retCode1               = self.__IXN.commit()
+            
+            if not self.__check_answer(retCode1):
+                localMessage="ERROR: unable to setMultiAttribute to portInterface[{}] ->[{}]".format(addPortInterfaceResult, retCode1)
+                return  self.__ret_func(False,"error", localMessage)
+            localPortInterface   = self.__IXN.remapIds(localPortInterface).replace("['","").replace("']","")
+            retCode1 = self.__IXN.commit()
+            if not self.__check_answer(retCode1):
+                localMessage="ERROR: unable to remapIds [{}] or commit [{}] new vport".format(localPortInterface, retCode1)
+                return  self.__ret_func(False,"error", localMessage)
+            self.__DM_VPORTINTERFACE[keyTempNew]=localPortInterface 
+        except Exception as excMsg:
+            return self.__ret_func(False,"error", "ERROR [Port {}] : exception [{}]".format(keyTempNew,excMsg)  )
+        #Port-specific Data model   
+        #self.__DM_PORT_IP_ADDRESS[keyTempNew]  = ipAddress                    
+        #self.__DM_PORT_IP_GETAWAY[keyTempNew]  = ipGetaway                  
+        #self.__DM_PORT_MAC_ADDRESS[keyTempNew] = macAddress
+        # Mac address specific assignment 
+        if macAddress != None:
+            #macAddressHandler="{}/ethernet".format(localPortInterface)
+            try:
+                #retCode1 = self.__IXN.setAttribute(macAddressHandler, '-macAddress', macAddress )
+                retCode1 = self.__IXN.setAttribute(localPortInterface + "/ethernet", '-macAddress', macAddress )
+                retCode2 = self.__IXN.commit()
+                if not self.__check_answer(retCode2):
+                    localMessage="ERROR:  [{}] [{}]".format(retCode1, retCode2)
+                    return  self.__ret_func(False,"error", localMessage)
+            except Exception as excMsg:
+                return self.__ret_func(False,"error", "ERROR [Port {}] : exception [{}]".format(keyTempNew,excMsg)  )
+        # Ip/Mac Addresses specific assignment 
+        if (ipAddress != None) or  (ipGetaway != None) :
+            if self.__DM_PORT_IPV4IFACE_OBJ.get(keyTempNew, None) == None:   
+                ipv4InterfaceObject = self.__IXN.add(localPortInterface, 'ipv4')
+                retCode1            = self.__IXN.commit()
+                ipv4InterfaceObject = self.__IXN.remapIds(ipv4InterfaceObject).replace("['","").replace("']","")
+                self.__DM_PORT_IPV4IFACE_OBJ[keyTempNew]=ipv4InterfaceObject
+            else:
+                ipv4InterfaceObject = self.__DM_PORT_IPV4IFACE_OBJ.get(keyTempNew, None)
+            try:
+                if (ipAddress != None) and  (ipGetaway == None):
+                    retCode1 = self.__IXN.setMultiAttribute(ipv4InterfaceObject, '-ip', ipAddress, '-maskWidth', '24'  )
+                elif (ipAddress == None) and  (ipGetaway != None):   
+                    retCode1 = self.__IXN.setMultiAttribute(ipv4InterfaceObject, '-gateway', ipGetaway, '-maskWidth', '24'  )
+                else: # (ipAddress != None) and  (ipGetaway != None):     
+                    retCode1 = self.__IXN.setMultiAttribute(ipv4InterfaceObject, '-gateway', ipGetaway, '-ip', ipAddress, '-maskWidth', '24'  )
+                retCode2 = self.__IXN.commit()
+                if not self.__check_answer(retCode2):
+                    localMessage="ERROR:  [{}] [{}]".format(retCode1, retCode2)
+                    return  self.__ret_func(False,"error", localMessage)
+            except Exception as excMsg:
+                return self.__ret_func(False,"error", "ERROR [Port {}] : exception [{}]".format(keyTempNew,excMsg)  )
+
+        newIpAddress  = self.__IXN.getAttribute(ipv4InterfaceObject,'-ip')
+        newIpGetaway  = self.__IXN.getAttribute(ipv4InterfaceObject,'-gateway')
+        maskWidth     = self.__IXN.getAttribute(ipv4InterfaceObject,'-maskWidth')
+        newMacAddress = self.__IXN.getAttribute(localPortInterface + "/ethernet", '-macAddress')
+        
+        
+        self.__DM_PORT_IP_ADDRESS[keyTempNew]  = newIpAddress                    
+        self.__DM_PORT_IP_GETAWAY[keyTempNew]  = newIpGetaway                  
+        self.__DM_PORT_MAC_ADDRESS[keyTempNew] = newMacAddress
 
 
+        print ("[ipv4InterfaceObject][Port {}] ====================================================".format(keyTempNew))
+        print("ip         [{}]".format(newIpAddress))
+        print("gateway    [{}]".format(newIpGetaway))
+        print("macaddress [{}]".format(newMacAddress))
+        print("maskWidth  [{}]".format(maskWidth))
+
+        #print (self.__IXN.help(ipv4InterfaceObject))
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+        return self.__ret_func(True,"success", "SUCCESS: create_vport_interface [{}] created [{}][{}][{}]".format(keyTempNew,ipAddress,ipGetaway,macAddress)  )
 
 
 
@@ -556,7 +610,7 @@ class InstrumentIXIA(Equipment):
 
 
 
-    def add_vport0(self, cardNumber, portNumber):       ### krepo added ###
+    def add_vport0___RIMUOVERE(self, cardNumber, portNumber):       ### krepo added ###
         """ add_vport(self, cardNumber, portNumber)
             Purpose:
                 add a vport, and put its handler in the self.__DM_VPORTLIST dictionary.
@@ -632,7 +686,7 @@ class InstrumentIXIA(Equipment):
 
 
 
-    def add_vport2(self, cardNumber, portNumber):       ### krepo added ###
+    def add_vport2____RIMUOVERE(self, cardNumber, portNumber):       ### krepo added ###
         """ add_vport2(self, cardNumber, portNumber)
             Purpose:
                 add a vport, and put its handler in the self.__DM_VPORTLIST dictionary.
