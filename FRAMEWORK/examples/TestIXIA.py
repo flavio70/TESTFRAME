@@ -106,10 +106,14 @@ class Test(TestCase):
 
         # Step #1 - Create all the vports before 
         IXIA.create_vport(9,1)
+        IXIA.create_vport(9,2)
+        IXIA.create_vport(9,3)
         IXIA.create_vport(9,4)
 
         # Step #2 - Connect all the vports to physical ports just after that all vports have been created
         IXIA.connect_vport_to_physical_port(9,1)
+        IXIA.connect_vport_to_physical_port(9,2)
+        IXIA.connect_vport_to_physical_port(9,3)
         IXIA.connect_vport_to_physical_port(9,4)
         
         #IXIA.create_vport_interface(9,1,"porta 9/1")
@@ -119,12 +123,32 @@ class Test(TestCase):
         
         # Step #3 - Check all ports state before preceed (max 60 sec pause for each method call) 
         IXIA.get_port_status(9,1)
+        IXIA.get_port_status(9,2)
+        IXIA.get_port_status(9,3)
         IXIA.get_port_status(9,4)
 
         # Step #4 - Create all ports interfaces here (ip/mac/gw) 
         IXIA.create_vport_interface(9, 1, ipAddress = "1.1.1.1")
-        IXIA.create_vport_interface(9, 4, ipAddress = "1.1.1.4",ipGetaway = "1.1.1.2")
- 
+        IXIA.create_vport_interface(9, 2, ipAddress = "1.1.1.2",ipGetaway = "1.1.1.3")
+        IXIA.create_vport_interface(9, 3, ipAddress = "1.1.1.3",ipGetaway = "1.1.1.2")
+        IXIA.create_vport_interface(9, 4, ipAddress = "1.1.1.4",ipGetaway = "1.1.1.4")
+
+        # Step #5 - Create traffic profiles (differnt names, same defaults)
+        IXIA.create_traffic_item(itemName = "Traffic type 1")
+        IXIA.create_traffic_item(itemName = "Traffic type 2")
+        IXIA.create_traffic_item(itemName = "Traffic type 3")
+
+        # Step #5 - Config tracking for the above -defined traffic profiles
+        IXIA.config_traffic_tracking(itemName = "Traffic type 1")
+        track01=['flowGroup2', 'sourceDestEndpointPair2']
+        IXIA.config_traffic_tracking(itemName = "Traffic type 2",trackingList = track01)
+        IXIA.config_traffic_tracking(itemName = "Traffic type 3",trackingList = ['flowGroup3', 'sourceDestEndpointPair3'])
+        IXIA.config_traffic_tracking(itemName = "Traffic type Non definito")
+        IXIA.config_traffic_tracking()
+
+
+
+
 
     def test_cleanup(self):
         '''
