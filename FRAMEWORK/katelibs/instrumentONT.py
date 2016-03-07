@@ -2814,9 +2814,10 @@ class InstrumentONT(Equipment):
 
 
 
-    def get_set_alarm_activation(self, portId, alarmActivation=""):   # ONT-5xx  ONT-6xx    ### krepo added ###       
+    def get_set_alarm_insertion_activation(self, portId, alarmOrder, alarmActivation=""):   # ONT-5xx  ONT-6xx    ### krepo added ###       
         """ ONT-5XX  / ONT-6xx
             Get or Set the alarm insertion status:
+                HI or LO alarm order
                 ON   Enable Alarms
                 OFF  Disable Alarms
             Return tuple: ( "True|False" , "< result/error list>)
@@ -2828,7 +2829,10 @@ class InstrumentONT(Equipment):
         if self.__ontType  == "5xx":
             ONTCmdString=":SOUR:DATA:TEL:ALAR:INS"
         else:
-            ONTCmdString=":SOUR:DATA:TEL:SDH:ALAR:INS"
+            if alarmOrder == 'HI':
+                ONTCmdString=":SOUR:DATA:TEL:SDH:ALAR:INS"
+            else:
+                ONTCmdString=":SOUR:DATA:TEL:SDH:TRIB:ALAR:INS"
 
         if portId == "":
             localMessage = "ERROR get_set_alarmActivation: portId  [{}] not specified".format(portId)
@@ -2866,9 +2870,10 @@ class InstrumentONT(Equipment):
 
 
 
-    def get_set_alarm_insertion_mode(self, portId, alarmInsertionMode=""):   # ONT-5xx  ONT-6xx    ### krepo added ###       
+    def get_set_alarm_insertion_mode(self, portId, alarmOrder, alarmInsertionMode=""):   # ONT-5xx  ONT-6xx    ### krepo added ###       
         """ ONT-5XX ONT-6xx
             Get or Set the alarm insertion mode from:
+                HI or LO  alarm order
                 NONE No alarm insertion.
                 CONT Continous alarm insertion.
                 BURST_ONCE  Once insertion of burst alarms as set by
@@ -2888,7 +2893,10 @@ class InstrumentONT(Equipment):
         if self.__ontType  == "5xx":
             ONTCmdString=":SOUR:DATA:TEL:ALAR:MODE"
         else:
-            ONTCmdString=":SOUR:DATA:TEL:SDH:ALAR:MODE"
+            if alarmOrder == 'HI':
+                ONTCmdString=":SOUR:DATA:TEL:SDH:ALAR:MODE"
+            else:
+                ONTCmdString=":SOUR:DATA:TEL:SDH:TRIB:ALAR:MODE"
         if portId == "":
             localMessage = "ERROR get_set_alarm_insertion_mode: portId  [{}] not specified".format(portId)
             self.__lc_msg(localMessage)
@@ -2982,12 +2990,11 @@ class InstrumentONT(Equipment):
                alarmInsertionType != "LPPLM" and \
                alarmInsertionType != "LPUNEQ" and \
                alarmInsertionType != "":
-                localMessage = "[5xx] ERROR get_set_alarm_insertion_type: alarmInsertionType  [{}] not valid [LOS|LOF|RSTIM|MSAIS|MSRDI|AUAIS|HPRDI|AULOP|HPUNEQ|HPTIM|HPPLM|TULOM|TUAIS|LPRDI|LPRFI|TULOP|LPTIM|LPPLM|LPUNEQ|''(to get status)]".format(alarmInsertionType)
-                self.__lc_msg(localMessage)
-                self.__method_failure(methodLocalName, None, "", localMessage)
-                return False, localMessage
+                    localMessage = "[5xx] ERROR get_set_alarm_insertion_type: alarmInsertionType  [{}] not valid [LOS|LOF|RSTIM|MSAIS|MSRDI|AUAIS|HPRDI|AULOP|HPUNEQ|HPTIM|HPPLM|TULOM|TUAIS|LPRDI|LPRFI|TULOP|LPTIM|LPPLM|LPUNEQ|''(to get status)]".format(alarmInsertionType)
+                    self.__lc_msg(localMessage)
+                    self.__method_failure(methodLocalName, None, "", localMessage)
+                    return False, localMessage
         else:
-            ONTCmdString=":SOUR:DATA:TEL:SDH:ALAR:TYPE"
             if alarmInsertionType != "LOF" and \
                alarmInsertionType != "RSTIM" and \
                alarmInsertionType != "MSAIS" and \
@@ -3000,12 +3007,28 @@ class InstrumentONT(Equipment):
                alarmInsertionType != "HPRDI" and \
                alarmInsertionType != "HPRDIC" and \
                alarmInsertionType != "HPRDIS" and \
-               alarmInsertionType != "HPRDIP" and \
-                alarmInsertionType != "":
-                localMessage = "[6xx] ERROR get_set_alarm_insertion_type: alarmInsertionType  [{}] not valid [LOF|RSTIM|MSAIS|MSRDI|AUAIS|AULOP|HPUNEQ|HPTIM|HPPLM|HPRDI|HPRDIC|HPRDIS|HPRDIP|''(to get status)]".format(alarmInsertionType)
-                self.__lc_msg(localMessage)
-                self.__method_failure(methodLocalName, None, "", localMessage)
-                return False, localMessage
+               alarmInsertionType != "HPRDIP":
+                ONTCmdString=":SOUR:DATA:TEL:SDH:ALAR:TYPE"
+            else:
+                if alarmInsertionType != "TUAIS" and \
+                   alarmInsertionType != "TULOP" and \
+                   alarmInsertionType != "LPUNEQ" and \
+                   alarmInsertionType != "LPTIM" and \
+                   alarmInsertionType != "LPPLM" and \
+                   alarmInsertionType != "LPRDI" and \
+                   alarmInsertionType != "":
+                    localMessage = "[6xx] ERROR get_set_alarm_insertion_type: alarmInsertionType  [{}] not valid [LOF|RSTIM|MSAIS|MSRDI|AUAIS|AULOP|HPUNEQ|HPTIM|HPPLM|HPRDI|HPRDIC|HPRDIS|HPRDIP|TUAIS|TULOP|LPUNEQ|LPTIM|LPPLM|LPRDI''(to get status)]".format(alarmInsertionType)
+                    self.__lc_msg(localMessage)
+                    self.__method_failure(methodLocalName, None, "", localMessage)
+                    return False, localMessage
+
+            if alarmInsertionType == "TUAIS" or \
+               alarmInsertionType == "TULOP" or \
+               alarmInsertionType == "LPUNEQ" or \
+               alarmInsertionType == "LPTIM" or \
+               alarmInsertionType == "LPPLM" or \
+               alarmInsertionType == "LPRDI":
+                ONTCmdString=":SOUR:DATA:TEL:SDH:TRIB:ALAR:TYPE"
 
         if alarmInsertionType == "":  # Get alarmInsertionType and exit
             localCommand="{}?".format(ONTCmdString)
@@ -4269,9 +4292,9 @@ if __name__ == "__main__xxx":   #now skip this part
     #print("tester.get_set_alarmed_frames_number result: [{}]".format(callResult))
     #callResult = tester.get_set_not_alarmed_frames_number(portId1,"444")
     #print("tester.get_set_not_alarmed_frames_number result: [{}]".format(callResult))
-    #callResult = tester.get_set_alarm_activation(portId1,"")
+    #callResult = tester.get_set_alarm_activation(portId1,"","")
     #print("tester.get_set_alarm_activation result: [{}]".format(callResult))
-    #callResult = tester.get_set_alarm_activation(portId1,"OFF")
+    #callResult = tester.get_set_alarm_activation(portId1,"HI","OFF")
     #print("tester.get_set_alarm_activation result: [{}]".format(callResult))
     #callResult = tester.get_set_alarm_insertion_mode(portId1,"BURST_CONT")
     #print("tester.get_set_alarm_insertion_mode result: [{}]".format(callResult))
@@ -4449,9 +4472,9 @@ if __name__ == "__main__xxx":
     #callResult = tester.get_set_alarm_insertion_type(portId1,"LOF")
     #print("tester.get_set_alarm_insertion_type result: [{}]".format(callResult))
 
-    #callResult = tester.get_set_alarm_activation(portId1,"OFF")
+    #callResult = tester.get_set_alarm_activation(portId1,"LO","OFF")
     #print("tester.get_set_alarm_activation result: [{}]".format(callResult))
-    #callResult = tester.get_set_alarm_activation(portId1,"ON")
+    #callResult = tester.get_set_alarm_activation(portId1,"HI","ON")
     #print("tester.get_set_alarm_activation result: [{}]".format(callResult))
     #callResult = tester.get_set_num_errored_burst_frames(portId1,"7")
     #print("tester.get_set_num_errored_burst_frames result: [{}]".format(callResult))
