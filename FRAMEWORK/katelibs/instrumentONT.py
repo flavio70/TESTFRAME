@@ -2995,19 +2995,19 @@ class InstrumentONT(Equipment):
                     self.__method_failure(methodLocalName, None, "", localMessage)
                     return False, localMessage
         else:
-            if alarmInsertionType != "LOF" and \
-               alarmInsertionType != "RSTIM" and \
-               alarmInsertionType != "MSAIS" and \
-               alarmInsertionType != "MSRDI" and \
-               alarmInsertionType != "AUAIS" and \
-               alarmInsertionType != "AULOP" and \
-               alarmInsertionType != "HPUNEQ" and \
-               alarmInsertionType != "HPTIM" and \
-               alarmInsertionType != "HPPLM" and \
-               alarmInsertionType != "HPRDI" and \
-               alarmInsertionType != "HPRDIC" and \
-               alarmInsertionType != "HPRDIS" and \
-               alarmInsertionType != "HPRDIP":
+            if alarmInsertionType == "LOF" or \
+               alarmInsertionType == "RSTIM" or \
+               alarmInsertionType == "MSAIS" or \
+               alarmInsertionType == "MSRDI" or \
+               alarmInsertionType == "AUAIS" or \
+               alarmInsertionType == "AULOP" or \
+               alarmInsertionType == "HPUNEQ" or \
+               alarmInsertionType == "HPTIM" or \
+               alarmInsertionType == "HPPLM" or \
+               alarmInsertionType == "HPRDI" or \
+               alarmInsertionType == "HPRDIC" or \
+               alarmInsertionType == "HPRDIS" or \
+               alarmInsertionType == "HPRDIP":
                 ONTCmdString=":SOUR:DATA:TEL:SDH:ALAR:TYPE"
             else:
                 if alarmInsertionType != "TUAIS" and \
