@@ -12,6 +12,7 @@
 
 
 import os, ast
+import django
 from django.db import connection
 from katelibs.kprint import *
 
@@ -19,6 +20,7 @@ from katelibs.kprint import *
 # settings.py file must be in ./DB_API_CONF folder
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "katelibs.DB_API_CONF.settings")
 
+django.setup()
 #import all objects defined in models.py
 #models.py module must be placed in ./DB_API_LIB folder
 from katelibs.DB_API_LIB.models import *

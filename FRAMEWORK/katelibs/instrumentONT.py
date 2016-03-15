@@ -80,9 +80,10 @@ class InstrumentONT(Equipment):
         self.__get_instrument_info_from_db(self.__prs.get_id(label)) # inizializza i dati di IP, tipo di ONT..dal DB
         #self.init_ont_type()  # inizializza i dati di IP, tipo di ONT..leggendo da strumento
         
-        self.__ontUser        = self.__prs.get_elem(self.get_label(), 'USER')
-        self.__ontPassword    = self.__prs.get_elem(self.get_label(), 'PWD')
-        self.__ontApplication = self.__prs.get_elem(self.get_label(), 'APPL')
+        
+        #self.__ontUser        = self.__prs.get_elem(self.get_label(), 'USER')
+        #self.__ontPassword    = self.__prs.get_elem(self.get_label(), 'PWD')
+        #self.__ontApplication = self.__prs.get_elem(self.get_label(), 'APPL')
         # Unique 5xx sessionName generation bound to start date&time (UTC)  Comment next row if a single static name needed
         #self.__sessionName          = "Session__" + datetime.datetime.utcnow().strftime("%d%b_%H%M%S") + "__UTC"
 
@@ -188,6 +189,21 @@ class InstrumentONT(Equipment):
         return str(None)
 
 
+
+    def __get_user_from_db(self,myid):
+        """
+        return TEqptCred record matching equipment_id = myid and where
+        credential type is 'ONT_SCPI'
+        """
+        tabCredType=TEqptCredType
+        tabCred=TEqptCred
+        instr_credId = tabCredType.objects.get(cr_type='ONT_SCPI').idt_eqpt_cred_type
+        row=tabCred.objects.get(t_equipment_id_equipment__id_equipment=myid,t_eqpt_cred_type_id_cred_type__idt_eqpt_cred_type=instr_credId)
+        return row
+        
+        
+
+
     def __get_instrument_info_from_db(self, ID):
         tabEqpt  = TEquipment
         # get Equipment Type ID for selected ID (i.e. 50 (for ONT506))
@@ -197,6 +213,9 @@ class InstrumentONT(Equipment):
         instr_ip = self.__get_net_info(ID)
 
         self.__ontIpAddress = instr_ip
+        userdb = self.__get_user_from_db(ID)
+        self.__ontUser = userdb.usr
+        self.__ontPassword = userdb.pwd
         
         #if   instr_type_name == "ONT50":
         #    self.__ontType = "5xx"
@@ -782,6 +801,15 @@ class InstrumentONT(Equipment):
         self.__method_failure(methodLocalName, None, "", localMessage)
         return False, localMessage
 
+    def set_user(self,ontUsr='Automation',ontPwd='Automation'):
+        """Set current user and password"""
+        self.__ontUser = ontUsr
+        self.__ontPassword = ontPwd
+        return True
+
+    def set_application(self,appName='SdhBert'):
+        """ Set current application to be loaded """
+        self.__ontApplication = appName
 
 
     def delete_session(self, sessionName):  ### krepo added ###

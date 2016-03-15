@@ -94,9 +94,6 @@ class TEquipment(models.Model):
         managed = False
         db_table = 'T_EQUIPMENT'
 
-    def __str__(self):          
-        return self.name
-
 
 class TEquipType(models.Model):
     id_type = models.AutoField(primary_key=True)
@@ -233,9 +230,6 @@ class TRuntime(models.Model):
         managed = False
         db_table = 'T_RUNTIME'
 
-    def __str__(self):          
-        return self.job_name
-
 
 class TScope(models.Model):
     id_scope = models.AutoField(primary_key=True)
@@ -278,7 +272,7 @@ class TSuitesBody(models.Model):
     t_test_revs_id_testrev = models.ForeignKey('TTestRevs', db_column='T_TEST_REVS_id_TestRev')  # Field name made lowercase.
     tcorder = models.IntegerField(db_column='TCorder')  # Field name made lowercase.
     run_section = models.CharField(max_length=8)
-    
+
     class Meta:
         managed = False
         db_table = 'T_SUITES_BODY'
@@ -301,8 +295,6 @@ class TTest(models.Model):
     class Meta:
         managed = False
         db_table = 'T_TEST'
-    def __str__(self):          
-        return self.test_name
 
 
 class TTestArea(models.Model):
@@ -377,3 +369,25 @@ class TTpyEntity(models.Model):
     class Meta:
         managed = False
         db_table = 'T_TPY_ENTITY'
+
+class TEqptCredType(models.Model):
+    idt_eqpt_cred_type = models.IntegerField(db_column='idT_EQPT_CRED_TYPE', primary_key=True)  # Field name made lowercase.
+    cr_type = models.CharField(max_length=45)
+
+    class Meta:
+        managed = False
+        db_table = 'T_EQPT_CRED_TYPE'
+
+
+
+class TEqptCred(models.Model):
+    cred_id = models.IntegerField(primary_key=True)
+    t_eqpt_cred_type_id_cred_type = models.ForeignKey('TEqptCredType', db_column='T_EQPT_CRED_TYPE_id_cred_type')  # Field name made lowercase.
+    t_equipment_id_equipment = models.ForeignKey('TEquipment', db_column='T_EQUIPMENT_id_equipment', blank=True, null=True)  # Field name made lowercase.
+    usr = models.CharField(max_length=45, blank=True, null=True)
+    pwd = models.CharField(max_length=45, blank=True, null=True)
+
+    class Meta:
+        managed = False
+        db_table = 'T_EQPT_CRED'
+
