@@ -25,12 +25,22 @@ class TestCase(object):
         """
         self.kenvironment = KEnvironment(testfilename=filename)
         self.__eqpt_list = []
+        self.runId = None
+        
+        
 
 
     def add_eqpt(self, eqpt):
         """ Store reference to an equipment.
         """
         self.__eqpt_list.append(eqpt)
+
+
+
+    def get_eqptlist(self):
+       """returns the stored eqptlist"""
+       return self.__eqpt_list
+
 
 
     def skip_section(self, run_section):
@@ -111,6 +121,7 @@ class TestCase(object):
         parser.add_argument("--testBody", help="Run the Test Main Body", action="store_true")
         parser.add_argument("--testClean", help="Run the Test Clean Up", action="store_true")
         parser.add_argument("--DUTClean", help="Run the DUTs Clean Up", action="store_true")
+        parser.add_argument("--runId", help="Reference to MySQL runtable entry",default=None,metavar="id")
         args = parser.parse_args()
 
         # For debugging, change to False
@@ -151,6 +162,7 @@ class TestCase(object):
             args.DUTClean = True
 
         self.trc_inf(str(args))
+        self.runId=args.runId
 
         self.dut_setup() if args.DUTSet else self.skip_section('DUT Setup')
         self.test_setup() if args.testSet else self.skip_section('test Setup')
