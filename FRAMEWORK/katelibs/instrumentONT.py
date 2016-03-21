@@ -4082,6 +4082,53 @@ class InstrumentONT(Equipment):
         return True, plainTextAnswer
 
 
+    def get_set_tu_path_trace_tx_TR16_string(self, portId, tr16String=""):   # ONT-6xx only  ### krepo added ###  
+        """ ONT-6xx only
+            Get or Set the 15-char string in J1 byte for TX channel:
+                tr16String: "string"|empty string to read current value
+            Return tuple: ( "True|False" , "< result/error list>)
+                True : command execution ok, current  alarm status in result string
+                False: error in command execution, details in error list string
+        """
+        methodLocalName = self.__lc_current_method_name(embedKrepoInit=True)
+        portId = self.__recover_port_to_use(portId)
+        if portId == "":
+            localMessage = "ERROR get_set_au_path_trace_tx_TR16_string: portId  [{}] not specified".format(portId)
+            self.__lc_msg(localMessage)
+            self.__method_failure(methodLocalName, None, "", localMessage)
+            return False, localMessage
+        if self.__ontType  == "6xx":
+            ONTCmdString=":SOUR:DATA:TEL:SDH:TRIB:SEL:J1TR:TR16:BLOC"
+        else:
+            localMessage="Command supported by ONT-6xx only (current test equipment type:[{}]) ".format(self.__ontType)
+            self.__lc_msg(localMessage)
+            self.__method_failure(methodLocalName, None, "", localMessage)
+            return False, localMessage
+        if tr16String == "":  # Get auPathTraceMode and exit
+            localCommand="{}?".format(ONTCmdString)
+            rawCallResult = self.__send_port_cmd(portId, localCommand)
+            sdhAnswer = self.__remove_dust(rawCallResult[1])
+            plainTextAnswer = self.__TR16_to_string(sdhAnswer)
+            self.__method_success(methodLocalName, None, plainTextAnswer)
+            return True, plainTextAnswer
+        asciiCsvString=self.__string_to_TR16(tr16String) # this is the format used in set and get
+        localCommand="{} {}".format(ONTCmdString, asciiCsvString)
+        #self.__lc_msg(localCommand)
+        rawCallResult = self.__send_port_cmd(portId, localCommand)
+        localCommand="{}?".format(ONTCmdString)
+        rawCallResult = self.__send_port_cmd(portId, localCommand)
+        sdhAnswer = self.__remove_dust(rawCallResult[1])
+        plainTextAnswer = self.__TR16_to_string(sdhAnswer)
+        if sdhAnswer != asciiCsvString:
+            localMessage="Tx TR16 J1 Send String required [{}] but set [{}]".format(tr16String,plainTextAnswer)
+            self.__lc_msg(localMessage)
+            self.__method_failure(methodLocalName, None, plainTextAnswer, localMessage)
+            return False, localMessage
+        localMessage="Tx TR16 J1 Send String specified:[{}]".format(plainTextAnswer)
+        self.__lc_msg(localMessage)
+        self.__method_success(methodLocalName, None, plainTextAnswer)
+        return True, plainTextAnswer
+
 
 
 
