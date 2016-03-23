@@ -133,20 +133,32 @@ class Test(TestCase):
         IXIA.create_vport_interface(9, 3, ipAddress = "1.1.1.3",ipGetaway = "1.1.1.2")
         IXIA.create_vport_interface(9, 4, ipAddress = "1.1.1.4",ipGetaway = "1.1.1.4")
 
-        # Step #5 - Create traffic profiles (differnt names, same defaults)
+        # Step #5 - Create traffic profiles (different names, same defaults)
         IXIA.create_traffic_item(itemName = "Traffic type 1")
-        IXIA.create_traffic_item(itemName = "Traffic type 2")
-        IXIA.create_traffic_item(itemName = "Traffic type 3")
+        #IXIA.create_traffic_item(itemName = "Traffic type 2")
+        #IXIA.create_traffic_item(itemName = "Traffic type 3")
 
-        # Step #5 - Config tracking for the above -defined traffic profiles
-        IXIA.config_traffic_tracking(itemName = "Traffic type 1")
-        track01=['flowGroup2', 'sourceDestEndpointPair2']
-        IXIA.config_traffic_tracking(itemName = "Traffic type 2",trackingList = track01)
-        IXIA.config_traffic_tracking(itemName = "Traffic type 3",trackingList = ['flowGroup3', 'sourceDestEndpointPair3'])
-        IXIA.config_traffic_tracking(itemName = "Traffic type Non definito")
-        IXIA.config_traffic_tracking()
+        # Step #6 - Config tracking for the above-defined traffic profiles
+        #IXIA.config_traffic_tracking(itemName = "Traffic type 1")
+        #IXIA.config_traffic_tracking(itemName = "Traffic type 2",trackingList = ['flowGroup2', 'sourceDestEndpointPair2'])
+        #IXIA.config_traffic_tracking(itemName = "Traffic type 3",trackingList = ['flowGroup3', 'sourceDestEndpointPair3'])
+        #IXIA.config_traffic_tracking(itemName = "Traffic type Non definito")
+
+        # da finire la chiamata successiva dopo aggiornamento IxNetwork
+        #IXIA.create_endpoint(endPointName="Endpoint1", itemName ="Traffic type 1",             srcSlotNo=9, srcPortNo=1, destSlotNo=9, destPortNo=4, frameSize=10, frameRate=100, frameCount=1000)
+        #IXIA.create_endpoint(endPointName="Endpoint2", itemName ="Traffic type 2",             srcSlotNo=9, srcPortNo=2, destSlotNo=9, destPortNo=3, frameSize=10, frameRate=100, frameCount=1000)
+        #IXIA.create_endpoint(endPointName="Endpoint3", itemName ="Traffic type 3",             srcSlotNo=9, srcPortNo=4, destSlotNo=9, destPortNo=4, frameSize=10, frameRate=100, frameCount=1000)
+        #IXIA.create_endpoint(endPointName="Endpointx", itemName ="Traffic type Non definito",  srcSlotNo=9, srcPortNo=1, destSlotNo=9, destPortNo=4, frameSize=10, frameRate=100, frameCount=1000)
+
+ 
+        IXIA.config_flowgroup()
 
 
+
+
+
+        # Step #10 - Traffic start/stop related calls 
+        #IXIA.regenerate_traffic_items()
 
 
 

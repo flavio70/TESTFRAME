@@ -85,6 +85,7 @@ class InstrumentIXIA(Equipment):
 
         #Traffic-specific Data model   
         self.__DM_TRAFFICLIST       = dict()                       
+        self.__DM_TRAFFIC_ENDPOINT  = dict()                       
 
        
         # !!! Don't delete the following lines !!!
@@ -650,11 +651,37 @@ class InstrumentIXIA(Equipment):
                 False............Port not ready after self.__checkPortUpRetries retries (1 retry every second)
                 answer_string....message for humans, to better understand  what happened in the processing flow  
         '''
+        
+        
+        
+        
+        '''
+        
+          # Create traffic
+          trafficItem = ixNet.add(ixNet.getRoot()+'traffic', 'trafficItem', '-trafficItemType', 'raw')
+          endpointSet = ixNet.add(trafficItem, 'endpointSet', '-sources', vport1+'/protocols',  '-destinations', vport2+'/protocols')
+          ixNet.commit()
+        
+        
+        
+        '''
+        
+        
         self.__lc_current_method_name(embedKrepoInit=True)
         try:
-            localTrafficItem = self.__IXN.add(self.__DM_ROOT + '/traffic', 'trafficItem')
+            #localTrafficItem = self.__IXN.add(self.__DM_ROOT + '/traffic', 'trafficItem', '-trafficItemType', 'raw')
+            localTrafficItem = self.__IXN.add(self.__DM_ROOT + 'traffic', 'trafficItem', '-trafficItemType', 'raw')
             retCode1         = self.__IXN.setMultiAttribute(localTrafficItem,'-enabled', 'True', '-name', itemName, '-routeMesh', routeMesh, '-srcDestMesh', srcDestMesh, '-trafficType', trafficType, '-transmitMode', transmitMode,'-biDirectional', biDirectional)
             retCode2         = self.__IXN.commit()
+            localTrafficItem2 = self.__IXN.add(localTrafficItem, 'endpointSet')
+            retCode2         = self.__IXN.commit()
+            ''' 
+            trafficItem = self.__IXN.add(self.__IXN.getRoot() +'traffic', 'trafficItem', '-trafficItemType', 'raw')
+            endpointSet =self.__IXN.add(trafficItem, 'endpointSet' )
+            #endpointSet =self.__IXN.add(trafficItem, 'endpointSet', '-sources', vport1+'/protocols',  '-destinations', vport2+'/protocols')
+            self.__IXN.commit()
+            ''' 
+            
             localTrafficItem = self.__IXN.remapIds(localTrafficItem).replace("['","").replace("']","")
             self.__DM_TRAFFICLIST[itemName]=localTrafficItem
             if (not self.__check_answer(retCode1)) or (not self.__check_answer(retCode2)):
@@ -664,11 +691,60 @@ class InstrumentIXIA(Equipment):
             return self.__ret_func(False,"error", "ERROR: TrafficItem  [{}] : exception [{}]".format(itemName,excMsg)  )
         return self.__ret_func(True,"success", "SUCCESS: create_traffic_item [{}]:trafficType[{}] transmitMode[{}] biDirectional[{}] routeMesh[{}] srcDestMesh[{}] ".format( itemName, trafficType,transmitMode,biDirectional,routeMesh ,srcDestMesh)  )
   
+  
+
+    def create_endpoint(self, endPointName, itemName, srcSlotNo, srcPortNo, destSlotNo, destPortNo, frameSize, frameRate, frameCount):
+        ''' Method
+        '''
+        self.__lc_current_method_name(embedKrepoInit=True)
+        #localTrafficItem = self.__DM_TRAFFICLIST.get(itemName, None)
+        localTrafficItem = self.__DM_TRAFFICLIST.get(itemName, None)
+        if  not localTrafficItem:
+            localMessage="ERROR: local Traffic Item [{}] NOT FOUND".format(itemName)
+            return self.__ret_func(False,"error",localMessage)
+        if (not srcSlotNo) or  (not srcPortNo) or  (not destSlotNo) or  (not destPortNo):
+            localMessage="ERROR: parameter not specified in [{}] creation: srcSlotNo[{}] srcPortNo[{}] destSlotNo[{}] destPortNo[{}]".format(endPointName ,srcSlotNo, srcPortNo, destSlotNo, destPortNo)
+            return self.__ret_func(False,"error",localMessage)
+        sourceKeyTemp = "{}/{}".format(srcSlotNo,srcPortNo) 
+        destKeyTemp   = "{}/{}".format(destSlotNo,destPortNo) 
+        #srcEndpoints  = self.__DM_VPORTINTERFACE.get(sourceKeyTemp, None)
+        #destEndpoints = self.__DM_VPORTINTERFACE.get(destKeyTemp,   None)
+        srcEndpoints  = self.__DM_VPORTLIST.get(sourceKeyTemp, None)
+        destEndpoints = self.__DM_VPORTLIST.get(destKeyTemp,   None)
+        
+        print(" AA  ********* srcEndpoints[{}]  destEndpoints[{}]".format(srcEndpoints,destEndpoints))
+        srcEndpoints="{}/interface".format(srcEndpoints)
+        destEndpoints="{}/interface".format(destEndpoints)
+        print(" BB  ********* srcEndpoints[{}]  destEndpoints[{}]".format(srcEndpoints,destEndpoints))
+       
+        if (not srcEndpoints) or (not destEndpoints):
+            localMessage="ERROR: endPoint not found in [{}] creation: srcEndpoints[{}] srcEndpoints[{}]".format(endPointName ,srcSlotNo, srcPortNo) 
+            return self.__ret_func(False,"error",localMessage)
+        try:
+            #localEndPointObject = self.__IXN.add(localTrafficItem, 'endpointSet', '-name', endPointName, '-sources', srcEndpoints,  '-destinations', destEndpoints )
+            localEndPointObject = self.__IXN.add(localTrafficItem ,'endpointSet', '-name', endPointName, '-sources', srcEndpoints,  '-destinations', destEndpoints )
+            retCode1 = self.__IXN.commit()
+            if (not self.__check_answer(retCode1)) :
+                localMessage="ERROR: unable to create new endpoint [{}]:  [{}] [{}]".format(endPointName, retCode1, localEndPointObject)
+                return self.__ret_func(False,"error",localMessage)
+            localEndPointObject = self.__IXN.remapIds(localEndPointObject).replace("['","").replace("']","")
+        except Exception as excMsg:
+            return self.__ret_func(False,"error", "ERROR:unable to create new endpoint  [{}] : exception [{}]".format(endPointName, excMsg)  )
+
+        self.__DM_TRAFFIC_ENDPOINT[endPointName]=localEndPointObject 
+
+
+
+        return self.__ret_func(True,"success", "SUCCESS: Create Endpoint [{}] : localEndPointObject[{}] ".format( endPointName, localEndPointObject)  )
+          
+        
+       
+
 
 
     def config_traffic_tracking(self, itemName = None, trackingList = ['flowGroup0', 'sourceDestEndpointPair0']):
         ''' Method
-                config_traffic_tracking(self, itemName, trackingList= ['flowGroup0', 'sourceDestEndpointPair0']):
+                config_traffic_tracking(self, itemName, trackingList= ['fllowGroup0', 'sourceDestEndpointPair0']):
             Purpose:
                 config traffic tracking for the traffic item named itemName
             Return tuple:
@@ -693,7 +769,50 @@ class InstrumentIXIA(Equipment):
         return self.__ret_func(True,"success", "SUCCESS: Config Traffic Item Tracking [{}] : trackingList [  {}  ] ".format( itemName, trackingList)  )
           
         
-       
+
+
+
+
+    def config_flowgroup(self):
+        self.__lc_current_method_name(embedKrepoInit=True)
+        #localTrafficItem = self.__IXN.getList( self.__DM_ROOT + '/traffic', 'trafficItem').replace("['","").replace("']","")
+        localElement = self.__IXN.getList( self.__DM_ROOT + '/traffic','trafficItem')
+        print("/traffic -> trafficItem [{}]".format(localElement))
+        localElement = self.__IXN.getList( self.__DM_ROOT + '/traffic/trafficItem','rateOptions')
+        print("/traffic/trafficItem -> rateOptions [{}]".format(localElement))
+        localElement = self.__IXN.getList( self.__DM_ROOT + '/traffic/trafficItem','dataCenterSettings')
+        print("/traffic/trafficItem -> dataCenterSettings [{}]".format(localElement))
+        localElement = self.__IXN.getList( self.__DM_ROOT + '/traffic/trafficItem','packetOptions')
+        print("/traffic/trafficItem -> packetOptions [{}]".format(localElement))
+        localElement = self.__IXN.getList( self.__DM_ROOT + '/traffic/trafficItem','frameOptions')
+        print("/traffic/trafficItem -> frameOptions [{}]".format(localElement))
+        localElement = self.__IXN.getList( self.__DM_ROOT + '/traffic/trafficItem','tracking')
+        print("/traffic/trafficItem -> tracking [{}]".format(localElement))
+        localElement = self.__IXN.getList( self.__DM_ROOT + '/traffic/trafficItem','pair')
+        print("/traffic/trafficItem -> pair [{}]".format(localElement))
+        localElement = self.__IXN.getList( self.__DM_ROOT + '/traffic/trafficItem','applicationProfile')
+        print("/traffic/trafficItem -> applicationProfile [{}]".format(localElement))
+        localElement = self.__IXN.getList( self.__DM_ROOT + '/traffic/trafficItem','applicationProfileType')
+        print("/traffic/trafficItem -> applicationProfileType [{}]".format(localElement))
+        localElement = self.__IXN.getList( self.__DM_ROOT + '/traffic/trafficItem','configEncap')
+        print("/traffic/trafficItem -> configEncap [{}]".format(localElement))
+        print("=-=========================================================")
+        print("=-=========================================================")
+        print(" TRAFFIC CHILDREN  ========================================")
+        print (self.__IXN.help(self.__DM_ROOT + '/traffic'))
+        print("=-=========================================================")
+        print("=-=========================================================")
+        print("=-=========================================================")
+        print(" TRAFFIC/TRAFFICITEM CHILDREN  ============================")
+        print (self.__IXN.help(self.__DM_ROOT + '/traffic/trafficItem'))
+        print("=-=========================================================")
+        print("=-=========================================================")
+        print("=-=========================================================")
+        #localElement = self.__IXN.getList( self.__DM_ROOT + '/traffic/trafficItem','configElement')
+        #print("/traffic/trafficItem -> endpointSet [{}]".format(localElement))
+        #localElement = self.__IXN.getList( self.__DM_ROOT + '/traffic/trafficItem/','endpointSet')
+        #print("/traffic/trafficItem -> endpointSet [{}]".format(localElement))
+        return self.__ret_func(True,"success", "SUCCESS: config_flow_group END ")
 
 
 
@@ -704,6 +823,41 @@ class InstrumentIXIA(Equipment):
 
 
 
+
+
+
+
+
+
+    def regenerate_traffic_items(self):       ### krepo added ###
+        """ regenerate_traffic_items(self)
+            Purpose:
+            Return tuple:
+                ("True|False" , "answer_string"  )
+                True.............dictionary updated
+                False............dictionary not updated
+                answer_string....message for humans, to better understand 
+                                 what happened in the processing flow  
+        """
+        methodLocalName = self.__lc_current_method_name(embedKrepoInit=True)
+ 
+        #tmpList = list(self.__IXN.getList(self.__IXN.getList(self.__DM_ROOT + '/traffic', 'trafficItem')).replace("]","").replace("[","").split(","))
+        tmpList = list(self.__IXN.getList(self.__DM_ROOT + '/traffic', 'trafficItem').replace("]","").replace("[","").split(","))
+        print("[{}]".format(tmpList))
+        for elementTmp in tmpList:
+            print("Item:[{}]".format(elementTmp))
+            try:
+                generateResult = self.__IXN.execute('generate',elementTmp) 
+                print("Regenerate --->[{}] Result:[{}]".format(elementTmp,generateResult))
+            except Exception as excMsg:
+                localMessage="Regenerate --->ERROR: exception [{}]".format(excMsg)    
+                print("[{}]".format(localMessage))
+              
+            #print (self.__IXN.help(self.__DM_ROOT , 'execList'))
+
+
+
+        return self.__ret_func(True, "success", "SUCCESS: traffic items regenerated")
 
 
 
