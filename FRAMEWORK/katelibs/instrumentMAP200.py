@@ -1704,12 +1704,12 @@ class InstrumentMAP(Equipment):
         else:
             commandToSend="{} {},{},{} ".format(localCommandSet ,chassisNumber, slotNumber, deviceNumber)
         responseList = self.__send_cmd(commandToSend)
-        print("responseList[{}]".format(responseList))
+        #print("responseList[{}]".format(responseList))
         self.__lc_msg(commandToSend)
         response = responseList[1]
-        print("response[{}]".format(response))
+        #print("response[{}]".format(response))
         response = self.__remove_dust(response)
-        print("response[{}]".format(response))
+        #print("response[{}]".format(response))
         
         localMessage = "MAP200 [{}]:VOA slot {} (Device {}) WAVE OFFSET DELETE waveLength[{}] ".format(self.__mapIpAddress,slotNumber, deviceNumber, waveLength)
         self.__lc_msg(localMessage)
