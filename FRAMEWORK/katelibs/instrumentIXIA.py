@@ -50,7 +50,9 @@ class InstrumentIXIA(Equipment):
         self.__calledMethodList     = []               #  used to track all method called
         self.__calledMethodStatus   = dict()           #  used to track all method called and last execution result
         # Bridge Connection
-        self.__bridgeIpAddress      = "151.98.40.136"  # ixnetwork server address       
+        #self.__bridgeIpAddress      = "151.98.40.136"  # ixnetwork server address OLD ONE      
+        self.__bridgeIpAddress      = "135.221.116.175"  # ixnetwork server address v8.01       
+
         self.__bridgePort           = 8009             # ixnetwork server port
         self.__pingRetryNumber      = 1                #  Retry number for -c ping option
         self.__maxPortNumberForCard = 32               #  Retry number for -c ping option
@@ -90,8 +92,9 @@ class InstrumentIXIA(Equipment):
        
         # !!! Don't delete the following lines !!!
         super().__init__(label, self.__prs.get_id(label))
+        
         self.__get_instrument_info_from_db(self.__prs.get_id(label)) # inizializza i dati di IP, tipo di Strumento ecc... dal DB
-           
+        
 
     #
     #   USEFUL FUNC & TOOLS

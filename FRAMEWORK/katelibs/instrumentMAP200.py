@@ -10,14 +10,14 @@
 #
 #
 # DETAILS: Python management module for MAP-200 chassis
-#          Managed "cassette" types: 
+#          Managed "cassette" types:
 #          - VOA
 #
 # MODULE: InstrumentMAP200.py  created to drive the connections and common low-level operations
 #                           involving JDSU MAP-200 chassis
 #
 # NOTES:  At the bottom of this file (main section) methods call are reported as examples
-#             
+#
 #
 #
 ###############################################################################
@@ -327,7 +327,7 @@ class InstrumentMAP(Equipment):
             return False, localMessage
           
         # check if moddule supports this command  
-        if  (" VOA " in slotContent):
+        if " VOA " in slotContent:
             localMessage = "MAP200 [{}]:found VOA".format(self.__mapIpAddress)
             self.__lc_msg(localMessage)
         else:
@@ -435,7 +435,7 @@ class InstrumentMAP(Equipment):
             return False, localMessage
           
         # check if moddule supports this command  
-        if  (" VOA " in slotContent):
+        if  " VOA " in slotContent:
             localMessage = "MAP200 [{}]:found VOA".format(self.__mapIpAddress)
             self.__lc_msg(localMessage)
         else:
@@ -551,7 +551,7 @@ class InstrumentMAP(Equipment):
             return False, localMessage
           
         # check if moddule supports this command  
-        if  (" VOA " in slotContent):
+        if  " VOA " in slotContent:
             localMessage = "MAP200 [{}]:found VOA".format(self.__mapIpAddress)
             self.__lc_msg(localMessage)
         else:
@@ -596,9 +596,9 @@ class InstrumentMAP(Equipment):
             #print ("response{}".format(type(response)))
             #print ("state{}".format(type(state)))
             try:
-               intresponse=int(response)
+                intresponse=int(response)
             except:
-               intresponse=response
+                intresponse=response
             if intresponse != state:
                 localMessage = "MAP200 [{}]:ERROR state required [{}] SET instead to [{}]".format(self.__mapIpAddress, state , response)
                 self.__lc_msg(localMessage)
@@ -670,7 +670,7 @@ class InstrumentMAP(Equipment):
             return False, localMessage
           
         # check if moddule supports this command  
-        if  (" VOA " in slotContent):
+        if  " VOA " in slotContent:
             localMessage = "MAP200 [{}]:found VOA".format(self.__mapIpAddress)
             self.__lc_msg(localMessage)
         else:
@@ -781,7 +781,7 @@ class InstrumentMAP(Equipment):
             return False, localMessage
           
         # check if moddule supports this command  
-        if  (" VOA " in slotContent):
+        if  " VOA " in slotContent:
             localMessage = "MAP200 [{}]:found VOA".format(self.__mapIpAddress)
             self.__lc_msg(localMessage)
         else:
@@ -873,7 +873,7 @@ class InstrumentMAP(Equipment):
             return False, localMessage
           
         # check if moddule supports this command  
-        if  (" VOA " in slotContent):
+        if  " VOA " in slotContent:
             localMessage = "MAP200 [{}]:found VOA".format(self.__mapIpAddress)
             self.__lc_msg(localMessage)
         else:
@@ -916,9 +916,9 @@ class InstrumentMAP(Equipment):
             response = responseList[1]
             response = self.__remove_dust(response)
             try:
-               intresponse=int(response)
+                intresponse=int(response)
             except:
-               intresponse=response
+                intresponse=response
             if intresponse != state:
                 localMessage = "MAP200 [{}]:ERROR state required [{}] SET instead to [{}]".format(self.__mapIpAddress, state , response)
                 self.__lc_msg(localMessage)
@@ -982,7 +982,7 @@ class InstrumentMAP(Equipment):
             return False, localMessage
           
         # check if moddule supports this command  
-        if  (" VOA " in slotContent):
+        if  " VOA " in slotContent:
             localMessage = "MAP200 [{}]:found VOA".format(self.__mapIpAddress)
             self.__lc_msg(localMessage)
         else:
@@ -1089,7 +1089,7 @@ class InstrumentMAP(Equipment):
             return False, localMessage
           
         # check if moddule supports this command  
-        if  (" VOA " in slotContent):
+        if  " VOA " in slotContent:
             localMessage = "MAP200 [{}]:found VOA".format(self.__mapIpAddress)
             self.__lc_msg(localMessage)
         else:
@@ -1191,7 +1191,7 @@ class InstrumentMAP(Equipment):
             return False, localMessage
           
         # check if moddule supports this command  
-        if  (" VOA " in slotContent):
+        if  " VOA " in slotContent:
             localMessage = "MAP200 [{}]:found VOA".format(self.__mapIpAddress)
             self.__lc_msg(localMessage)
         else:
@@ -1314,7 +1314,7 @@ class InstrumentMAP(Equipment):
             return False, localMessage
           
         # check if moddule supports this command  
-        if  (" VOA " in slotContent):
+        if  " VOA " in slotContent:
             localMessage = "MAP200 [{}]:found VOA".format(self.__mapIpAddress)
             self.__lc_msg(localMessage)
         else:
@@ -1436,7 +1436,7 @@ class InstrumentMAP(Equipment):
             return False, localMessage
           
         # check if moddule supports this command  
-        if  (" VOA " in slotContent):
+        if  " VOA " in slotContent:
             localMessage = "MAP200 [{}]:found VOA".format(self.__mapIpAddress)
             self.__lc_msg(localMessage)
         else:
@@ -1568,7 +1568,7 @@ class InstrumentMAP(Equipment):
             return False, localMessage
           
         # check if moddule supports this command  
-        if  (" VOA " in slotContent):
+        if  " VOA " in slotContent:
             localMessage = "MAP200 [{}]:found VOA".format(self.__mapIpAddress)
             self.__lc_msg(localMessage)
         else:
@@ -1611,9 +1611,9 @@ class InstrumentMAP(Equipment):
             response = responseList[1]
             response = self.__remove_dust(response)
             try:
-               intresponse=int(response)
+                intresponse=int(response)
             except:
-               intresponse=response
+                intresponse=response
             if intresponse != enable:
                 localMessage = "MAP200 [{}]:ERROR enable required [{}] SET instead to [{}]".format(self.__mapIpAddress, enable , response)
                 self.__lc_msg(localMessage)
@@ -1685,7 +1685,7 @@ class InstrumentMAP(Equipment):
             return False, localMessage
           
         # check if moddule supports this command  
-        if  (" VOA " in slotContent):
+        if  " VOA " in slotContent:
             localMessage = "MAP200 [{}]:found VOA".format(self.__mapIpAddress)
             self.__lc_msg(localMessage)
         else:
