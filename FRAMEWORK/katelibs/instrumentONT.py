@@ -80,9 +80,10 @@ class InstrumentONT(Equipment):
         self.__get_instrument_info_from_db(self.__prs.get_id(label)) # inizializza i dati di IP, tipo di ONT..dal DB
         #self.init_ont_type()  # inizializza i dati di IP, tipo di ONT..leggendo da strumento
         
-        self.__ontUser        = self.__prs.get_elem(self.get_label(), 'USER')
-        self.__ontPassword    = self.__prs.get_elem(self.get_label(), 'PWD')
-        self.__ontApplication = self.__prs.get_elem(self.get_label(), 'APPL')
+        
+        #self.__ontUser        = self.__prs.get_elem(self.get_label(), 'USER')
+        #self.__ontPassword    = self.__prs.get_elem(self.get_label(), 'PWD')
+        #self.__ontApplication = self.__prs.get_elem(self.get_label(), 'APPL')
         # Unique 5xx sessionName generation bound to start date&time (UTC)  Comment next row if a single static name needed
         #self.__sessionName          = "Session__" + datetime.datetime.utcnow().strftime("%d%b_%H%M%S") + "__UTC"
 
@@ -188,6 +189,21 @@ class InstrumentONT(Equipment):
         return str(None)
 
 
+
+    def __get_user_from_db(self,myid):
+        """
+        return TEqptCred record matching equipment_id = myid and where
+        credential type is 'ONT_SCPI'
+        """
+        tabCredType=TEqptCredType
+        tabCred=TEqptCred
+        instr_credId = tabCredType.objects.get(cr_type='ONT_SCPI').idt_eqpt_cred_type
+        row=tabCred.objects.get(t_equipment_id_equipment__id_equipment=myid,t_eqpt_cred_type_id_cred_type__idt_eqpt_cred_type=instr_credId)
+        return row
+        
+        
+
+
     def __get_instrument_info_from_db(self, ID):
         tabEqpt  = TEquipment
         # get Equipment Type ID for selected ID (i.e. 50 (for ONT506))
@@ -197,6 +213,9 @@ class InstrumentONT(Equipment):
         instr_ip = self.__get_net_info(ID)
 
         self.__ontIpAddress = instr_ip
+        userdb = self.__get_user_from_db(ID)
+        self.__ontUser = userdb.usr
+        self.__ontPassword = userdb.pwd
         
         #if   instr_type_name == "ONT50":
         #    self.__ontType = "5xx"
@@ -782,6 +801,15 @@ class InstrumentONT(Equipment):
         self.__method_failure(methodLocalName, None, "", localMessage)
         return False, localMessage
 
+    def set_user(self,ontUsr='Automation',ontPwd='Automation'):
+        """Set current user and password"""
+        self.__ontUser = ontUsr
+        self.__ontPassword = ontPwd
+        return True
+
+    def set_application(self,appName='SdhBert'):
+        """ Set current application to be loaded """
+        self.__ontApplication = appName
 
 
     def delete_session(self, sessionName):  ### krepo added ###
@@ -2814,9 +2842,10 @@ class InstrumentONT(Equipment):
 
 
 
-    def get_set_alarm_activation(self, portId, alarmActivation=""):   # ONT-5xx  ONT-6xx    ### krepo added ###       
+    def get_set_alarm_insertion_activation(self, portId, alarmOrder, alarmActivation=""):   # ONT-5xx  ONT-6xx    ### krepo added ###       
         """ ONT-5XX  / ONT-6xx
             Get or Set the alarm insertion status:
+                HI or LO alarm order
                 ON   Enable Alarms
                 OFF  Disable Alarms
             Return tuple: ( "True|False" , "< result/error list>)
@@ -2828,7 +2857,10 @@ class InstrumentONT(Equipment):
         if self.__ontType  == "5xx":
             ONTCmdString=":SOUR:DATA:TEL:ALAR:INS"
         else:
-            ONTCmdString=":SOUR:DATA:TEL:SDH:ALAR:INS"
+            if alarmOrder == 'HI':
+                ONTCmdString=":SOUR:DATA:TEL:SDH:ALAR:INS"
+            else:
+                ONTCmdString=":SOUR:DATA:TEL:SDH:TRIB:ALAR:INS"
 
         if portId == "":
             localMessage = "ERROR get_set_alarmActivation: portId  [{}] not specified".format(portId)
@@ -2866,9 +2898,10 @@ class InstrumentONT(Equipment):
 
 
 
-    def get_set_alarm_insertion_mode(self, portId, alarmInsertionMode=""):   # ONT-5xx  ONT-6xx    ### krepo added ###       
+    def get_set_alarm_insertion_mode(self, portId, alarmOrder, alarmInsertionMode=""):   # ONT-5xx  ONT-6xx    ### krepo added ###       
         """ ONT-5XX ONT-6xx
             Get or Set the alarm insertion mode from:
+                HI or LO  alarm order
                 NONE No alarm insertion.
                 CONT Continous alarm insertion.
                 BURST_ONCE  Once insertion of burst alarms as set by
@@ -2888,7 +2921,10 @@ class InstrumentONT(Equipment):
         if self.__ontType  == "5xx":
             ONTCmdString=":SOUR:DATA:TEL:ALAR:MODE"
         else:
-            ONTCmdString=":SOUR:DATA:TEL:SDH:ALAR:MODE"
+            if alarmOrder == 'HI':
+                ONTCmdString=":SOUR:DATA:TEL:SDH:ALAR:MODE"
+            else:
+                ONTCmdString=":SOUR:DATA:TEL:SDH:TRIB:ALAR:MODE"
         if portId == "":
             localMessage = "ERROR get_set_alarm_insertion_mode: portId  [{}] not specified".format(portId)
             self.__lc_msg(localMessage)
@@ -2982,30 +3018,45 @@ class InstrumentONT(Equipment):
                alarmInsertionType != "LPPLM" and \
                alarmInsertionType != "LPUNEQ" and \
                alarmInsertionType != "":
-                localMessage = "[5xx] ERROR get_set_alarm_insertion_type: alarmInsertionType  [{}] not valid [LOS|LOF|RSTIM|MSAIS|MSRDI|AUAIS|HPRDI|AULOP|HPUNEQ|HPTIM|HPPLM|TULOM|TUAIS|LPRDI|LPRFI|TULOP|LPTIM|LPPLM|LPUNEQ|''(to get status)]".format(alarmInsertionType)
-                self.__lc_msg(localMessage)
-                self.__method_failure(methodLocalName, None, "", localMessage)
-                return False, localMessage
+                    localMessage = "[5xx] ERROR get_set_alarm_insertion_type: alarmInsertionType  [{}] not valid [LOS|LOF|RSTIM|MSAIS|MSRDI|AUAIS|HPRDI|AULOP|HPUNEQ|HPTIM|HPPLM|TULOM|TUAIS|LPRDI|LPRFI|TULOP|LPTIM|LPPLM|LPUNEQ|''(to get status)]".format(alarmInsertionType)
+                    self.__lc_msg(localMessage)
+                    self.__method_failure(methodLocalName, None, "", localMessage)
+                    return False, localMessage
         else:
-            ONTCmdString=":SOUR:DATA:TEL:SDH:ALAR:TYPE"
-            if alarmInsertionType != "LOF" and \
-               alarmInsertionType != "RSTIM" and \
-               alarmInsertionType != "MSAIS" and \
-               alarmInsertionType != "MSRDI" and \
-               alarmInsertionType != "AUAIS" and \
-               alarmInsertionType != "AULOP" and \
-               alarmInsertionType != "HPUNEQ" and \
-               alarmInsertionType != "HPTIM" and \
-               alarmInsertionType != "HPPLM" and \
-               alarmInsertionType != "HPRDI" and \
-               alarmInsertionType != "HPRDIC" and \
-               alarmInsertionType != "HPRDIS" and \
-               alarmInsertionType != "HPRDIP" and \
-                alarmInsertionType != "":
-                localMessage = "[6xx] ERROR get_set_alarm_insertion_type: alarmInsertionType  [{}] not valid [LOF|RSTIM|MSAIS|MSRDI|AUAIS|AULOP|HPUNEQ|HPTIM|HPPLM|HPRDI|HPRDIC|HPRDIS|HPRDIP|''(to get status)]".format(alarmInsertionType)
-                self.__lc_msg(localMessage)
-                self.__method_failure(methodLocalName, None, "", localMessage)
-                return False, localMessage
+            if alarmInsertionType == "LOF" or \
+               alarmInsertionType == "RSTIM" or \
+               alarmInsertionType == "MSAIS" or \
+               alarmInsertionType == "MSRDI" or \
+               alarmInsertionType == "AUAIS" or \
+               alarmInsertionType == "AULOP" or \
+               alarmInsertionType == "HPUNEQ" or \
+               alarmInsertionType == "HPTIM" or \
+               alarmInsertionType == "HPPLM" or \
+               alarmInsertionType == "HPRDI" or \
+               alarmInsertionType == "HPRDIC" or \
+               alarmInsertionType == "HPRDIS" or \
+               alarmInsertionType == "HPRDIP":
+                ONTCmdString=":SOUR:DATA:TEL:SDH:ALAR:TYPE"
+            else:
+                if alarmInsertionType != "TUAIS" and \
+                   alarmInsertionType != "TULOP" and \
+                   alarmInsertionType != "LPUNEQ" and \
+                   alarmInsertionType != "LPTIM" and \
+                   alarmInsertionType != "LPPLM" and \
+                   alarmInsertionType != "LPRDI" and \
+                   alarmInsertionType != "":
+                    localMessage = "[6xx] ERROR get_set_alarm_insertion_type: alarmInsertionType  [{}] not valid [LOF|RSTIM|MSAIS|MSRDI|AUAIS|AULOP|HPUNEQ|HPTIM|HPPLM|HPRDI|HPRDIC|HPRDIS|HPRDIP|TUAIS|TULOP|LPUNEQ|LPTIM|LPPLM|LPRDI''(to get status)]".format(alarmInsertionType)
+                    self.__lc_msg(localMessage)
+                    self.__method_failure(methodLocalName, None, "", localMessage)
+                    return False, localMessage
+
+            if alarmInsertionType == "TUAIS" or \
+               alarmInsertionType == "TULOP" or \
+               alarmInsertionType == "LPUNEQ" or \
+               alarmInsertionType == "LPTIM" or \
+               alarmInsertionType == "LPPLM" or \
+               alarmInsertionType == "LPRDI":
+                ONTCmdString=":SOUR:DATA:TEL:SDH:TRIB:ALAR:TYPE"
 
         if alarmInsertionType == "":  # Get alarmInsertionType and exit
             localCommand="{}?".format(ONTCmdString)
@@ -4031,6 +4082,53 @@ class InstrumentONT(Equipment):
         return True, plainTextAnswer
 
 
+    def get_set_tu_path_trace_tx_TR16_string(self, portId, tr16String=""):   # ONT-6xx only  ### krepo added ###  
+        """ ONT-6xx only
+            Get or Set the 15-char string in J1 byte for TX channel:
+                tr16String: "string"|empty string to read current value
+            Return tuple: ( "True|False" , "< result/error list>)
+                True : command execution ok, current  alarm status in result string
+                False: error in command execution, details in error list string
+        """
+        methodLocalName = self.__lc_current_method_name(embedKrepoInit=True)
+        portId = self.__recover_port_to_use(portId)
+        if portId == "":
+            localMessage = "ERROR get_set_au_path_trace_tx_TR16_string: portId  [{}] not specified".format(portId)
+            self.__lc_msg(localMessage)
+            self.__method_failure(methodLocalName, None, "", localMessage)
+            return False, localMessage
+        if self.__ontType  == "6xx":
+            ONTCmdString=":SOUR:DATA:TEL:SDH:TRIB:SEL:J1TR:TR16:BLOC"
+        else:
+            localMessage="Command supported by ONT-6xx only (current test equipment type:[{}]) ".format(self.__ontType)
+            self.__lc_msg(localMessage)
+            self.__method_failure(methodLocalName, None, "", localMessage)
+            return False, localMessage
+        if tr16String == "":  # Get auPathTraceMode and exit
+            localCommand="{}?".format(ONTCmdString)
+            rawCallResult = self.__send_port_cmd(portId, localCommand)
+            sdhAnswer = self.__remove_dust(rawCallResult[1])
+            plainTextAnswer = self.__TR16_to_string(sdhAnswer)
+            self.__method_success(methodLocalName, None, plainTextAnswer)
+            return True, plainTextAnswer
+        asciiCsvString=self.__string_to_TR16(tr16String) # this is the format used in set and get
+        localCommand="{} {}".format(ONTCmdString, asciiCsvString)
+        #self.__lc_msg(localCommand)
+        rawCallResult = self.__send_port_cmd(portId, localCommand)
+        localCommand="{}?".format(ONTCmdString)
+        rawCallResult = self.__send_port_cmd(portId, localCommand)
+        sdhAnswer = self.__remove_dust(rawCallResult[1])
+        plainTextAnswer = self.__TR16_to_string(sdhAnswer)
+        if sdhAnswer != asciiCsvString:
+            localMessage="Tx TR16 J1 Send String required [{}] but set [{}]".format(tr16String,plainTextAnswer)
+            self.__lc_msg(localMessage)
+            self.__method_failure(methodLocalName, None, plainTextAnswer, localMessage)
+            return False, localMessage
+        localMessage="Tx TR16 J1 Send String specified:[{}]".format(plainTextAnswer)
+        self.__lc_msg(localMessage)
+        self.__method_success(methodLocalName, None, plainTextAnswer)
+        return True, plainTextAnswer
+
 
 
 
@@ -4269,9 +4367,9 @@ if __name__ == "__main__xxx":   #now skip this part
     #print("tester.get_set_alarmed_frames_number result: [{}]".format(callResult))
     #callResult = tester.get_set_not_alarmed_frames_number(portId1,"444")
     #print("tester.get_set_not_alarmed_frames_number result: [{}]".format(callResult))
-    #callResult = tester.get_set_alarm_activation(portId1,"")
+    #callResult = tester.get_set_alarm_activation(portId1,"","")
     #print("tester.get_set_alarm_activation result: [{}]".format(callResult))
-    #callResult = tester.get_set_alarm_activation(portId1,"OFF")
+    #callResult = tester.get_set_alarm_activation(portId1,"HI","OFF")
     #print("tester.get_set_alarm_activation result: [{}]".format(callResult))
     #callResult = tester.get_set_alarm_insertion_mode(portId1,"BURST_CONT")
     #print("tester.get_set_alarm_insertion_mode result: [{}]".format(callResult))
@@ -4449,9 +4547,9 @@ if __name__ == "__main__xxx":
     #callResult = tester.get_set_alarm_insertion_type(portId1,"LOF")
     #print("tester.get_set_alarm_insertion_type result: [{}]".format(callResult))
 
-    #callResult = tester.get_set_alarm_activation(portId1,"OFF")
+    #callResult = tester.get_set_alarm_activation(portId1,"LO","OFF")
     #print("tester.get_set_alarm_activation result: [{}]".format(callResult))
-    #callResult = tester.get_set_alarm_activation(portId1,"ON")
+    #callResult = tester.get_set_alarm_activation(portId1,"HI","ON")
     #print("tester.get_set_alarm_activation result: [{}]".format(callResult))
     #callResult = tester.get_set_num_errored_burst_frames(portId1,"7")
     #print("tester.get_set_num_errored_burst_frames result: [{}]".format(callResult))

@@ -512,10 +512,13 @@ class Plugin1850TL1():
         return self.__last_output
 
 
-    def event_collection_start(self, reset=True):
+    def event_collection_start(self, reset=True, delay=5):
         """ Start TL1 event collection
+            reset : if True, all previously collected events will be cleaned
+            delay : delay time (don't change) 
         """
         self.__collector.event_start(reset)
+        time.sleep(delay)
 
 
     def event_collection_stop(self):
