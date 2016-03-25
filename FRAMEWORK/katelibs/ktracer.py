@@ -49,7 +49,8 @@ class KTracer():
         self.__main_file = "{:s}/SUITE_trace.log".format(self.__base_path)
 
         if trunk:
-            if os.path.isfile(self.__main_file):os.remove(self.__main_file)
+            if os.path.isfile(self.__main_file):
+                os.remove(self.__main_file)
             self.__main_fh = open(self.__main_file, "w")
             os.chmod(self.__main_file, 0o666)
         else:
@@ -71,12 +72,9 @@ class KTracer():
 
         try:
             insp = inspect.stack()
-            print(insp)
             for i in range(len(insp)):
-                print(i)
                 # Searching on current stack frame for this function calling
                 if insp[i][4][0].find("k_tracer_error(") != -1:
-                    print("trovato")
                     stack_elem = insp[i + level]
                     #print(stack_elem[0])
                     #print(stack_elem[0].get_label())
@@ -86,7 +84,6 @@ class KTracer():
                     break
 
             label = "{}:{}({})".format(context_mod, context_row, context_fun)
-            print(label)
         except:
             label = "FRAMEWORK"
 
@@ -94,7 +91,6 @@ class KTracer():
             self.__main_fh.write("[{:s} {:50s}] {:s}\n".format(ts, label, row))
         self.__main_fh.write("[{:s} {:50s}]\n".format(ts, label))
 
-        print(msg)
 
 
     def k_tracer_info(self, msg, level=None):
@@ -125,7 +121,6 @@ class KTracer():
             self.__main_fh.write("[{:s} {:50s}] {:s}\n".format(ts, label, row))
         self.__main_fh.write("[{:s} {:50s}]\n".format(ts, label))
 
-        print(msg)
 
 
     def k_tracer_debug(self, msg, level=None):
