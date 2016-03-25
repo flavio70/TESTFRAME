@@ -7,7 +7,6 @@
     Provides test class definition and common functions
 """
 
-import os
 import argparse
 
 from katelibs.kenviron import KEnvironment
@@ -25,9 +24,7 @@ class TestCase(object):
         """
         self.kenvironment = KEnvironment(testfilename=filename)
         self.__eqpt_list = []
-        self.runId = None
-        
-        
+        self.__run_id = None
 
 
     def add_eqpt(self, eqpt):
@@ -36,11 +33,9 @@ class TestCase(object):
         self.__eqpt_list.append(eqpt)
 
 
-
     def get_eqptlist(self):
-       """returns the stored eqptlist"""
-       return self.__eqpt_list
-
+        """returns the stored eqptlist"""
+        return self.__eqpt_list
 
 
     def skip_section(self, run_section):
@@ -162,7 +157,7 @@ class TestCase(object):
             args.DUTClean = True
 
         self.trc_inf(str(args))
-        self.runId=args.runId
+        self.__run_id=args.runId
 
         self.dut_setup() if args.DUTSet else self.skip_section('DUT Setup')
         self.test_setup() if args.testSet else self.skip_section('test Setup')
@@ -172,16 +167,38 @@ class TestCase(object):
 
 
     def add_success(self, ref_obj, title, elapsed_time, out_text):
-        
+        """ Inject a POSITIVE record on xml result file
+            ref_obj      : reference to an Equipment variable (could be None)
+            title        : describe the performed action. For example, a CLI/TL1/... command
+            out_text     : verbose description of test outcome.
+            elapsed_time : explicit declaration of test's time execution. See start_time()
+        """
         self.kenvironment.krepo.add_success(ref_obj, title, elapsed_time, out_text)
-    
+
+
     def add_failure(self, ref_obj, title, elapsed_time, out_text, err_text, log_text=None):
-        
+        """ Inject a FAILURE record on xml result file
+            ref_obj      : reference to an Equipment variable (could be None)
+            title        : describe the performed action. For example, a CLI/TL1/... command
+            out_text     : verbose description of test outcome.
+            err_text     : verbose description of errored scenario.
+            log_text     : additional reference to log repository (optional)
+            elapsed_time : explicit declaration of test's time execution. See start_time()
+        """
         self.kenvironment.krepo.add_failure(ref_obj, title, elapsed_time, out_text, err_text, log_text)
-        
+
+
     def add_skipped(self, ref_obj, title, elapsed_time, out_text, err_text, skip_text=None):
-        
+        """ Inject a SKIPPED record on xml result file
+            ref_obj      : reference to an Equipment variable (could be None)
+            title        : describe the performed action. For example, a CLI/TL1/... command
+            out_text     : verbose description of test outcome.
+            err_text     : verbose description of skip reasons
+            log_text     : additional reference to log repository (optional)
+            elapsed_time : explicit declaration of test's time execution. See start_time()
+        """
         self.kenvironment.krepo.add_skipped(ref_obj, title, elapsed_time, out_text, err_text, skip_text)
+
 
     def start_tps_block(self, dut_id, tps_area, tps_name):
         '''
@@ -192,10 +209,10 @@ class TestCase(object):
 
 
     def stop_tps_block(self, dut_id, tps_area, tps_name):
-        """ 
+        """
         Stop the block containing the code related to the specific TPS (test Procedure)
         This function will terminate the specific XML report file related to TPSName test id
-        """ 
+        """
         self.kenvironment.krepo.stop_tps_block(dut_id, tps_area, tps_name)
 
 

@@ -44,8 +44,10 @@ class TL1EventCollector():
             collector_fn = "collector.log"
         else:
             collector_fn = collector
-        
-        if os.path.isfile(collector_fn):os.remove(collector_fn)
+
+        if os.path.isfile(collector_fn):
+            os.remove(collector_fn)
+
         self.__f = open(collector_fn, "w")
         os.chmod(collector_fn, 0o666)
 
@@ -314,12 +316,12 @@ class TL1EventCollector():
 
         # Trash all trailing characters from stream
         if self.__eve_read_all() == False:
-            self.__trc_error("error [1] sending TL1 command [{:s}]".format(cmd))
+            self.__trc_err("error [1] sending TL1 command [{:s}]".format(cmd))
             return False
 
         # Sending command to interface
         if self.__eve_write(cmd) == False:
-            self.__trc_error("error [2] sending TL1 command [{:s}]".format(cmd))
+            self.__trc_err("error [2] sending TL1 command [{:s}]".format(cmd))
             return False
 
         tl1_response  = ""
@@ -331,7 +333,7 @@ class TL1EventCollector():
             result_list = self.__eve_expect([b"\n\>", b"\n\;"])
 
             if result_list == ([],[],[]):
-                self.__trc_error("error [3] sending TL1 command [{:s}]".format(cmd))
+                self.__trc_err("error [3] sending TL1 command [{:s}]".format(cmd))
                 return False
 
             msg_tmp = str(result_list[2], 'utf-8')
@@ -349,7 +351,7 @@ class TL1EventCollector():
                 elif msg_tmp.find("KEEP ALIVE MESSAGE") != -1:
                     keepalive_count = keepalive_count + 1
                     if keepalive_count == keepalive_count_max:
-                        self.__trc_error("error [4] sending TL1 command [{:s}]".format(cmd))
+                        self.__trc_err("error [4] sending TL1 command [{:s}]".format(cmd))
                         return False
                     continue
 
@@ -357,9 +359,9 @@ class TL1EventCollector():
                     tl1_response = tl1_response + re.sub('(\r\n)+', "\r\n", msg_tmp, 0)
                     if tl1_verb != "ed-pid"  and  tl1_verb != "act-user":
                         if tl1_response.count(";") > 1:
-                            self.__trc_error("error [5] sending TL1 command [{:s}]".format(cmd))
+                            self.__trc_err("error [5] sending TL1 command [{:s}]".format(cmd))
                             raise KFrameException("INVALID TL1 TERMINATION")
-                            return False
+                            #return False
                     if tl1_response.strip() == ";":
                         continue
                     break
@@ -436,7 +438,7 @@ class TL1EventCollector():
                 time.sleep(1)
 
         if not is_connected:
-            self.__trc_error("TL1: Timeout on connection")
+            self.__trc_err("TL1: Timeout on connection")
             raise KFrameException("TL1: Timeout on connection")
 
         return self.__if_eve
@@ -456,7 +458,7 @@ class TL1EventCollector():
             self.__ktrc.k_tracer_info(msg, level)
 
 
-    def __trc_error(self, msg, level=None):
+    def __trc_err(self, msg, level=None):
         """ INTERNAL USAGE
         """
         if self.__ktrc is not None:
@@ -515,7 +517,7 @@ class Plugin1850TL1():
     def event_collection_start(self, reset=True, delay=5):
         """ Start TL1 event collection
             reset : if True, all previously collected events will be cleaned
-            delay : delay time (don't change) 
+            delay : delay time (don't change)
         """
         self.__collector.event_start(reset)
         time.sleep(delay)
@@ -577,7 +579,7 @@ class Plugin1850TL1():
                 time.sleep(2)
             else:
                 error_msg = "TIMEOUT ({:d}s) DETECTED in do_until '{:s}'".format(timeout, cmd)
-                self.__trc_error(error_msg)
+                self.__trc_err(error_msg)
                 result = False
                 #raise KFrameException(error_msg)
                 break
@@ -605,7 +607,7 @@ class Plugin1850TL1():
         """
 
         if policy == "COND" and cond is None:
-            self.__trc_error("An instance of TL1check is mandatory for policy=='COND'")
+            self.__trc_err("An instance of TL1check is mandatory for policy=='COND'")
             return False
 
         if cmd.find(';') == -1:
@@ -657,17 +659,17 @@ class Plugin1850TL1():
 
         # Trash all trailing characters from stream
         if self.__cmd_read_all() == False:
-            self.__trc_error("error [1] sending TL1 command [{:s}]".format(cmd))
+            self.__trc_err("error [1] sending TL1 command [{:s}]".format(cmd))
             self.__last_output = "TIMEOUT DETECTED ON TL1 INTERFACE"
             raise KFrameException(self.__last_output)
-            return False
+            #return False
 
         # Sending command to interface
         if self.__cmd_write(cmd) == False:
-            self.__trc_error("error [2] sending TL1 command [{:s}]".format(cmd))
+            self.__trc_err("error [2] sending TL1 command [{:s}]".format(cmd))
             self.__last_output = "TIMEOUT DETECTED ON TL1 INTERFACE"
             raise KFrameException(self.__last_output)
-            return False
+            #return False
 
 
         if cmd.lower() == "canc-user;":
@@ -683,14 +685,14 @@ class Plugin1850TL1():
 
                 if result_list == ([],[],[]):
                     if is_until:
-                        self.__trc_error("error [3] UNTIL sending TL1 command [{:s}]".format(cmd))
+                        self.__trc_err("error [3] UNTIL sending TL1 command [{:s}]".format(cmd))
                         self.__last_output = ""
                         return False
                     else:
-                        self.__trc_error("error [3] sending TL1 command [{:s}]".format(cmd))
+                        self.__trc_err("error [3] sending TL1 command [{:s}]".format(cmd))
                         self.__last_output = "TIMEOUT DETECTED ON TL1 INTERFACE"
                         raise KFrameException(self.__last_output)
-                        return False
+                        #return False
 
                 msg_tmp = str(result_list[2], 'utf-8')
 
@@ -707,20 +709,20 @@ class Plugin1850TL1():
                     elif msg_tmp.find("KEEP ALIVE MESSAGE") != -1:
                         keepalive_count = keepalive_count + 1
                         if keepalive_count == keepalive_count_max:
-                            self.__trc_error("error [4] sending TL1 command [{:s}]".format(cmd))
+                            self.__trc_err("error [4] sending TL1 command [{:s}]".format(cmd))
                             self.__last_output = "MAXIMUM KEEPALIVE ON TL1 RESPONSE REACHED"
                             raise KFrameException(self.__last_output)
-                            return False
+                            #return False
                         continue
 
                     else:
                         tl1_response = tl1_response + re.sub('(\r\n)+', "\r\n", msg_tmp, 0)
                         if tl1_verb != "ed-pid"  and  tl1_verb != "act-user":
                             if tl1_response.count(";") > 1:
-                                self.__trc_error("error [5] sending TL1 command [{:s}]".format(cmd))
+                                self.__trc_err("error [5] sending TL1 command [{:s}]".format(cmd))
                                 self.__last_output = "INVALID TL1 TERMINATION"
                                 raise KFrameException(self.__last_output)
-                                return False
+                                #return False
                         if tl1_response.strip() == ";":
                             continue
                         break
@@ -810,7 +812,7 @@ class Plugin1850TL1():
                 time.sleep(1)
 
         if not is_connected:
-            self.__trc_error("TL1: Timeout on connection")
+            self.__trc_err("TL1: Timeout on connection")
             raise KFrameException("TL1: Timeout on connection")
 
         return self.__if_cmd
@@ -823,13 +825,13 @@ class Plugin1850TL1():
             #self.__do("CANC-USER;", "COMPLD")
         #except Exception as eee:
             #msg = "Error in disconnection - {:s}".format(str(eee))
-            #self.__trc_error(msg)
+            #self.__trc_err(msg)
             #raise KFrameException(msg)
         try:
-            self.__trc_error("CLOSING TELNET SESSION")
+            self.__trc_err("CLOSING TELNET SESSION")
             self.__if_cmd.close()
         except Exception as eee:
-            self.__trc_error("ERROR ON CLOSING TELNET SESSION")
+            self.__trc_err("ERROR ON CLOSING TELNET SESSION")
 
         self.__if_cmd = None
 
@@ -869,7 +871,7 @@ class Plugin1850TL1():
             self.__ktrc.k_tracer_info(msg, level)
 
 
-    def __trc_error(self, msg, level=None):
+    def __trc_err(self, msg, level=None):
         """ INTERNAL USAGE
         """
         if self.__ktrc is not None:
@@ -912,6 +914,6 @@ if __name__ == "__main__":
 
     time.sleep(1)
 
-    tl1.thr_event_terminate()
+    #tl1.thr_event_terminate()
 
     print("FINE")

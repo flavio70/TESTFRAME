@@ -172,11 +172,7 @@ class Kunit:
         calling this function into testcase object will generate a specific XML report file for each TPSName provided
         '''
 
-        file_name = "{:s}/{:s}.[{:s}]_{:s}_{:s}.XML".format(self.__dir,
-                                                     os.path.splitext(os.path.splitext(self.__clnm[self.master_file_name])[0])[0],
-                                                     dut_id,
-                                                     tps_area,
-                                                     tps_name)
+        file_name = "{:s}/{:s}.[{:s}]_{:s}_{:s}.XML".format(self.__dir, os.path.splitext(os.path.splitext(self.__clnm[self.master_file_name])[0])[0], dut_id, tps_area, tps_name)
 
         self.__reports[file_name] = None
         self.__clnm[file_name] = None
@@ -189,18 +185,15 @@ class Kunit:
         Stop the block containing the code related to the specific TPS (test Procedure)
         This function will terminate the specific XML report file related to TPSName test id
         '''
-        file_name = "{:s}/{:s}.[{:s}]_{:s}_{:s}.XML".format(self.__dir,
-                                                     os.path.splitext(os.path.splitext(self.__clnm[self.master_file_name])[0])[0],
-                                                     dut_id,
-                                                     tps_area,
-                                                     tps_name)
+        file_name = "{:s}/{:s}.[{:s}]_{:s}_{:s}.XML".format(self.__dir, os.path.splitext(os.path.splitext(self.__clnm[self.master_file_name])[0])[0], dut_id, tps_area, tps_name)
         self.frame_close(file_name)
 
         self.__reports.pop(file_name)
         self.__clnm.pop(file_name)
 
 
-    def __make_test_case(self, ref_obj, clnm, title, elapsed_time, counter):
+    @staticmethod
+    def __make_test_case(ref_obj, clnm, title, elapsed_time, counter):
         """ INTERNAL USAGE
         """
         try:
@@ -219,7 +212,8 @@ class Kunit:
         return msg
 
 
-    def __make_system_out(self, out_text):
+    @staticmethod
+    def __make_system_out(out_text):
         """ INTERNAL USAGE
         """
         return  '\t\t<system-out>\n'    +\
@@ -229,7 +223,8 @@ class Kunit:
                 '\t\t</system-out>\n'
 
 
-    def __make_system_err(self, out_text):
+    @staticmethod
+    def __make_system_err(out_text):
         """ INTERNAL USAGE
         """
         return  '\t\t<system-err>\n'    +\
@@ -239,7 +234,8 @@ class Kunit:
                 '\t\t</system-err>\n'
 
 
-    def __make_log_error(self, out_text):
+    @staticmethod
+    def __make_log_error(out_text):
         """ INTERNAL USAGE
         """
         if out_text is None:
@@ -252,7 +248,8 @@ class Kunit:
                 '\t\t</failure>\n'
 
 
-    def __make_skipped(self, out_text):
+    @staticmethod
+    def __make_skipped(out_text):
         """ INTERNAL USAGE
         """
         if out_text is None:
@@ -270,24 +267,24 @@ class Kunit:
 
 if __name__ == "__main__":
     print("DEBUG")
-    kun = Kunit("/users/ghelfc/domain.prova.py")
+    kun = Kunit("/users/ghelfc", "domain.prova.py")
 
     kun.start_time()
     # simulo un tempo di esecuzione
     time.sleep(3)
 
-    kun.start_tps_block("DATA", "1.2.3")
-    kun.start_tps_block("TDM",  "5.3.6")
+    kun.start_tps_block(1, "DATA", "1.2.3")
+    kun.start_tps_block(1, "TDM",  "5.3.6")
 
     kun.add_success(None, "TL1 AAA", None, "TESTO")
     kun.add_failure(None, "TL1 BBB", "120.0", "DENY detected", "internal timeout", "traccia")
 
-    kun.stop_tps_block("TDM",  "5.3.6")
+    kun.stop_tps_block(1, "TDM",  "5.3.6")
 
     kun.add_skipped(None, "CLI AAA", "0.0", "TESTO", "not applicable")
     kun.add_success(None, "TL1 DDD", "2.3", "TESTO")
 
-    kun.stop_tps_block("DATA", "1.2.3")
+    kun.stop_tps_block(1, "DATA", "1.2.3")
 
     kun.add_success(None, "TL1 EEE", "2.8", "TESTO")
 

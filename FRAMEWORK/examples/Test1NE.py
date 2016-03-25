@@ -57,13 +57,13 @@ class Test(TestCase):
         DUT Setup section Implementation
         insert DUT SetUp code for your test below
         '''
-        THE_SWP = SWP1850TSS()
+        #THE_SWP = SWP1850TSS()
         # temporaneo
-        THE_SWP.init_from_db(swp_flv="FLV_ALC-TSS__BASE00.25.FD0491__VM")
+        #THE_SWP.init_from_db(swp_flv="FLV_ALC-TSS__BASE00.25.FD0491__VM")
 
         #NE1.flc_ip_config()
 
-        NE1.flc_load_swp(THE_SWP)
+        #NE1.flc_load_swp(THE_SWP)
 
         #NE1.flc_scratch_db()
         #NE1.flc_reboot()
