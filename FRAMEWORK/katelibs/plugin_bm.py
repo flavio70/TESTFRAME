@@ -293,6 +293,10 @@ class Plugin1850BM():
             info = self.read_remote_inventory(slot + 1, relaxed=True)
             if info != (None, None):
                 result[slot+1] = info
+            # Check for connection: skip if not present
+            if self.__active is None:
+                self.__trc_err("\nBOTH SLC ARE NOT AVAILABLE.\n")
+                return result
 
         return result
 
@@ -335,14 +339,18 @@ if __name__ == "__main__":
 
     trace = KTracer(level="ERROR")
 
-    bm = Plugin1850BM("135.221.125.79", ktrc=trace)
+    bm = Plugin1850BM("135.221.126.41", ktrc=trace)
+    print("connesso")
 
-    print(bm.get_active_slc())
+    #print(bm.get_active_slc())
+    print("active slc valutata")
     #print(bm.get_active_slc())
     #print(bm.send_command("help"))
     #print(bm.send_command(": touch /tmp/PIPPO"))
-    print(bm.read_remote_inventory(11))
+    #print(bm.read_remote_inventory(11))
+    print("remote inventory per 11 ricevuta")
     print(bm.read_complete_remote_inventory())
+    print("completa remote inventory ricevuta")
 
     bm.clean_up()
 

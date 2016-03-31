@@ -35,13 +35,16 @@ def is_reachable(ip):
     return (os.system(cmd) == 0)
 
 
-def write_info(ip, reminv):
-    print("#" * 80)
-    print(ip)
-    for the_key in sorted(reminv, key=reminv.get, reverse=False):
-        card_name = reminv[the_key][0]
-        signature = reminv[the_key][1]
-        print("\t{:2}: {:16s} [{}]".format(the_key, card_name, signature))
+def write_info(ip, reminv, verbose):
+    if verbose:
+        print("#" * 80)
+        print(ip)
+        for the_key in sorted(reminv, key=reminv.get, reverse=False):
+            card_name = reminv[the_key][0]
+            signature = reminv[the_key][1]
+            print("\t{:2}: {:16s} [{}]".format(the_key, card_name, signature))
+    else:
+        print("Info stored on DB for [{}]".format(ip))
 
 
 def check_info_on_db(eqpt_id, reminv):
@@ -50,6 +53,7 @@ def check_info_on_db(eqpt_id, reminv):
     query = ' '.join( ( "SELECT *",
                         "FROM   T_BOARDS",
                         "WHERE  T_EQUIPMENT_id_equipment='{}'".format(eqpt_id) ) )
+
     cursor.execute(query)
 
     result = cursor.fetchall()
@@ -113,12 +117,14 @@ def insert_info_on_db(eqpt_id, reminv):
         card_name = reminv[the_key][0]
         signature = reminv[the_key][1]
         id_board_type = None
+        card_id = None
         for r in tab_board_type.objects.all():
             if r.name == card_name:
                 card_id = r.id_board_type
                 break
         if card_id is None:
-            card_id = 0     # UNKNOWN card type
+            print("UNKNOWN card type on node[{}], slot[{}]".format(eqpt_id, the_key))
+            continue
 
         cursor = connection.cursor()
 
@@ -140,29 +146,30 @@ def insert_info_on_db(eqpt_id, reminv):
         result = cursor.fetchall()
 
 
+def is_a_new_node(eqpt_id):
+    cursor = connection.cursor()
+
+    query = ' '.join( ( "SELECT id_board",
+                        "FROM   T_BOARDS",
+                        "WHERE  T_EQUIPMENT_id_equipment='{}'".format(eqpt_id) ) )
+
+    cursor.execute(query)
+
+    result = cursor.fetchall()
+
+    return (len(result) == 0)
+
+
 if __name__ == "__main__":
 
-    #parser = argparse.ArgumentParser()
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--fast", help="get only new nodes info", action="store_true")
+    parser.add_argument("--verbose", help="print a detailed activity report", action="store_true")
     #parser.add_argument("--all", help="get full info", action="store_true")
-    #args = parser.parse_args()
+    args = parser.parse_args()
 
     tab_eqpt_type = TEquipType
     tab_board_type = TBoardType
-
-    if False:
-        reminv = {}
-        reminv[2]   = "10X1GEPP","32324149544131305831474550504E47433541464B46414138444730383035314141414130312D2D2D2D2D2D2D2D2D2D2D2D2D2D434C2020434C303832303930333330202020202030303038313032312D2D2D2D2D2D2D2D2D2D2D2D2D2D2D2D2D2D2D2D2D2D2D2D2D2D2D2D2D2D2D2D2D2D2D2D2D2D2D2D2D2D2D2D2D2DE6BB"
-        reminv[22]  = "1P10GSO","3232414954413150313047534F204E4749374143394D414133414C39323131314141414130312020202020202020202020202020434C2020434C3036323839303831352020202020303030363037323120202020202020202020202020202020202020202020202020202020202020202020202020202020202020202020E9E9"
-        reminv[33]  = "1P10GSO","3232414954413150313047534F204E4749374146324D414133414C39323131314141414130332D2D2D2D2D2D2D2D2D2D2D2D2D2D434C2020434C303631353930373037202020202030303037303632322D2D2D2D2D2D2D2D2D2D2D2D2D2D2D2D2D2D2D2D2D2D2D2D2D2D2D2D2D2D2D2D2D2D2D2D2D2D2D2D2D2D2D2D2D2DE6E2"
-        reminv[12]  = "1X10GEPP","2324149544131583130474550504E47433541464A46414138444730383034394141414130312D2D2D2D2D2D2D2D2D2D2D2D2D2D434C2020434C303831373930353439202020202030303038303730332D2D2D2D2D2D2D2D2D2D2D2D2D2D2D2D2D2D2D2D2D2D2D2D2D2D2D2D2D2D2D2D2D2D2D2D2D2D2D2D2D2D2D2D2D2DE69D"
-        reminv[9]   = "1X10GEPP","2324149544131583130474550504E47433541464A46414138444730383034394141414130312D2D2D2D2D2D2D2D2D2D2D2D2D2D434C2020434C303832303930313038202020202030303038303532362D2D2D2D2D2D2D2D2D2D2D2D2D2D2D2D2D2D2D2D2D2D2D2D2D2D2D2D2D2D2D2D2D2D2D2D2D2D2D2D2D2D2D2D2D2DE6A9"
-        reminv[1]   = "EC320","32324149544145433332302020204E47433541473246414133414C39323131304141414530362D2D2D2D2D2D2D2D2D2D2D2D2D2D434C2020434C303932373931323938202020202030303131303531302D2D2D2D2D2D2D2D2D2D2D2D2D2D2D2D2D2D2D2D2D2D2D2D2D2D2D2D2D2D2D2D2D2D2D2D2D2D2D2D2D2D2D2D2D2DE755"
-        reminv[10]  = "MT160LO","3232414954414D543136304C4F204E47433541473046414133414C39323130384146414130342D2D2D2D2D2D2D2D2D2D2D2D2D2D434C2020434C303934303930383430202020202030303039313030322D2D2D2D2D2D2D2D2D2D2D2D2D2D2D2D2D2D2D2D2D2D2D2D2D2D2D2D2D2D2D2D2D2D2D2D2D2D2D2D2D2D2D2D2D2DE6E4"
-        reminv[32]  = "PP10GEX2","FFFFFFFFFFF5050313047455832FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF885F"
-        reminv[15]  = "PP10GEX2","FFFFFFFFFFF5050313047455832FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF885F"
-
-        insert_info_on_db(1009, reminv)
-        sys.exit(0)
 
 
     allIP = TNet.objects.all()
@@ -173,10 +180,32 @@ if __name__ == "__main__":
 
         if eIP != "None":
             if eType.find("1850TSS") != -1:
+                if args.fast:
+                    if not is_a_new_node(r.id_equipment):
+                        print("Node [{}: {}] already checked - skip".format(r.id_equipment, eIP))
+                        continue
+                    else:
+                        print("Node [{}: {}] to be checked".format(r.id_equipment, eIP))
+
                 if is_reachable(eIP):
-                    bm = Plugin1850BM(eIP)
-                    reminv = bm.read_complete_remote_inventory()
+                    print("Connecting [{}: {}]...".format(r.id_equipment, eIP))
+                    try:
+                        bm = Plugin1850BM(eIP)
+                    except Exception as eee:
+                        print("Exception on connecting [{}]".format(eee))
+                        continue
+
+                    try:
+                        reminv = bm.read_complete_remote_inventory()
+                    except Exception as eee:
+                        print("Exception on retrieving info [{}]".format(eee))
+                        bm.clean_up()
+                        continue
+
                     if len(reminv) != 0:
-                        write_info(eIP, reminv)
+                        write_info(eIP, reminv, args.verbose)
                         insert_info_on_db(r.id_equipment, reminv)
+
                     bm.clean_up()
+                else:
+                    print("Node [{}: {}] not reachable".format(r.id_equipment, eIP))
