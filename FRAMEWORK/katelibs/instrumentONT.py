@@ -3080,7 +3080,7 @@ class InstrumentONT(Equipment):
         return True, sdhAnswer
 
 
-    def get_set_num_errored_burst_frames(self, portId, burstErroredFramesNumber=""):   # ONT-5xx  ONT-6xx   ### krepo added ###      
+    def get_set_num_errored_burst_frames(self, portId, pathOrder, burstErroredFramesNumber=""):   # ONT-5xx  ONT-6xx   ### krepo added ###      
         """ ONT-5xx  ONT-6xx
             Get or Set number of frames, in which error insertion is active:
             is the duration of error insertion is burstErroredFramesNumber frames.
@@ -3095,6 +3095,8 @@ class InstrumentONT(Equipment):
             ONTCmdString=":SOUR:DATA:TEL:ERR:BURS:ACTI"
         else:
             ONTCmdString=":SOUR:DATA:TEL:SDH:ERR:BURS:ACTI"
+            if pathOrder == "LO":
+                ONTCmdString=":SOUR:DATA:TEL:SDH:TRIB:ERR:BURS:ACTI"
         if portId == "":
             localMessage = "ERROR get_set_num_errored_burst_frames: portId  [{}] not specified".format(portId)
             self.__lc_msg(localMessage)
@@ -3130,7 +3132,7 @@ class InstrumentONT(Equipment):
         return True, sdhAnswer
 
 
-    def get_set_num_not_errored_burst_frames(self, portId, burstNotErroredFramesNumber=""):   # ONT-5xx  ONT-6xx   ### krepo added ###       
+    def get_set_num_not_errored_burst_frames(self, portId, pathOrder, burstNotErroredFramesNumber=""):   # ONT-5xx  ONT-6xx   ### krepo added ###       
         """ ONT-5xx  ONT-6xx
             Get or Set number of frames, in which error insertion is inactive:
             is the duration of inactive error insertion is burstNotErroredFramesNumber frames.
@@ -3145,6 +3147,8 @@ class InstrumentONT(Equipment):
             ONTCmdString=":SOUR:DATA:TEL:ERR:BURS:INAC"
         else:
             ONTCmdString=":SOUR:DATA:TEL:SDH:ERR:BURS:INAC"
+            if pathOrder == "LO":
+                ONTCmdString=":SOUR:DATA:TEL:SDH:TRIB:ERR:BURS:INAC"
         if portId == "":
             localMessage = "ERROR get_set_num_not_errored_burst_frames: portId  [{}] not specified".format(portId)
             self.__lc_msg(localMessage)
@@ -3181,7 +3185,7 @@ class InstrumentONT(Equipment):
 
 
 
-    def get_set_error_activation(self, portId, errorActivation=""):   # ONT-5xx  ONT-6xx   ### krepo added ###       
+    def get_set_error_activation(self, portId, pathOrder, errorActivation=""):   # ONT-5xx  ONT-6xx   ### krepo added ###       
         """ ONT-5xx  ONT-6xx
             Get or Set the error insertion status:
                 ON   Activate Error Insertion
@@ -3196,6 +3200,9 @@ class InstrumentONT(Equipment):
             ONTCmdString=":SOUR:DATA:TEL:ERR:INS"  # ONT original command string put here
         else:
             ONTCmdString=":SOUR:DATA:TEL:SDH:ERR:INS"  # ONT original command string put here
+            if pathOrder == "LO":
+                ONTCmdString=":SOUR:DATA:TEL:SDH:TRIB:ERR:INS"
+
         if portId == "":
             localMessage = "ERROR get_set_error_activation: portId  [{}] not specified".format(portId)
             self.__lc_msg(localMessage)
@@ -3232,7 +3239,7 @@ class InstrumentONT(Equipment):
 
 
 
-    def get_set_error_insertion_mode(self, portId, errorInsertionMode=""):   # ONT-5xx  ONT-6xx    ### krepo added ###       
+    def get_set_error_insertion_mode(self, portId, pathOrder, errorInsertionMode=""):   # ONT-5xx  ONT-6xx    ### krepo added ###       
         """ ONT-5XX ONT-6xx
             Get or Set the error insertion mode from:
                 NONE            No error insertion..
@@ -3255,6 +3262,9 @@ class InstrumentONT(Equipment):
                                 :SOUR:DATA:TEL:ERR:BURS:INAC
                                 :SOUR:DATA:TEL:ERR:BURS:ACTI:TIME
                                 :SOUR:DATA:TEL:ERR:BURS:INAC:TIME
+            Path Order: only for ONT-6xx
+                                LO 
+                                HO
             Return tuple: ( "True|False" , "< result/error list>)
                 True : command execution ok, current  error insertion mode in result string
                 False: error in command execution, details in error list string
@@ -3265,6 +3275,9 @@ class InstrumentONT(Equipment):
             ONTCmdString=":SOUR:DATA:TEL:ERR:MODE"
         else:
             ONTCmdString=":SOUR:DATA:TEL:SDH:ERR:MODE"
+            if pathOrder == "LO":
+                ONTCmdString=":SOUR:DATA:TEL:SDH:TRIB:ERR:MODE"
+        
         if portId == "":
             localMessage = "ERROR get_set_error_insertion_mode: portId  [{}] not specified".format(portId)
             self.__lc_msg(localMessage)
@@ -3306,7 +3319,7 @@ class InstrumentONT(Equipment):
 
 
 
-    def get_set_error_rate(self, portId, errorRate=""):   # ONT-5xx  ONT-6xx    ### krepo added ###       
+    def get_set_error_rate(self, portId, pathOrder, errorRate=""):   # ONT-5xx  ONT-6xx    ### krepo added ###       
         """ ONT-5XX ONT-6xx
             Get or Set number of frames, in which error insertion is active:
             is the duration of error insertion is errorRate frames.
@@ -3314,6 +3327,9 @@ class InstrumentONT(Equipment):
              Return tuple: ( "True|False" , "< result/error list>)
                 True : command execution ok, current read errorRate in result string
                 False: error in command execution, details in error list string
+            Path Order: only for ONT-6xx
+                                LO 
+                                HO
         """
         methodLocalName = self.__lc_current_method_name(embedKrepoInit=True)
         portId = self.__recover_port_to_use(portId)
@@ -3321,6 +3337,8 @@ class InstrumentONT(Equipment):
             ONTCmdString=":SOUR:DATA:TEL:ERR:RATE"
         else:
             ONTCmdString=":SOUR:DATA:TEL:SDH:ERR:RATE"
+            if pathOrder == "LO":
+                ONTCmdString=":SOUR:DATA:TEL:SDH:TRIB:ERR:RATE"
         if portId == "":
             localMessage = "ERROR get_set_error_rate: portId  [{}] not specified".format(portId)
             self.__lc_msg(localMessage)
@@ -3402,19 +3420,23 @@ class InstrumentONT(Equipment):
                 self.__method_failure(methodLocalName, None, "", localMessage)
                 return False, localMessage
         else:
-            ONTCmdString=":SOUR:DATA:TEL:SDH:ERR:TYPE"
-            if errorInsertionType != "RAND" and \
-               errorInsertionType != "FAS" and \
-               errorInsertionType != "RSBIP" and \
-               errorInsertionType != "MSBIP" and \
-               errorInsertionType != "MSREI" and \
-               errorInsertionType != "HPBIP" and \
-               errorInsertionType != "HPREI" and \
-               errorInsertionType != "":
-                localMessage = "[6xx] ERROR get_set_error_insertion_type: errorInsertionType  [{}] not valid [RAND|FAS|RSBIP|MSBIP|MSREI|HPBIP|HPREI|''(to get status)]".format(errorInsertionType)
-                self.__lc_msg(localMessage)
-                self.__method_failure(methodLocalName, None, "", localMessage)
-                return False, localMessage
+            if errorInsertionType == "RAND" or \
+               errorInsertionType == "FAS" or \
+               errorInsertionType == "RSBIP" or \
+               errorInsertionType == "MSBIP" or \
+               errorInsertionType == "MSREI" or \
+               errorInsertionType == "HPBIP" or \
+               errorInsertionType == "HPREI":
+                ONTCmdString=":SOUR:DATA:TEL:SDH:ERR:TYPE"
+            else:
+                if errorInsertionType == "LPBIP" or \
+                   errorInsertionType == "LPREI":
+                    ONTCmdString=":SOUR:DATA:TEL:SDH:TRIB:ERR:TYPE"
+                else:
+                    localMessage = "[6xx] ERROR get_set_error_insertion_type: errorInsertionType  [{}] not valid [RAND|FAS|RSBIP|MSBIP|MSREI|HPBIP|HPREI|LPBIP|LPREI''(to get status)]".format(errorInsertionType)
+                    self.__lc_msg(localMessage)
+                    self.__method_failure(methodLocalName, None, "", localMessage)
+                    return False, localMessage
 
         if errorInsertionType == "":  # Get errorInsertionType and exit
             localCommand="{}?".format(ONTCmdString)
@@ -4125,6 +4147,53 @@ class InstrumentONT(Equipment):
             self.__method_failure(methodLocalName, None, plainTextAnswer, localMessage)
             return False, localMessage
         localMessage="Tx TR16 J1 Send String specified:[{}]".format(plainTextAnswer)
+        self.__lc_msg(localMessage)
+        self.__method_success(methodLocalName, None, plainTextAnswer)
+        return True, plainTextAnswer
+
+    def get_set_tu_path_trace_tx_J2_TR16_string(self, portId, tr16String=""):   # ONT-6xx only  ### krepo added ###  
+        """ ONT-6xx only
+            Get or Set the 15-char string in J1 byte for TX channel:
+                tr16String: "string"|empty string to read current value
+            Return tuple: ( "True|False" , "< result/error list>)
+                True : command execution ok, current  alarm status in result string
+                False: error in command execution, details in error list string
+        """
+        methodLocalName = self.__lc_current_method_name(embedKrepoInit=True)
+        portId = self.__recover_port_to_use(portId)
+        if portId == "":
+            localMessage = "ERROR get_set_au_path_trace_tx_J2_TR16_string: portId  [{}] not specified".format(portId)
+            self.__lc_msg(localMessage)
+            self.__method_failure(methodLocalName, None, "", localMessage)
+            return False, localMessage
+        if self.__ontType  == "6xx":
+            ONTCmdString=":SOUR:DATA:TEL:SDH:TRIB:SEL:J2TR:TR16:BLOC"
+        else:
+            localMessage="Command supported by ONT-6xx only (current test equipment type:[{}]) ".format(self.__ontType)
+            self.__lc_msg(localMessage)
+            self.__method_failure(methodLocalName, None, "", localMessage)
+            return False, localMessage
+        if tr16String == "":  # Get auPathTraceMode and exit
+            localCommand="{}?".format(ONTCmdString)
+            rawCallResult = self.__send_port_cmd(portId, localCommand)
+            sdhAnswer = self.__remove_dust(rawCallResult[1])
+            plainTextAnswer = self.__TR16_to_string(sdhAnswer)
+            self.__method_success(methodLocalName, None, plainTextAnswer)
+            return True, plainTextAnswer
+        asciiCsvString=self.__string_to_TR16(tr16String) # this is the format used in set and get
+        localCommand="{} {}".format(ONTCmdString, asciiCsvString)
+        #self.__lc_msg(localCommand)
+        rawCallResult = self.__send_port_cmd(portId, localCommand)
+        localCommand="{}?".format(ONTCmdString)
+        rawCallResult = self.__send_port_cmd(portId, localCommand)
+        sdhAnswer = self.__remove_dust(rawCallResult[1])
+        plainTextAnswer = self.__TR16_to_string(sdhAnswer)
+        if sdhAnswer != asciiCsvString:
+            localMessage="Tx TR16 J2 Send String required [{}] but set [{}]".format(tr16String,plainTextAnswer)
+            self.__lc_msg(localMessage)
+            self.__method_failure(methodLocalName, None, plainTextAnswer, localMessage)
+            return False, localMessage
+        localMessage="Tx TR16 J2 Send String specified:[{}]".format(plainTextAnswer)
         self.__lc_msg(localMessage)
         self.__method_success(methodLocalName, None, plainTextAnswer)
         return True, plainTextAnswer
