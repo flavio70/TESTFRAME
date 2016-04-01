@@ -17,6 +17,14 @@ from katelibs.database  import *
 from django.db          import connection
 
 
+def getEqptIdByIP(node_ip):
+    for r in allIP:
+        if r.ip == node_ip:
+            return r.t_equipment_id_equipment.id_equipment
+
+    return None
+
+
 def getEqptTypeName(n):
     return tab_eqpt_type.objects.get(id_type=n).name
 
@@ -160,52 +168,89 @@ def is_a_new_node(eqpt_id):
     return (len(result) == 0)
 
 
+def get_info_for_node_ip(node_ip, verbose):
+    eIP = node_ip[0]
+
+    id_eqpt = getEqptIdByIP(eIP)
+    if id_eqpt is None:
+        print("Node [{}] not found on DB".format(eIP))
+        sys.exit(0)
+
+    if is_reachable(eIP):
+        print("Connecting [{}]...".format(eIP))
+        try:
+            bm = Plugin1850BM(eIP)
+        except Exception as eee:
+            print("Exception on connecting [{}]".format(eee))
+            return
+
+        try:
+            reminv = bm.read_complete_remote_inventory()
+        except Exception as eee:
+            print("Exception on retrieving info [{}]".format(eee))
+            bm.clean_up()
+            return
+
+        if len(reminv) != 0:
+            write_info(eIP, reminv, True)
+            insert_info_on_db(id_eqpt, reminv)
+        else:
+            print("Empty remote inventory")
+
+        bm.clean_up()
+    else:
+        print("Node [{}] not reachable".format(eIP))
+
+
+
 if __name__ == "__main__":
 
     parser = argparse.ArgumentParser()
     parser.add_argument("--fast", help="get only new nodes info", action="store_true")
     parser.add_argument("--verbose", help="print a detailed activity report", action="store_true")
+    parser.add_argument("--nodeip", nargs=1, help="can only specified node ip")
     #parser.add_argument("--all", help="get full info", action="store_true")
     args = parser.parse_args()
 
     tab_eqpt_type = TEquipType
     tab_board_type = TBoardType
-
-
     allIP = TNet.objects.all()
 
-    for r in TEquipment.objects.all():
-        eType = getEqptTypeName(r.t_equip_type_id_type.id_type)
-        eIP   = getEqptIP(r.id_equipment)
+    if args.nodeip is not None:
+        get_info_for_node_ip(args.nodeip, args.verbose)
+    else:
+        for r in TEquipment.objects.all():
+            eType = getEqptTypeName(r.t_equip_type_id_type.id_type)
+            eIP   = getEqptIP(r.id_equipment)
 
-        if eIP != "None":
-            if eType.find("1850TSS") != -1:
-                if args.fast:
-                    if not is_a_new_node(r.id_equipment):
-                        print("Node [{}: {}] already checked - skip".format(r.id_equipment, eIP))
-                        continue
-                    else:
-                        print("Node [{}: {}] to be checked".format(r.id_equipment, eIP))
+            if eIP != "None":
+                if eType.find("1850TSS") != -1:
+                    if args.fast:
+                        if not is_a_new_node(r.id_equipment):
+                            print("Node [{}: {}] already checked - skip".format(r.id_equipment, eIP))
+                            continue
+                        else:
+                            print("Node [{}: {}] to be checked".format(r.id_equipment, eIP))
 
-                if is_reachable(eIP):
-                    print("Connecting [{}: {}]...".format(r.id_equipment, eIP))
-                    try:
-                        bm = Plugin1850BM(eIP)
-                    except Exception as eee:
-                        print("Exception on connecting [{}]".format(eee))
-                        continue
+                    if is_reachable(eIP):
+                        print("Connecting [{}: {}]...".format(r.id_equipment, eIP))
+                        try:
+                            bm = Plugin1850BM(eIP)
+                        except Exception as eee:
+                            print("Exception on connecting [{}]".format(eee))
+                            continue
 
-                    try:
-                        reminv = bm.read_complete_remote_inventory()
-                    except Exception as eee:
-                        print("Exception on retrieving info [{}]".format(eee))
+                        try:
+                            reminv = bm.read_complete_remote_inventory()
+                        except Exception as eee:
+                            print("Exception on retrieving info [{}]".format(eee))
+                            bm.clean_up()
+                            continue
+
+                        if len(reminv) != 0:
+                            write_info(eIP, reminv, args.verbose)
+                            insert_info_on_db(r.id_equipment, reminv)
+
                         bm.clean_up()
-                        continue
-
-                    if len(reminv) != 0:
-                        write_info(eIP, reminv, args.verbose)
-                        insert_info_on_db(r.id_equipment, reminv)
-
-                    bm.clean_up()
-                else:
-                    print("Node [{}: {}] not reachable".format(r.id_equipment, eIP))
+                    else:
+                        print("Node [{}: {}] not reachable".format(r.id_equipment, eIP))
