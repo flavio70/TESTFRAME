@@ -9,11 +9,20 @@ Module used to drive Jenkins jobs
 import os, sys, time
 import json, glob
 import argparse
+import signal
 from git import Repo
 from katelibs.kunit import Kunit
 from katelibs.database import *
 from katelibs.kprint import *
 from django.db import connection
+
+
+gRunId = ''
+
+def handler_signal(signum, stack):
+		print ('Received:%s SIGTERM Signal/n...Aborting K@TE suite execution...'%signum)
+		set_RunTime_status(gRunId, 'ABORTED')
+		print('...Done!!')
 
 
 def printFRMWRKdata(JenkinsHome, JobWorkspace):
@@ -115,6 +124,7 @@ def main():
 	"""
 	Main loop
 	"""
+	global gRunId
 	parser = argparse.ArgumentParser()
 	parser.add_argument("inputSuite", help="The suite test file to be processed")
 	parser.add_argument("jobName", help="Jenkins Job Name", nargs='?', default='Local')
@@ -126,6 +136,9 @@ def main():
 	args = parser.parse_args()
 	print(args)
 	args.DBMode = False
+	gRunId = args.KateRunId
+	
+	signal.signal(signal.SIGTERM, handler_signal)
  
 	try:
 		args.JenkinsHome = os.environ['JENKINS_HOME']
