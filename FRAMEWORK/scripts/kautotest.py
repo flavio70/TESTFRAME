@@ -144,7 +144,8 @@ def main():
 		args.JenkinsHome = os.environ['JENKINS_HOME']
 		args.JobWorkspace = os.environ['WORKSPACE']
 		printFRMWRKdata(args.JenkinsHome, args.JobWorkspace)
-	except:
+	except Exception as e:
+		print(str(e))
 		#sys.exit('Exiting ... \nError getting os environment JENKINS Data')
 		print('JENKINS ENV NOT DETECTED\nASSUME you are Calling me for DEBUG SCOPE...')
 		args.JobWorkspace = input("Please enter equivalent workspace: ")
