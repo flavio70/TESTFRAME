@@ -23,11 +23,15 @@ class Plugin1850CLI():
     """
         CLI plugin for 1850TSS Equipment
     """
-    def __init__(self, IP, PORT=1123, krepo=None, ktrc=None, eRef=None):
+    def __init__(self, IP, PORT=1123, krepo=None, ktrc=None, eRef=None, log=None):
         """
             Costructor for generic CLI interface
             IP   : equipment's IP Address
             PORT : CLI interface Port
+            krepo: reference to KUnit reporting instance
+            ktrc : reference to Kate Tracer
+            eRef : reference to equipment (for label)
+            log  : file name for log collection
         """
 
         # Private members:
@@ -50,6 +54,12 @@ class Plugin1850CLI():
         self.__last_status = "NONE"       # last CLI command status)
         # Semaphore for CLI Keep Alive Threading area
         #self.__thread_lock = threading.Lock()
+        self.__logfile     = None         # File handler for logging purpose
+
+        # Opening log file
+        if log is not None:
+            self.__logfile = open(log, "w")
+
 
     def get_last_cmd(self):
         """
@@ -373,8 +383,13 @@ class Plugin1850CLI():
 
         if cmd != "logout" and not keepalive:
             # Trash all trailing characters from stream
-            while str(self.__if_cmd.read_very_eager().strip(), 'utf-8') != "":
-                pass
+            while True:
+                block = str(self.__if_cmd.read_very_eager().strip(), 'utf-8')
+                if block != "":
+                    self.__logger(block)
+                else:
+                    break
+
             #self.__trc_inf("++++++++++++++++++++++++")
             #self.__trc_inf("SET KEEPALIVE FLAG FALSE")
             #self.__trc_inf("++++++++++++++++++++++++")
@@ -416,6 +431,7 @@ class Plugin1850CLI():
                 return False
             skip = ".. message: waiting - other CLI command in progress\r"
             self.__last_output = buf.decode().replace(skip,"")
+            self.__logger(str(buf[2], 'utf-8'))
         if not keepalive:
             #with self.__thread_lock:
             self.__KeepaliveEnb = True
@@ -439,6 +455,14 @@ class Plugin1850CLI():
         """ INTERNAL USAGE
         """
         return condition in self.get_last_outcome()
+
+
+    def __logger(self, msg):
+        if self.__logfile:
+            ts = datetime.datetime.now().isoformat(' ')
+            for row in msg.replace("\r","").split("\n"):
+                self.__logfile.write("[{}] {}\n".format(ts, row))
+
 
     def __t_success(self, title, elapsed_time, out_text):
         """ INTERNAL USAGE

@@ -60,18 +60,22 @@ class Eqpt1850TSS320(Equipment):
 
         self.__net_con = SSH1850(self.__net.get_ip_str())
 
-        tl1_event = "{:s}/{:s}_tl1_event.log".format(kenv.path_collector(), label)
+        tl1_event = "{}/{}_{}_tl1_event.log".format(kenv.path_collector(), kenv.get_test_file_name(), label)
+        tl1_log   = "{}/{}_{}_tl1.log".format(kenv.path_logs(), kenv.get_test_file_name(), label)
+        cli_log   = "{}/{}_{}_cli.log".format(kenv.path_logs(), kenv.get_test_file_name(), label)
 
         self.tl1 = Plugin1850TL1(   self.__net.get_ip_str(),
                                     eRef=self,
                                     krepo=self.__krepo,
                                     ktrc=self.__kenv.ktrc,
-                                    collector=tl1_event)
+                                    collector=tl1_event,
+                                    log=tl1_log)
 
         self.cli = Plugin1850CLI(   self.__net.get_ip_str(),
                                     eRef=self,
                                     ktrc=self.__kenv.ktrc,
-                                    krepo=self.__krepo)
+                                    krepo=self.__krepo,
+                                    log=cli_log)
 
         self.bm  = Plugin1850BM(    self.__net.get_ip_str(),
                                     eRef=self,

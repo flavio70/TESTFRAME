@@ -13,6 +13,7 @@ import telnetlib
 import re
 import threading
 import time
+import datetime
 import os
 
 from katelibs.kexception    import KFrameException
@@ -474,13 +475,14 @@ class Plugin1850TL1():
     TL1_TIMEOUT = 1200   # default timeout for TL1 command interaction
 
 
-    def __init__(self, IP, PORT=3083, krepo=None, eRef=None, collector=None, ktrc=None):
+    def __init__(self, IP, PORT=3083, krepo=None, eRef=None, collector=None, log=None, ktrc=None):
         """
         Costructor for generic TL1 interface
         IP        : equipment's IP Address
         PORT      : TL1 interface Port
         krepo     : reference to KUnit reporting instance
         eRef      : reference to equipment (for label)
+        log       : file name for log collection
         collector : file name for event collector
         ktrc      : reference to Kate Tracer
         """
@@ -495,6 +497,11 @@ class Plugin1850TL1():
         self.__last_output = ""     # store the output of latest TL1 command sent
         self.__time_mark   = None   # Time mark to aborting a TL1 interaction (only for CMD)
         self.__collector   = None   # TL1 Event Collector
+        self.__logfile     = None   # File handler for logging purpose
+
+        # Opening log file
+        if log is not None:
+            self.__logfile = open(log, "w")
 
         # TL1 Event Scanner initialization
         self.__collector = TL1EventCollector(self.__the_ip, self.__the_port, collector, self.__ktrc)
@@ -506,6 +513,8 @@ class Plugin1850TL1():
         """ Closing all TL1 activities
         """
         self.__collector.thr_event_terminate()
+        if self.__logfile is not None:
+            self.__logfile.close()
 
 
     def get_last_outcome(self):
@@ -756,9 +765,12 @@ class Plugin1850TL1():
         """
         for _ in (1,2):
             try:
-                while str(self.__if_cmd.read_very_eager().strip(), 'utf-8') != "":
-                    pass
-                return True
+                while True:
+                    block = str(self.__if_cmd.read_very_eager().strip(), 'utf-8')
+                    if block == "":
+                        return True
+                    else:
+                        self.__logger(block)
             except Exception as eee:
                 self.__trc_dbg("exception in __cmd_read_all() - {}".format(eee))
                 self.__if_cmd = self.__cmd_connect()    # renewing interface
@@ -786,11 +798,13 @@ class Plugin1850TL1():
         """
         try:
             result_list = self.__if_cmd.expect(key_list, timeout=30)
-            return result_list
         except Exception as eee:
+            result_list = [],[],[]
             self.__trc_dbg("Exception in __cmd_expect() - {} - ignoring".format(eee))
 
-        return [],[],[]
+        self.__logger(str(result_list[2], 'utf-8'))
+
+        return result_list
 
 
     def __cmd_connect(self):
@@ -834,6 +848,13 @@ class Plugin1850TL1():
             self.__trc_err("ERROR ON CLOSING TELNET SESSION")
 
         self.__if_cmd = None
+
+
+    def __logger(self, msg):
+        if self.__logfile:
+            ts = datetime.datetime.now().isoformat(' ')
+            for row in msg.replace("\r","").split("\n"):
+                self.__logfile.write("[{}] {}\n".format(ts, row))
 
 
     def __t_success(self, title, elapsed_time, out_text):

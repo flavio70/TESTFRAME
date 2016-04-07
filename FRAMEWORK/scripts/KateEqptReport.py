@@ -101,59 +101,50 @@ if __name__ == "__main__":
 
     allIP  = TNet.objects.all()
     allSer = TSerial.objects.all()
+    board_type_list = getBoardTypeList()
 
     tabLocation = TLocation
     tabEqptType = TEquipType
 
-    board_type_list = getBoardTypeList()
+    for r in TEquipment.objects.all():
+        eType = getEqptTypeName(tabEqptType, r.t_equip_type_id_type.id_type)
+        eLoc  = getEqptLocation(tabLocation, r.t_location_id_location.id_location)
+        eIP   = getEqptIP(allIP, r.id_equipment)
 
-    if True:
-        for r in TEquipment.objects.all():
-            eType = getEqptTypeName(tabEqptType, r.t_equip_type_id_type.id_type)
-            eLoc  = getEqptLocation(tabLocation, r.t_location_id_location.id_location)
-            eIP   = getEqptIP(allIP, r.id_equipment)
-            if args.serials:
-                eSer = getEqptSerial(allSer, r.id_equipment)
-                res='{:5s} {:12s} {:10s} {:20s} {:20s} {:16} {:s}'.format(
-                        str(r.id_equipment),
-                        eType,
-                        eLoc,
-                        str(r.name),
-                        eIP,
-                        str(r.owner),
-                        eSer
-                    )
+        if args.serials:
+            eSer = getEqptSerial(allSer, r.id_equipment)
+            res='{:5s} {:12s} {:10s} {:20s} {:20s} {:16} {:s}'.format(
+                    str(r.id_equipment),
+                    eType,
+                    eLoc,
+                    str(r.name),
+                    eIP,
+                    str(r.owner),
+                    eSer
+                )
+        elif args.boards:
+            board_list = getEqptBoards(r.id_equipment, eType, board_type_list)
+            if board_list is None:
+                board_list = ""
             else:
-                if args.boards:
-                    board_list = getEqptBoards(r.id_equipment, eType, board_type_list)
-                else:
-                    board_list = None
+                board_list = "[{}]".format(board_list)
 
-                if board_list is None:
-                    res='{:5s} {:12s} {:10s} {:20s} {:20s} {:16}'.format(
-                            str(r.id_equipment),
-                            eType,
-                            eLoc,
-                            str(r.name),
-                            eIP,
-                            str(r.owner)
-                        )
-                else:
-                    res='{:5s} {:12s} {:10s} {:20s} {:20s} {:16} [{}]'.format(
-                            str(r.id_equipment),
-                            eType,
-                            eLoc,
-                            str(r.name),
-                            eIP,
-                            str(r.owner),
-                            board_list
-                        )
-            print(res)
-    else:
-        if True:
-            for r in TEquipment.objects.filter(1==F(TEquipment__T_EQUIP_TYPE_id_type)):
-                print(r.name)
+            res='{:5s} {:12s} {:10s} {:20s} {:20s} {:16} {}'.format(
+                    str(r.id_equipment),
+                    eType,
+                    eLoc,
+                    str(r.name),
+                    eIP,
+                    str(r.owner),
+                    board_list
+                )
         else:
-            tt = TEquipType
-            for r in tt.objects.all().order_by('name'):
-                print(r.name)
+            res='{:5s} {:12s} {:10s} {:20s} {:20s} {:16}'.format(
+                    str(r.id_equipment),
+                    eType,
+                    eLoc,
+                    str(r.name),
+                    eIP,
+                    str(r.owner)
+                )
+        print(res)

@@ -178,6 +178,7 @@ class SerIF:
         """
         self.__ser_info = {}
 
+
     def set_serial_to_slot(self, slot, the_ip, the_port):
         """ Constructor
             slot     : equipment's slot number
@@ -186,10 +187,18 @@ class SerIF:
         """
         self.__ser_info[slot] = { 'IP' : the_ip, 'port' : the_port }
 
+
     def get_val(self, slot):
         """ Return the couple (IP, PORT) for specified slot number
         """
         return ( (self.__ser_info[slot]['IP']).get_val(), self.__ser_info[slot]['port'] )
+
+
+    def get_slots(self):
+        """ Return a list of managed slots
+        """
+        return self.__ser_info.keys()
+
 
     def __debug(self):
         """ INTERNAL USAGE
