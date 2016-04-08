@@ -3,8 +3,7 @@
 ###############################################################################
 # MODULE: ktracer.py
 #         Collect and log trace messages for K@TE framework
-#         A message log will be collect on .../logs/SUITE_trace.log file and
-#         print on STDOUT if required
+#         A message log will be collect on file and print on STDOUT if required
 #         Only on file, a Time Stamp and an environment information will be
 #         add on message text
 #
@@ -26,7 +25,7 @@ class KTracer():
     Manage tracing
     """
 
-    def __init__(self, basedir=None, level="INFO", trunk=True):
+    def __init__(self, basedir=None, filename=None, level="INFO", trunk=True):
         """
         Costructor for KEnvironment.
         basedir : (opt) home of test running enviromnent
@@ -40,13 +39,18 @@ class KTracer():
         else:
             self.__base_path = basedir
 
+        if filename is None:
+            self.__filename = "TestCase"
+        else:
+            self.__filename = filename
+
         self.__enable_info_level = "{:s}/TRACE_VERBOSE".format(self.__base_path)
         if os.path.exists(self.__enable_info_level):
             self.__level = "DEBUG"
         else:
             self.__level = level
 
-        self.__main_file = "{:s}/SUITE_trace.log".format(self.__base_path)
+        self.__main_file = "{:s}/{:s}_trace.log".format(self.__base_path, self.__filename)
 
         if trunk:
             if os.path.isfile(self.__main_file):
@@ -91,6 +95,8 @@ class KTracer():
             self.__main_fh.write("[{:s} {:50s}] {:s}\n".format(ts, label, row))
         self.__main_fh.write("[{:s} {:50s}]\n".format(ts, label))
 
+        print(msg)
+
 
 
     def k_tracer_info(self, msg, level=None):
@@ -121,6 +127,10 @@ class KTracer():
             self.__main_fh.write("[{:s} {:50s}] {:s}\n".format(ts, label, row))
         self.__main_fh.write("[{:s} {:50s}]\n".format(ts, label))
 
+        if self.__level == "INFO":
+            print(msg)
+        elif os.path.exists(self.__enable_info_level):
+            print(msg)
 
 
     def k_tracer_debug(self, msg, level=None):

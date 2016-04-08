@@ -13,6 +13,7 @@ import time
 from katelibs.kenviron      import KEnvironment
 from katelibs.kpreset       import KPreset
 from katelibs.kunit         import Kunit
+from katelibs.klogger       import Klogger1850
 from katelibs.equipment     import Equipment
 from katelibs.facility1850  import IP, NetIF, SerIF
 from katelibs.access1850    import SER1850, SSH1850
@@ -60,15 +61,15 @@ class Eqpt1850TSS320(Equipment):
 
         self.__net_con = SSH1850(self.__net.get_ip_str())
 
-        tl1_event = "{}/{}_{}_tl1_event.log".format(kenv.path_collector(), kenv.get_test_file_name(), label)
-        tl1_log   = "{}/{}_{}_tl1.log".format(kenv.path_logs(), kenv.get_test_file_name(), label)
-        cli_log   = "{}/{}_{}_cli.log".format(kenv.path_logs(), kenv.get_test_file_name(), label)
+        tl1_eve = "{}/{}_{}_tl1_event.log".format(kenv.path_collector(), kenv.get_test_file_name(), label)
+        tl1_log = "{}/{}_{}_tl1.log".format(kenv.path_logs(), kenv.get_test_file_name(), label)
+        cli_log = "{}/{}_{}_cli.log".format(kenv.path_logs(), kenv.get_test_file_name(), label)
 
         self.tl1 = Plugin1850TL1(   self.__net.get_ip_str(),
                                     eRef=self,
                                     krepo=self.__krepo,
                                     ktrc=self.__kenv.ktrc,
-                                    collector=tl1_event,
+                                    collector=tl1_eve,
                                     log=tl1_log)
 
         self.cli = Plugin1850CLI(   self.__net.get_ip_str(),
@@ -82,12 +83,15 @@ class Eqpt1850TSS320(Equipment):
                                     krepo=self.__krepo,
                                     ktrc=self.__kenv.ktrc)
 
+        self.__serial_log = Klogger1850(self.__ser, kenv.path_logs(), kenv.get_test_file_name(), label)
+
 
 
     def clean_up(self):
         self.tl1.cleanup()
         self.cli.disconnect()
         self.bm.clean_up()
+        self.__serial_log.clean_up()
 
 
     def get_preset(self, name):
