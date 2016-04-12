@@ -180,12 +180,12 @@ class Kunit:
 
 
     def start_tps_block(self, dut_id, tps_area, tps_name):
-        '''
+        """
         Start an official block containg all code related to aspecific TPS (Test Procedure)
         calling this function into testcase object will generate a specific XML report file for each TPSName provided
-        '''
+        """
 
-        file_name = "{:s}/{:s}.[{:s}]_{:s}_{:s}.XML".format(self.__dir, os.path.splitext(os.path.splitext(self.__clnm[self.__master_file_name])[0])[0], dut_id, tps_area, tps_name)
+        file_name = "{:s}/{:s}.[{}]_{:s}_{:s}.XML".format(self.__dir, os.path.splitext(os.path.splitext(self.__clnm[self.__master_file_name])[0])[0], dut_id, tps_area, tps_name)
 
         self.__reports[file_name] = None
         self.__clnm[file_name] = None
@@ -194,11 +194,11 @@ class Kunit:
 
 
     def stop_tps_block(self, dut_id, tps_area, tps_name):
-        '''
+        """
         Stop the block containing the code related to the specific TPS (test Procedure)
         This function will terminate the specific XML report file related to TPSName test id
-        '''
-        file_name = "{:s}/{:s}.[{:s}]_{:s}_{:s}.XML".format(self.__dir, os.path.splitext(os.path.splitext(self.__clnm[self.__master_file_name])[0])[0], dut_id, tps_area, tps_name)
+        """
+        file_name = "{:s}/{:s}.[{}]_{:s}_{:s}.XML".format(self.__dir, os.path.splitext(os.path.splitext(self.__clnm[self.__master_file_name])[0])[0], dut_id, tps_area, tps_name)
         self.frame_close(file_name)
 
         self.__reports.pop(file_name)
@@ -236,15 +236,10 @@ class Kunit:
                 '\t\t</system-out>\n'
 
 
-    def __make_system_err(self, out_text):
+    @staticmethod
+    def __make_system_err(out_text):
         """ INTERNAL USAGE
         """
-        if self.__logdir is not None:
-            out_text = "{}\nLOG FILES:".format(out_text)
-            for logfile in sorted(glob.glob("{}/{}*.log".format(self.__logdir, self.__test_name))):
-                a_log ="{}/artifact/logs/{}".format(self.__build_url, os.path.basename(logfile))
-                out_text = "{}\n{}".format(out_text, a_log)
-
         return  '\t\t<system-err>\n'    +\
                 '\t\t\t<![CDATA[\n'     +\
                 out_text                +\
@@ -252,12 +247,17 @@ class Kunit:
                 '\t\t</system-err>\n'
 
 
-    @staticmethod
-    def __make_log_error(out_text):
+    def __make_log_error(self, out_text):
         """ INTERNAL USAGE
         """
         if out_text is None:
             out_text = ""
+
+        if self.__logdir is not None:
+            out_text = "{}\nLOG FILES:".format(out_text)
+            for logfile in sorted(glob.glob("{}/{}*.log".format(self.__logdir, self.__test_name))):
+                a_log ="{}/artifact/logs/{}".format(self.__build_url, os.path.basename(logfile))
+                out_text = "{}\n{}".format(out_text, a_log)
 
         return  '\t\t<failure>\n'       +\
                 '\t\t\t<![CDATA[\n'     +\
