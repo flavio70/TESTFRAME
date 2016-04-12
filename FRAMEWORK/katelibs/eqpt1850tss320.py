@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+"""
 ###############################################################################
 # MODULE: eqpt1850tss320.py
 #
@@ -6,22 +7,20 @@
 # DATE  : 29/07/2015
 #
 ###############################################################################
+"""
 
 import os
 import time
 
 from katelibs.kenviron      import KEnvironment
-from katelibs.kpreset       import KPreset
-from katelibs.kunit         import Kunit
 from katelibs.klogger       import Klogger1850
 from katelibs.equipment     import Equipment
 from katelibs.facility1850  import IP, NetIF, SerIF
 from katelibs.access1850    import SER1850, SSH1850
-from katelibs.facility_tl1  import TL1message
 from katelibs.plugin_tl1    import Plugin1850TL1
 from katelibs.plugin_cli    import Plugin1850CLI
 from katelibs.plugin_bm     import Plugin1850BM
-from katelibs.database      import *
+from katelibs.database      import TEquipment, TSerial, TNet
 
 
 
@@ -50,11 +49,11 @@ class Eqpt1850TSS320(Equipment):
         self.__net      = {}            # IP address informations (from DB)
         self.__ser      = {}            # Serial(s) informations (from DB)
 
-        super().__init__(label, self.__prs.get_id(label))
+        self.id = self.__prs.get_id(label)
 
-        self.id = self.get_id()
-        
-        self.__get_eqpt_info_from_db(self.__prs.get_id(label))
+        super().__init__(label, self.id)
+
+        self.__get_eqpt_info_from_db()
 
         flc1ser = self.__ser.get_val(1)
         self.__ser_con = SER1850( (flc1ser[0], flc1ser[1]) )
@@ -62,8 +61,8 @@ class Eqpt1850TSS320(Equipment):
         self.__net_con = SSH1850(self.__net.get_ip_str())
 
         tl1_eve = "{}/{}_{}_tl1_event.log".format(kenv.path_collector(), kenv.get_test_file_name(), label)
-        tl1_log = "{}/{}_{}_tl1.log".format(kenv.path_logs(), kenv.get_test_file_name(), label)
-        cli_log = "{}/{}_{}_cli.log".format(kenv.path_logs(), kenv.get_test_file_name(), label)
+        tl1_log = "{}/{}_{}_tl1.log".format(kenv.path_logs(), kenv.get_test_name(), label)
+        cli_log = "{}/{}_{}_cli.log".format(kenv.path_logs(), kenv.get_test_name(), label)
 
         self.tl1 = Plugin1850TL1(   self.__net.get_ip_str(),
                                     eRef=self,
@@ -88,6 +87,8 @@ class Eqpt1850TSS320(Equipment):
 
 
     def clean_up(self):
+        """ Release all resources
+        """
         self.tl1.cleanup()
         self.cli.disconnect()
         self.bm.clean_up()
@@ -185,7 +186,7 @@ class Eqpt1850TSS320(Equipment):
         self.__net_con.send_cmd_simple("flc_reboot")
 
         klist = [b'Start BOOT image V', b'Restarting system']
-        res = self.__ser_con.expect(klist)
+        res = self.__ser_con.ser_expect(klist)
         if res[0] == 0  or  res[0] == 1:
             self.__trc_dbg("FLC RESTARTED")
             self.__t_success("FLC REBOOT", None, "FLC restarted")
@@ -359,10 +360,10 @@ class Eqpt1850TSS320(Equipment):
             res = self.__ser_con.send_cmd_and_capture(cmd)
             current_swp_id = res.split()[0]
 
-        return (current_swp_id == self.__swp.get_swp_ref())
+        return current_swp_id == self.__swp.get_swp_ref()
 
 
-    def INSTALL(self, swp, do_format=False):
+    def install(self, swp, do_format=False):
         """ Start a complete node installation
             swp       : an instance of SWP1850TSS class
             do_format : before swp loading, a complete disk format will be performed (default: False)
@@ -426,6 +427,7 @@ class Eqpt1850TSS320(Equipment):
 
 
     def __is_ongoing_to_address(self, dest_ip):
+        """ INTERNAL USAGE """
         # Check if this equipment is able to reach a specified IP address - Command sent to console interface
         cmd = "ping -c 4 {:s}".format(dest_ip)
         exp = "4 packets transmitted, 4 received, 0% packet loss,"
@@ -434,6 +436,7 @@ class Eqpt1850TSS320(Equipment):
 
 
     def __is_reachable_by_ip(self):
+        """ INTERNAL USAGE """
         # Verify IP connection from network to this equipment
         cmd = "ping -c 2 {:s} >/dev/null".format(self.__net.get_ip_str())
         if os.system(cmd) == 0:
@@ -441,26 +444,26 @@ class Eqpt1850TSS320(Equipment):
         return False
 
 
-    def __get_net_info(self, n):
-        tabNet = TNet
+    def __get_net_info(self):
+        """ INTERNAL USAGE """
 
-        for r in tabNet.objects.all():
-            if r.t_equipment_id_equipment:
-                if r.t_equipment_id_equipment.id_equipment == n:
-                    return r.ip,r.nm,r.gw
+        for row in TNet.objects.all():
+            if row.t_equipment_id_equipment:
+                if row.t_equipment_id_equipment.id_equipment == self.id:
+                    return row.ip,row.nm,row.gw
 
         return str(None),str(None),str(None)
 
 
-    def __get_eqpt_info_from_db(self, ID):
-        self.__trc_inf("CONFIGURATION EQUIPMENT ID := {:d}".format(ID))
-        tabEqpt  = TEquipment
+    def __get_eqpt_info_from_db(self):
+        """ INTERNAL USAGE """
+        self.__trc_inf("CONFIGURATION EQUIPMENT ID := {}".format(self.id))
 
-        e_name    = tabEqpt.objects.get(id_equipment=ID).name
-        e_type_id = tabEqpt.objects.get(id_equipment=ID).t_equip_type_id_type.id_type
-        e_type    = tabEqpt.objects.get(id_equipment=ID).t_equip_type_id_type.name
+        e_name    = TEquipment.objects.get(id_equipment=self.id).name
+        e_type_id = TEquipment.objects.get(id_equipment=self.id).t_equip_type_id_type.id_type
+        e_type    = TEquipment.objects.get(id_equipment=self.id).t_equip_type_id_type.name
 
-        e_ip,e_nm,e_gw  = self.__get_net_info(ID)
+        e_ip,e_nm,e_gw  = self.__get_net_info()
 
         if   e_type_id == 1  or  e_type_id == 3:
             self.__arch = "STD"
@@ -472,102 +475,97 @@ class Eqpt1850TSS320(Equipment):
             self.__arch = "SIM"
             eth_adapter = "q"
 
-        ip  = IP(e_ip)
-        nm  = IP(e_nm)
-        gw  = IP(e_gw)
+        the_ip  = IP(e_ip)
+        the_nm  = IP(e_nm)
+        the_gw  = IP(e_gw)
 
         self.__trc_inf("  Name   : {:s}".format(e_name))
         self.__trc_inf("  Type   : {:s}".format(e_type))
         self.__trc_inf("  Net    : {:s} {:s} {:s} {:s} {:s}".format(eth_adapter,
-                                                                    ip.get_val(),
-                                                                    nm.get_val(),
-                                                                    gw.get_val(),
-                                                                    ip.evaluate_mac()))
+                                                                    the_ip.get_val(),
+                                                                    the_nm.get_val(),
+                                                                    the_gw.get_val(),
+                                                                    the_ip.evaluate_mac()))
 
-        self.__net = NetIF(ip, nm, gw, ip.evaluate_mac(), eth_adapter)
+        self.__net = NetIF(the_ip, the_nm, the_gw, the_ip.evaluate_mac(), eth_adapter)
         self.__ser = SerIF()
 
-        tabSer = TSerial
-        tabNet = TNet
-        for r in tabSer.objects.all():
-            if r.t_equipment_id_equipment.id_equipment == ID:
-                sIP = tabNet.objects.get(id_ip=r.t_net_id_ip.id_ip)
-                self.__ser.set_serial_to_slot(r.slot, IP(sIP.ip), r.port)
-                self.__trc_inf("  Serial : {:2d} <--> {:s}:{:d}".format(r.slot, sIP.ip, r.port))
+        for row in TSerial.objects.all():
+            if row.t_equipment_id_equipment.id_equipment == self.id:
+                ser_ip = TNet.objects.get(id_ip=row.t_net_id_ip.id_ip)
+                self.__ser.set_serial_to_slot(row.slot, IP(ser_ip.ip), row.port)
+                self.__trc_inf("  Serial : {:2d} <--> {:s}:{:d}".format(row.slot, ser_ip.ip, row.port))
 
         self.__trc_inf("CONFIGURATION END\n")
 
 
     def __open_main_ssh_connection(self):
+        """ INTERNAL USAGE """
         self.__net_con = SSH1850(self.__net.get_ip_str())
 
 
     def __close_main_ssh_connection(self):
+        """ INTERNAL USAGE """
         self.__net_con.close_ssh()
         self.__net_con = None
 
 
     def __t_success(self, title, elapsed_time, out_text):
-        """ INTERNAL USAGE
-        """
+        """ INTERNAL USAGE """
         if self.__krepo:
             self.__krepo.add_success(self, title, elapsed_time, out_text)
 
 
     def __t_failure(self, title, e_time, out_text, err_text, log_text=None):
-        """ INTERNAL USAGE
-        """
+        """ INTERNAL USAGE """
         if self.__krepo:
             self.__krepo.add_failure(self, title, e_time, out_text, err_text, log_text)
 
 
     def __t_skipped(self, title, e_time, out_text, err_text, skip_text=None):
-        """ INTERNAL USAGE
-        """
+        """ INTERNAL USAGE """
         if self.__krepo:
             self.__krepo.add_skipped(self, title, e_time, out_text, err_text, skip_text)
 
 
     def __trc_dbg(self, msg):
-        """ INTERNAL USAGE
-        """
+        """ INTERNAL USAGE """
         self.__kenv.ktrc.k_tracer_debug(msg, level=1)
 
 
     def __trc_inf(self, msg):
-        """ INTERNAL USAGE
-        """
+        """ INTERNAL USAGE """
         self.__kenv.ktrc.k_tracer_info(msg, level=1)
 
 
     def __trc_err(self, msg):
-        """ INTERNAL USAGE
-        """
+        """ INTERNAL USAGE """
         self.__kenv.ktrc.k_tracer_error(msg, level=1)
 
 
 
 if __name__ == '__main__':
+    #from katelibs.swp1850tss320 import SWP1850TSS
+
     print("DEBUG Eqpt1850TSS320")
-    #r=Kunit('pippo')
-    kenvironment = KEnvironment(testfilename="PROVA.py")
+    KENVIRONMENT = KEnvironment(testfilename="PROVA.py")
     #nodeA = Eqpt1850TSS320("nodeA", 1024)
-    nodeB = Eqpt1850TSS320("nodeB", 1025)
+    NODEB = Eqpt1850TSS320("nodeB", 1025)
 
-    THE_SWP = SWP1850TSS()
-    THE_SWP.init_from_db(swp_flv="FLV_ALC-TSS__BASE00.25.FD0491__VM")
+    #THE_SWP = SWP1850TSS()
+    #THE_SWP.init_from_db(swp_flv="FLV_ALC-TSS__BASE00.25.FD0491__VM")
 
-    #nodeB.INSTALL(THE_SWP)
+    #NODEB.install(THE_SWP)
 
-    #nodeB.flc_ip_config()
-    #nodeB.flc_reboot()
-    nodeB.slc_reboot(11)
-    #nodeB.flc_ip_config()
-    #nodeB.flc_wait_in_service()
+    #NODEB.flc_ip_config()
+    #NODEB.flc_reboot()
+    NODEB.slc_reboot(11)
+    #NODEB.flc_ip_config()
+    #NODEB.flc_wait_in_service()
 
     time.sleep(2)
 
-    nodeB.clean_up()
+    NODEB.clean_up()
 
     #r.frame_close()
 

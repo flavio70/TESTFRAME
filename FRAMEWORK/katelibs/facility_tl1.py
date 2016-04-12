@@ -1021,7 +1021,7 @@ class TL1message():
 if __name__ == "__main__":
     print("DEBUG")
 
-    msg3 = """
+    MSG3 = """
 
    PLEASE-SET-SID-C8A00 15-10-04 20:31:15
 M  165 COMPLD
@@ -1031,7 +1031,7 @@ M  165 COMPLD
 ;
 """
 
-    msg5 = """
+    MSG5 = """
 
    "nodeA - HFmCheckPomOnMVC4TU12-rg" 14-03-16 01:55:45
 M  780 COMPLD
@@ -1121,7 +1121,7 @@ M  780 COMPLD
 ;
 """
 
-    msg6 = """
+    MSG6 = """
 
    PLEASE-SET-SID-63880 15-09-18 05:11:48
 M  480 COMPLD
@@ -1173,7 +1173,7 @@ M  480 COMPLD
 ;
 """
 
-    msg8 = """
+    MSG8 = """
 
    PLEASE-SET-SID-10980 12-07-21 08:34:57
 M  693 COMPLD
@@ -1566,42 +1566,42 @@ M  693 COMPLD
 """
 
 
-    mm = TL1message(msg8)
-    print(mm.decode("JSON"))
+    MM = TL1message(MSG8)
+    print(MM.decode("JSON"))
 
     sys.exit(0)
 
     if True:
-        mm = TL1message(msg5)
-        print(mm.decode("JSON"))
-        print(mm.get_cmd_attr_value("MVC4-1-1-36-23", "TRC"))
-        filt = TL1check()
-        filt.add_aid("MVC4-1-1-36-33")
-        filt.add_aid("MVC4-1-1-36-23")
-        filt.add_aid("MVC4-1-1-36-49")
-        filt.add_aid("MVC4-1-1-36-3")
-        filt.add_pst("OOS-AU")
-        filt.add_sst("SGEO")
-        filt.add_sst("PMD")
-        filt.add_field("PTFTYPE", "MODVC4")
-        filt.add_field("TRC", "X010010011101010010010101110010")
-        filt.add_field("TRC", "PIPPO")
-        filt.debug()
-        print(filt.evaluate_msg(mm, sst='AND'))
+        MM = TL1message(MSG5)
+        print(MM.decode("JSON"))
+        print(MM.get_cmd_attr_value("MVC4-1-1-36-23", "TRC"))
+        FILT = TL1check()
+        FILT.add_aid("MVC4-1-1-36-33")
+        FILT.add_aid("MVC4-1-1-36-23")
+        FILT.add_aid("MVC4-1-1-36-49")
+        FILT.add_aid("MVC4-1-1-36-3")
+        FILT.add_pst("OOS-AU")
+        FILT.add_sst("SGEO")
+        FILT.add_sst("PMD")
+        FILT.add_field("PTFTYPE", "MODVC4")
+        FILT.add_field("TRC", "X010010011101010010010101110010")
+        FILT.add_field("TRC", "PIPPO")
+        FILT.debug()
+        print(FILT.evaluate_msg(MM, sst='AND'))
     else:
-        mm = TL1message(msg6)
-        print(mm.decode("JSON"))
-        print(mm.get_cmd_attr_values("9"))
-        print(mm.get_cmd_attr_value("9", 4))
+        MM = TL1message(MSG6)
+        print(MM.decode("JSON"))
+        print(MM.get_cmd_attr_values("9"))
+        print(MM.get_cmd_attr_value("9", 4))
 
     sys.exit(0)
 
-    mm = TL1message(msg3)
-    print(mm.decode("JSON"))
+    MM = TL1message(MSG3)
+    print(MM.decode("JSON"))
 
-    filt = TL1check()
-    filt.add_field("PTFRATE", "MODVC4")
-    filt.debug()
-    print(filt.evaluate_msg(mm))
+    FILT = TL1check()
+    FILT.add_field("PTFRATE", "MODVC4")
+    FILT.debug()
+    print(FILT.evaluate_msg(MM))
 
     print("FINE")

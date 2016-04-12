@@ -12,6 +12,7 @@
 import datetime
 import telnetlib
 import threading
+import os
 
 from katelibs.facility1850  import SerIF
 
@@ -30,11 +31,11 @@ class Klogger1850():
             testname: current test file name
             label   : equipment label
         """
-        self.__ser = serials        # Instance of SerIF (for list of < slot, <IP,port> >)
-        self.__basedir = basedir    # Base dir for log files
-        self.__testname = testname  # Current Test File Name
-        self.__label = label        # Equipment's label
-        self.__if = None            # Serial interface handler
+        self.__ser = serials                            # Instance of SerIF (for list of < slot, <IP,port> >)
+        self.__basedir = basedir                        # Base dir for log files
+        self.__testname = os.path.splitext(testname)[0] # Current Test File Name
+        self.__label = label                            # Equipment's label
+        self.__if = None                                # Serial interface handler
 
         # Semaphore for klogger info area
         self.__thread_semaphore = threading.Lock()
@@ -119,6 +120,6 @@ if __name__ == "__main__":
 
     time.sleep(20)
 
-    LOG.cleanup()
+    LOG.clean_up()
 
     print("FINE")

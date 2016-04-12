@@ -9,7 +9,7 @@
 ###############################################################################
 """
 
-from katelibs.database import *
+from katelibs.database import connection
 
 
 
@@ -34,7 +34,9 @@ class SWP1850TSS():
         self.__swp_reference    = {}    # (dict) Installation string (StartApp string)
 
 
-    def get_release_from_db(self, rel_id):
+    def __get_release_from_db(self, rel_id):
+        """ INTERNAL RELEASE
+        """
         cursor = connection.cursor()
         query = "SELECT sw_rel_name FROM T_SW_REL WHERE id_sw_rel='{}'".format(rel_id)
         cursor.execute(query)
@@ -42,7 +44,9 @@ class SWP1850TSS():
         return cursor.fetchone()[0]
 
 
-    def get_product_from_db(self, prod_id):
+    def __get_product_from_db(self, prod_id):
+        """ INTERNAL RELEASE
+        """
         cursor = connection.cursor()
         query = "SELECT product FROM T_PROD WHERE id_prod='{}'".format(prod_id)
         cursor.execute(query)
@@ -102,8 +106,8 @@ class SWP1850TSS():
         for row in cursor.fetchall():
             arch = row[5]
             self.__swp_id[arch]         = row[0]
-            self.__swp_prod[arch]       = self.get_product_from_db(row[1])
-            self.__swp_release          = self.get_release_from_db(row[2])
+            self.__swp_prod[arch]       = self.__get_product_from_db(row[1])
+            self.__swp_release          = self.__get_release_from_db(row[2])
             self.__swp_rel_label        = row[3]
             self.__swp_label            = row[4]
             self.__swp_author           = row[6]
@@ -124,7 +128,6 @@ class SWP1850TSS():
         if delivery not in ["DEVEL", "VALIDATION", "FINAL"]:
             print("Invalid delivery qualifier")
             return False
-        pass
 
 
     def get_startapp(self, shelf_type):
@@ -190,22 +193,10 @@ class SWP1850TSS():
 if __name__ == '__main__':
     print("DEBUG SWP1850TSS")
 
-    my_swp1 = SWP1850TSS()
+    MY_SWP1 = SWP1850TSS()
 
-    my_swp1.init_from_db_generic("integration", "2016-02-04 12:23:17", "V7.10.25-N007")
+    MY_SWP1.init_from_db_generic("integration", "2016-02-04 12:23:17", "V7.10.25-N007")
 
-    my_swp1.debug()
-
-    if False:
-        my_swp1.init_from_db(swp_flv="FLV_ALC-TSS__BASE00.25.FD0491__VM")
-
-        my_swp2 = SWP1850TSS()
-
-        my_swp2.init_manual(str_enh=swpstr, str_std=None, str_sim=None)
-
-        print(my_swp1.get_swp_label())
-        print(my_swp1.get_release())
-        print(my_swp1.get_swp_ref())
-        print(my_swp1.get_startapp("ENH"))
+    MY_SWP1.debug()
 
     print("FINE")
