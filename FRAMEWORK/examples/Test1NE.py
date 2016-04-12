@@ -113,6 +113,7 @@ class Test(TestCase):
         test Cleanup Section implementation
         insert CleanUp code for your test below
         '''
+        self.start_tps_block(NE1.id, "EM", "1-2-3")
         NE1.tl1.do("RMV-EQPT::8XSO-1-1-14;")
         NE1.tl1.do("DLT-EQPT::8XSO-1-1-14;")
         NE1.tl1.do("RTRV-EQPT::MDL-1-1-14;")
@@ -153,7 +154,7 @@ class Test(TestCase):
                 print("  EVENT : {} - {}".format(elem.get_eve_type(), elem.get_eve_body()))
 
 
-        #self.stop_tps_block("EM", "1-2-3")
+        self.stop_tps_block(NE1.id, "EM", "1-2-3")
 
 
 
