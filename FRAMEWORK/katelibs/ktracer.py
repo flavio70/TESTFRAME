@@ -42,7 +42,7 @@ class KTracer():
         if filename is None:
             self.__filename = "TestCase"
         else:
-            self.__filename = os.path.splitext(filename)[0]
+            self.__filename = os.path.basename(os.path.splitext(filename)[0])
 
         self.__enable_info_level = "{:s}/TRACE_VERBOSE".format(self.__base_path)
         if os.path.exists(self.__enable_info_level):
