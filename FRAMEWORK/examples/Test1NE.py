@@ -88,6 +88,8 @@ class Test(TestCase):
         '''
         NE1.tl1.event_collection_start()
         NE1.tl1.do("ACT-USER::admin:::Alcatel1;")
+        # questo genera volutamente un errore
+        NE1.tl1.do("ACT-USER::admin:::Alcatel1;")
 
 
     def test_body(self):

@@ -19,7 +19,7 @@
 import os
 import json
 
-from katelibs.database import *
+from katelibs.database import TTpyEntity, TPstEntity
 from django.db import connection
 
 
@@ -96,13 +96,12 @@ class KPreset():
         return res
 
 
-    def get_from_list(self, equip_name, a_list, elem):
+    def get_from_list(self, equip_name, elem):
         """
             Return a generic element value for specified equipment (list scenario)
             OBSOLETE OBSOLETE
         """
         try:
-            #res = self.__presets[equip_name][a_list][elem]
             res = self.get_elem(equip_name, elem)
         except Exception:
             res = ""
@@ -132,6 +131,7 @@ class KPresetBuilder():
 
 
     def __get_test_list(self):
+        """ INTERNAL USAGE """
         cursor = connection.cursor()
 
         query = ' '.join( ( "SELECT test_id, test_name, topology",
@@ -151,50 +151,53 @@ class KPresetBuilder():
 
 
     def __get_attr_value(self, id_tpy_ent):
+        """ INTERNAL USAGE """
         tab_pst_entity = TPstEntity
-        for r in tab_pst_entity.objects.all():
-            if r.t_tpy_entity_id_entity.id_entity == id_tpy_ent:
-                return r.pstvalue
+        for row in tab_pst_entity.objects.all():
+            if row.t_tpy_entity_id_entity.id_entity == id_tpy_ent:
+                return row.pstvalue
         return None
 
 
     def __get_eqpt_id_for_presetting(self, id_tpy_ent):
+        """ INTERNAL USAGE """
         tab_pst_entity = TPstEntity
-        for r in tab_pst_entity.objects.all():
-            if r.t_tpy_entity_id_entity.id_entity == id_tpy_ent:
-                return r.t_equipment_id_equipment.id_equipment
+        for row in tab_pst_entity.objects.all():
+            if row.t_tpy_entity_id_entity.id_entity == id_tpy_ent:
+                return row.t_equipment_id_equipment.id_equipment
         return None
 
 
     def __evaluate_entity(self, id_topo):
-        #id_topo = 3 # solo per debug
+        """ INTERNAL USAGE """
         tab_tpy_body = TTpyEntity
 
         elem = { }
 
-        for r in tab_tpy_body.objects.all():
-            if r.t_topology_id_topology.id_topology == id_topo:
-                # New element for key r.entityname
-                if not r.entityname in elem:
-                    elem[r.entityname] = [ ]
+        for row in tab_tpy_body.objects.all():
+            if row.t_topology_id_topology.id_topology == id_topo:
+                # New element for key row.entityname
+                if not row.entityname in elem:
+                    elem[row.entityname] = [ ]
                 # Adding tuple <attribute,value> (i.e. <'P1','1-1-2-3'>)
                 atval = { }
-                if r.elemname.find("#") != -1:
+                if row.elemname.find("#") != -1:
                     # Equipment Type managemtrovato tipo di equipaggiamento
-                    atval = ("TYPE", r.elemname.replace("#",""))
-                    elem[r.entityname].append(atval)
+                    atval = ("TYPE", row.elemname.replace("#",""))
+                    elem[row.entityname].append(atval)
                     # Aggiungo l'ID di equipment
-                    atval = ("ID", self.__get_eqpt_id_for_presetting(r.id_entity))
-                    elem[r.entityname].append(atval)
+                    atval = ("ID", self.__get_eqpt_id_for_presetting(row.id_entity))
+                    elem[row.entityname].append(atval)
                 else:
-                    val = self.__get_attr_value(r.id_entity)
-                    atval = (r.elemname, val)
-                    elem[r.entityname].append(atval)
+                    val = self.__get_attr_value(row.id_entity)
+                    atval = (row.elemname, val)
+                    elem[row.entityname].append(atval)
 
         return elem
 
 
     def __test_presets(self, test_ref):
+        """ INTERNAL USAGE """
         name = list(test_ref.keys())[0]
         id_test = test_ref[name][0]
         id_topo = test_ref[name][1]
@@ -205,14 +208,15 @@ class KPresetBuilder():
 
         name_js = "{:s}/{:s}.prs".format(self.__test_dir, name)
 
-        fh = open(name_js, "w")
+        file_handler = open(name_js, "w")
 
-        json.dump(elem_list, fh, ensure_ascii=False,indent=4,separators=(',',':'))
+        json.dump(elem_list, file_handler, ensure_ascii=False,indent=4,separators=(',',':'))
 
-        fh.close()
+        file_handler.close()
 
 
     def __generate_preset_file(self):
+        """ INTERNAL USAGE """
         for test_ref in self.__test_list:
             self.__test_presets(test_ref)
 
@@ -223,35 +227,34 @@ if __name__ == '__main__':
 
 
     if False:
-        testarea = "~/TESTFRAME/FRAMEWORK/examples"
-        testfilename = "Test1NE.py"
+        TESTAREA = "~/TESTFRAME/FRAMEWORK/examples"
 
-        kprs = KPreset(testarea, testfilename)
+        KPRS = KPreset(TESTAREA, "Test1NE.py")
 
         print("-" * 80)
 
-        print("NE1 id   := " + str(kprs.get_id("NE1")))
-        print("NE1 type := " + kprs.get_type("NE1"))
+        print("NE1 id   := " + str(KPRS.get_id("NE1")))
+        print("NE1 type := " + KPRS.get_type("NE1"))
 
-        print("ONT1 id    := " + str(kprs.get_id("ONT1")))
-        print("ONT1 type  := " + kprs.get_type("ONT1"))
-        print("ONT1 USER  := " + str(kprs.get_elem("ONT1", "USER")))
-        print("ONT1 PWD   := " + str(kprs.get_elem("ONT1", "PWD")))
-        print("ONT1 APPL  := " + str(kprs.get_elem("ONT1", "APPL")))
-        print("ONT1 P1    := " + str(kprs.get_elem("ONT1", "P1")))
-        print("ONT1 P2    := " + str(kprs.get_elem("ONT1", "P2")))
-        print("ONT1 P3    := " + str(kprs.get_elem("ONT1", "P3")))
+        print("ONT1 id    := " + str(KPRS.get_id("ONT1")))
+        print("ONT1 type  := " + KPRS.get_type("ONT1"))
+        print("ONT1 USER  := " + str(KPRS.get_elem("ONT1", "USER")))
+        print("ONT1 PWD   := " + str(KPRS.get_elem("ONT1", "PWD")))
+        print("ONT1 APPL  := " + str(KPRS.get_elem("ONT1", "APPL")))
+        print("ONT1 P1    := " + str(KPRS.get_elem("ONT1", "P1")))
+        print("ONT1 P2    := " + str(KPRS.get_elem("ONT1", "P2")))
+        print("ONT1 P3    := " + str(KPRS.get_elem("ONT1", "P3")))
 
-        print("ONT2 Port2 := " + str(kprs.get_elem("ONT2", "Port2")))
+        print("ONT2 Port2 := " + str(KPRS.get_elem("ONT2", "Port2")))
 
-        print(kprs.get_all_ids())
+        print(KPRS.get_all_ids())
     else:
-        testarea = "."
-        newprs = KPresetBuilder(testarea, id_suite=65, id_preset=48)
-        kprs = KPreset(testarea, "Test3.py")
-        print("NE1 id   := " + str(kprs.get_id("NE1")))
-        print("NE1 type := " + kprs.get_type("NE1"))
-        print("NE1 P1   := " + kprs.get_elem("NE1", "P1"))
-        print("NE2 id   := " + str(kprs.get_id("NE2")))
-        print("NE2 type := " + kprs.get_type("NE2"))
-        print("NE2 P1   := " + kprs.get_elem("NE2", "P1"))
+        TESTAREA = "."
+        NEWPRS = KPresetBuilder(TESTAREA, id_suite=65, id_preset=48)
+        KPRS = KPreset(TESTAREA, "Test3.py")
+        print("NE1 id   := " + str(KPRS.get_id("NE1")))
+        print("NE1 type := " + KPRS.get_type("NE1"))
+        print("NE1 P1   := " + KPRS.get_elem("NE1", "P1"))
+        print("NE2 id   := " + str(KPRS.get_id("NE2")))
+        print("NE2 type := " + KPRS.get_type("NE2"))
+        print("NE2 P1   := " + KPRS.get_elem("NE2", "P1"))

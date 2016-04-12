@@ -254,7 +254,7 @@ class TL1EventCollector():
             tl1_response  = ""
 
             while do_repeat:
-                result_list = self.__if_eve.expect([b"\n\>", b"\n\;"], timeout=3)
+                result_list = self.__if_eve.expect([rb"\n\>", rb"\n\;"], timeout=3)
 
                 if result_list[0] == -1:
                     # Timeout Detected
@@ -331,7 +331,7 @@ class TL1EventCollector():
         keepalive_count = 0
 
         while True:
-            result_list = self.__eve_expect([b"\n\>", b"\n\;"])
+            result_list = self.__eve_expect([rb"\n\>", rb"\n\;"])
 
             if result_list == ([],[],[]):
                 self.__trc_err("error [3] sending TL1 command [{:s}]".format(cmd))
@@ -690,7 +690,7 @@ class Plugin1850TL1():
             keepalive_count = 0
 
             while True:
-                result_list = self.__cmd_expect([b"\n\>", b"\n\;"])
+                result_list = self.__cmd_expect([rb"\n\>", rb"\n\;"])
 
                 if result_list == ([],[],[]):
                     if is_until:
@@ -845,16 +845,18 @@ class Plugin1850TL1():
             self.__trc_err("CLOSING TELNET SESSION")
             self.__if_cmd.close()
         except Exception as eee:
-            self.__trc_err("ERROR ON CLOSING TELNET SESSION")
+            self.__trc_err("ERROR ON CLOSING TELNET SESSION - [{}]".format(eee))
 
         self.__if_cmd = None
 
 
     def __logger(self, msg):
+        """ INTERNAL USAGE
+        """
         if self.__logfile:
-            ts = datetime.datetime.now().isoformat(' ')
+            timestamp = datetime.datetime.now().isoformat(' ')
             for row in msg.replace("\r","").split("\n"):
-                self.__logfile.write("[{}] {}\n".format(ts, row))
+                self.__logfile.write("[{}] {}\n".format(timestamp, row))
 
 
     def __t_success(self, title, elapsed_time, out_text):
@@ -905,36 +907,35 @@ if __name__ == "__main__":
 
     print("DEBUG")
 
-    trace = KTracer(level="DEBUG")
-    tl1 = Plugin1850TL1("135.221.125.79", ktrc=trace)
-    trace.k_tracer_error("PROVA", level=0)
+    TRACE = KTracer(level="DEBUG")
+    TL1 = Plugin1850TL1("135.221.125.79", ktrc=TRACE)
+    TRACE.k_tracer_error("PROVA", level=0)
 
     if False:
         # DB PULITO
-        tl1.do("ACT-USER::admin:MYTAG::Root1850;")
-        tl1.do("ED-PID::admin:::Root1850,Alcatel1,Alcatel1;")
+        TL1.do("ACT-USER::admin:MYTAG::Root1850;")
+        TL1.do("ED-PID::admin:::Root1850,Alcatel1,Alcatel1;")
         #
-        tl1.do("SET-PRMTR-NE::::::REGION=ETSI,PROVMODE=MANEQ-AUTOFC;")
-        tl1.do("RTRV-PRMTR-NE;")
-        tl1.do("SET-ATTR-SECUDFLT::::::MAXSESSION=6;")
-        tl1.do("ENT-EQPT::SHELF-1-1::::PROVISIONEDTYPE=UNVRSL320,SHELFNUM=1,SHELFROLE=MAIN;")
+        TL1.do("SET-PRMTR-NE::::::REGION=ETSI,PROVMODE=MANEQ-AUTOFC;")
+        TL1.do("RTRV-PRMTR-NE;")
+        TL1.do("SET-ATTR-SECUDFLT::::::MAXSESSION=6;")
+        TL1.do("ENT-EQPT::SHELF-1-1::::PROVISIONEDTYPE=UNVRSL320,SHELFNUM=1,SHELFROLE=MAIN;")
     else:
         # DB Inizializzato
-        tl1.do("ACT-USER::admin:MYTAG::Alcatel1;")
-        tl1.event_collection_start()
+        TL1.do("ACT-USER::admin:MYTAG::Alcatel1;")
+        TL1.event_collection_start()
         time.sleep(2)
-        filt = TL1check()
-        filt.add_pst("IS")
-        tl1.do("ENT-EQPT::PP1GE-1-1-18::::PROVISIONEDTYPE=PP1GE:IS;", policy="COND", cond=filt)
+        FILT = TL1check()
+        FILT.add_pst("IS")
+        TL1.do("ENT-EQPT::PP1GE-1-1-18::::PROVISIONEDTYPE=PP1GE:IS;", policy="COND", cond=FILT)
         time.sleep(15)
-        tl1.do("RTRV-EQPT::MDL-1-1-18;")
-        res = tl1.get_last_outcome()
-        print(res)
-        tl1.do("RMV-EQPT::PP1GE-1-1-18;")
-        tl1.do("DLT-EQPT::PP1GE-1-1-18;")
+        TL1.do("RTRV-EQPT::MDL-1-1-18;")
+        print(TL1.get_last_outcome())
+        TL1.do("RMV-EQPT::PP1GE-1-1-18;")
+        TL1.do("DLT-EQPT::PP1GE-1-1-18;")
 
     time.sleep(1)
 
-    #tl1.thr_event_terminate()
+    #TL1.thr_event_terminate()
 
     print("FINE")
