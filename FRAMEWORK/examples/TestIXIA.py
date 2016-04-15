@@ -64,7 +64,7 @@ class Test(TestCase):
         test Setup Section implementation
         insert general SetUp code for your test below
         '''
-        IXIA.connect_bridge()
+        IXIA.connect_ixnetwork()
 
 
     def test_body(self):
@@ -72,94 +72,106 @@ class Test(TestCase):
         test Body Section implementation
         insert Main body code for your test below
         '''
-        # Step #0 - Add chassis and clear ownership of all the ports of the used card(9, in this case)
-        IXIA.add_chassis()
-        IXIA.clear_slot_ownership(9)
-
-        #IXIA.init_chassis_cards_handle_list()
-        #IXIA.init_chassis_ports_handle_list()
-        #IXIA.get_card_handler(9)
-        #IXIA.get_slot_port_handle_list(9)
+        nomeTraffico = "Traffico di Test"
         
-        # Step #0.A - Clear ownership of a specific port via (slot,port) coordinates   
-        #IXIA.clear_port_ownership(9,1)
-        #IXIA.clear_port_ownership(9,44)
-
-        #IXIA.add_vport(9,12)
-        #IXIA.add_vport(9,1)
-        #IXIA.remove_vport(9,12)
-        #IXIA.remove_vport(9,1)
-        #IXIA.remove_vport(9,2)
-        #IXIA.add_vport(9,1)
-        #IXIA.add_vport(9,1) 
-        #print (risultato)
-
+        testPortList  = [('135.221.113.142', 2, 2), ('135.221.113.142', 2, 3)]
+        IXIA.create_all_vports(testPortList)
+        #IXIA.create_traffic(vPortIdTx   = ('135.221.113.142', 2, 2), 
+                            #vPortIdRx   = ('135.221.113.142', 2, 3),
+                            #trafficName = nomeTraffico)
+        
+        IXIA.create_traffic(vPortIdTx   = ('135.221.113.142', 2, 2), 
+                            vPortIdRx   = ('135.221.113.142', 2, 3),
+                            trafficName = nomeTraffico,
+                            VLanId                 = 144,
+                            VLanCFI                = 1,
+                            VLanPriority           = 5,
+                            VLanSrcMacAddr         = "00:20:60:00:00:03",
+                            VLanDestMacAddr        = "00:20:60:00:00:04")
+        
+        
+        
+        
+        IXIA.bind_all_phy_ports_to_vports(testPortList)
+        IXIA.start_all_protocols()
+        IXIA.start_traffic()
   
-        #IXIA.create_vport(9,3)
-        #IXIA.create_vport(9,4)
-        #IXIA.create_vport(9,5)
-        #IXIA.create_vport(9,6)
-        #IXIA.connect_vport_to_physical_port(9,3)
-        #IXIA.connect_vport_to_physical_port(9,4)
-        #IXIA.connect_vport_to_physical_port(9,5)
-        #IXIA.connect_vport_to_physical_port(9,6)
+        #IXIA.check_traffic()
+        #dizionario=dict()
+        #dizionario = IXIA.get_port_statistic('135.221.113.142', 2, 2)[1]
+        #print("=======================================")
+        #print("{}".format(dizionario))
+        #print("=======================================")
+        #print("Tx Frames port 2 [{}]".format(dizionario.get("Frames Tx.")))
 
-        # Step #1 - Create all the vports before 
-        IXIA.create_vport(9,1)
-        IXIA.create_vport(9,2)
-        IXIA.create_vport(9,3)
-        IXIA.create_vport(9,4)
-
-        # Step #2 - Connect all the vports to physical ports just after that all vports have been created
-        IXIA.connect_vport_to_physical_port(9,1)
-        IXIA.connect_vport_to_physical_port(9,2)
-        IXIA.connect_vport_to_physical_port(9,3)
-        IXIA.connect_vport_to_physical_port(9,4)
+        #dizionario = IXIA.get_port_statistic('135.221.113.142', 2, 3)[1]
+        #print("=======================================")
+        #print("{}".format(dizionario))
+        #print("=======================================")
+        #print("Rx Frames port 3[{}]".format(dizionario.get("Valid Frames Rx.")))
         
-        #IXIA.create_vport_interface(9,1,"porta 9/1")
-        #IXIA.create_vport_interface(9,4,"porta 9/4")
-        #IXIA.set_vport_parameters(9,1)
-        #IXIA.set_vport_parameters(9,4)
+        #dizionario = IXIA.get_flow_statistic(nomeTraffico)[1]
+        #print("=======================================")
+        #print("{}".format(dizionario))
+        #print("=======================================")
         
-        # Step #3 - Check all ports state before preceed (max 60 sec pause for each method call) 
-        IXIA.get_port_status(9,1)
-        IXIA.get_port_status(9,2)
-        IXIA.get_port_status(9,3)
-        IXIA.get_port_status(9,4)
-
-        # Step #4 - Create all ports interfaces here (ip/mac/gw) 
-        IXIA.create_vport_interface(9, 1, ipAddress = "1.1.1.1")
-        IXIA.create_vport_interface(9, 2, ipAddress = "1.1.1.2",ipGetaway = "1.1.1.3")
-        IXIA.create_vport_interface(9, 3, ipAddress = "1.1.1.3",ipGetaway = "1.1.1.2")
-        IXIA.create_vport_interface(9, 4, ipAddress = "1.1.1.4",ipGetaway = "1.1.1.4")
-
-        # Step #5 - Create traffic profiles (different names, same defaults)
-        IXIA.create_traffic_item(itemName = "Traffic type 1")
-        #IXIA.create_traffic_item(itemName = "Traffic type 2")
-        #IXIA.create_traffic_item(itemName = "Traffic type 3")
-
-        # Step #6 - Config tracking for the above-defined traffic profiles
-        #IXIA.config_traffic_tracking(itemName = "Traffic type 1")
-        #IXIA.config_traffic_tracking(itemName = "Traffic type 2",trackingList = ['flowGroup2', 'sourceDestEndpointPair2'])
-        #IXIA.config_traffic_tracking(itemName = "Traffic type 3",trackingList = ['flowGroup3', 'sourceDestEndpointPair3'])
-        #IXIA.config_traffic_tracking(itemName = "Traffic type Non definito")
-
-        # da finire la chiamata successiva dopo aggiornamento IxNetwork
-        #IXIA.create_endpoint(endPointName="Endpoint1", itemName ="Traffic type 1",             srcSlotNo=9, srcPortNo=1, destSlotNo=9, destPortNo=4, frameSize=10, frameRate=100, frameCount=1000)
-        #IXIA.create_endpoint(endPointName="Endpoint2", itemName ="Traffic type 2",             srcSlotNo=9, srcPortNo=2, destSlotNo=9, destPortNo=3, frameSize=10, frameRate=100, frameCount=1000)
-        #IXIA.create_endpoint(endPointName="Endpoint3", itemName ="Traffic type 3",             srcSlotNo=9, srcPortNo=4, destSlotNo=9, destPortNo=4, frameSize=10, frameRate=100, frameCount=1000)
-        #IXIA.create_endpoint(endPointName="Endpointx", itemName ="Traffic type Non definito",  srcSlotNo=9, srcPortNo=1, destSlotNo=9, destPortNo=4, frameSize=10, frameRate=100, frameCount=1000)
-
- 
-        IXIA.config_flowgroup()
-
-
-
-
-
-        # Step #10 - Traffic start/stop related calls 
-        #IXIA.regenerate_traffic_items()
-
+        #dizionario = IXIA.get_traffic_item_statistic(nomeTraffico)[1]
+        #print("=======================================")
+        #print("{}".format(dizionario))
+        #print("=======================================")
+        
+        #
+        #   SI blocca: forse va invocato a traffico running...boh
+        #
+        #dizionario = IXIA.get_txrx_frame_rate_statistic(nomeTraffico)[1]
+        #print("=======================================")
+        #print("{}".format(dizionario))
+        #print("=======================================")
+        
+        
+        #dizionario = IXIA.get_port_cpu_statistic('135.221.113.142', 2, 2)[1]
+        #print("=======================================")
+        #print("{}".format(dizionario))
+        #print("=======================================")
+        
+         
+        
+        #dizionario = IXIA.get_global_protocol_statistic('135.221.113.142', 2, 2)[1]
+        #print("=======================================")
+        #print("{}".format(dizionario))
+        #print("=======================================")
+         
+        
+        #dizionario = IXIA.get_l2l3_test_summary_statistic('135.221.113.142', 2, 2)[1]
+        #print("=======================================")
+        #print("{}".format(dizionario))
+        #print("=======================================")
+        
+               
+        #
+        #   SI blocca: forse va invocato a traffico running...boh
+        #
+        #dizionario = IXIA.get_flow_detective_statistic('135.221.113.142', 2, 2)[1]
+        #print("=======================================")
+        #print("{}".format(dizionario))
+        #print("=======================================")
+        
+        
+        #dizionario = IXIA.get_data_plane_port_statistic("Ethernet - 001")[1]
+        #print("=======================================")
+        #print("{}".format(dizionario))
+        #print("=======================================")
+        
+        
+        
+        
+        #dizionario = IXIA.get_user_defined_statistic("prova")[1]
+        #print("=======================================")
+        #print("{}".format(dizionario))
+        #print("=======================================")
+        
+        
+         
 
 
     def test_cleanup(self):
@@ -167,7 +179,7 @@ class Test(TestCase):
         test Cleanup Section implementation
         insert CleanUp code for your test below
         '''
-        IXIA.disconnect_bridge()
+        ####IXIA.disconnect_bridge()
 
 
 
@@ -177,7 +189,7 @@ class Test(TestCase):
         DUT CleanUp Section implementation
         insert DUT CleanUp code for your test below
         '''
-        IXIA.clean_up()
+        ####IXIA.clean_up()
 
 
 #########################################################################

@@ -86,7 +86,7 @@ class IxNet:
         # process the results from the endpoint
         connectString = self.__Recv()
         if connectString == 'proxy':
-            self._socket.sendall(options)
+            self._socket.sendall(bytes(options, 'UTF-8'))
             self._connectTokens = str(self.__Recv())
             connectTokens = dict(zip(self._connectTokens.split()[::2], self._connectTokens.split()[1::2]))
             self._proxySocket = self._socket
