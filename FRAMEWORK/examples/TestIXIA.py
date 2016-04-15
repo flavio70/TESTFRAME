@@ -72,14 +72,30 @@ class Test(TestCase):
         test Body Section implementation
         insert Main body code for your test below
         '''
-        nomeTraffico = "Traffico di Test"
+
+        IXIA.start_all_protocols()
+
+
+        # EXAMPLE WITH PORT 2/1 LOOPED TX->RX
+        nomeTraffico = "Traffico di Test PORTA 1 LOOP"
+        testPortList  = [('135.221.113.142', 2, 1)]
+        IXIA.create_all_vports(testPortList)
         
+        IXIA.create_traffic(vPortIdTx   = ('135.221.113.142', 2, 1), 
+                            vPortIdRx   = ('135.221.113.142', 2, 1),
+                            trafficName = nomeTraffico,
+                            TCframeCount           = 9876)  # 9876 frames for this traffic (default 10000)
+        IXIA.bind_all_phy_ports_to_vports(testPortList)
+
+        IXIA.start_traffic()
+        IXIA.stop_traffic(20)
+
+
+        
+        # EXAMPLE WITH PORT 2/2->TX and PORT 2/3-RX with VLAN creation
+        nomeTraffico = "Traffico di Test PORTA 2->3"
         testPortList  = [('135.221.113.142', 2, 2), ('135.221.113.142', 2, 3)]
         IXIA.create_all_vports(testPortList)
-        #IXIA.create_traffic(vPortIdTx   = ('135.221.113.142', 2, 2), 
-                            #vPortIdRx   = ('135.221.113.142', 2, 3),
-                            #trafficName = nomeTraffico)
-        
         IXIA.create_traffic(vPortIdTx   = ('135.221.113.142', 2, 2), 
                             vPortIdRx   = ('135.221.113.142', 2, 3),
                             trafficName = nomeTraffico,
@@ -88,13 +104,28 @@ class Test(TestCase):
                             VLanPriority           = 5,
                             VLanSrcMacAddr         = "00:20:60:00:00:03",
                             VLanDestMacAddr        = "00:20:60:00:00:04")
-        
-        
-        
-        
         IXIA.bind_all_phy_ports_to_vports(testPortList)
-        IXIA.start_all_protocols()
+
         IXIA.start_traffic()
+        IXIA.stop_traffic(20)
+
+
+        # EXAMPLE WITH PORT 2/4 LOOPED TX->RX
+        nomeTraffico = "Traffico di Test PORTA 4 LOOP"
+        testPortList  = [('135.221.113.142', 2, 4)]
+        IXIA.create_all_vports(testPortList)
+        
+        IXIA.create_traffic(vPortIdTx    = ('135.221.113.142', 2, 4), 
+                            vPortIdRx    = ('135.221.113.142', 2, 4),
+                            trafficName  = nomeTraffico,
+                            TCframeCount = 20000)  # 141281 frames for this traffic (default 10000)
+        IXIA.bind_all_phy_ports_to_vports(testPortList)
+
+        IXIA.start_traffic()
+        IXIA.stop_traffic(20)
+  
+  
+  
   
         #IXIA.check_traffic()
         #dizionario=dict()

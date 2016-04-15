@@ -364,25 +364,42 @@ class InstrumentIXIA(Equipment):
 
 
 
-    def start_all_protocols(self):
+    def start_all_protocols(self,timeToWait=20):
         methodLocalName = self.__lc_current_method_name(embedKrepoInit=True)
-        print("Starting all protocols in 20sec")        
+        print("[{}] Start protocols and wait for {}sec".format(methodLocalName, timeToWait))        
         self.__IXN.execute('startAllProtocols')
-        print("Starting protocols in progress...")
-        time.sleep(20)
+        time.sleep(timeToWait)
+        print("[{}] Protocols now started".format( timeToWait))
         return self.__ret_func(True,"success", "[{}] Success".format(methodLocalName) )
  
 
 
-    def start_traffic(self):
+    def start_traffic(self,timeToWait=20):
         methodLocalName = self.__lc_current_method_name(embedKrepoInit=True)
-        print("Starting all traffic in 20sec")        
+        print("[{}] Start traffic and wait for {}sec".format(methodLocalName, timeToWait))        
         self.__IXN.execute('generate', self.__globalTrafficItem)
         self.__IXN.execute('apply', self.__ROOT + '/traffic')
         self.__IXN.execute('start', self.__ROOT + '/traffic')
-        print("Sleep 20sec to send all traffic")
-        time.sleep(20)
+        print("[{}] Traffic now started".format(methodLocalName))             
+        time.sleep(timeToWait)
         return self.__ret_func(True,"success", "[{}] Success".format(methodLocalName) )
+
+
+
+    def stop_traffic(self,timeToStop=0):
+        methodLocalName = self.__lc_current_method_name(embedKrepoInit=True)
+        #print("Stop all traffic ")        
+        print("[{}] Traffic will be stopped in {}sec".format(methodLocalName,timeToStop))
+        time.sleep(timeToStop)
+        #self.__IXN.execute('generate', self.__globalTrafficItem)
+        #self.__IXN.execute('apply', self.__ROOT + '/traffic')
+        self.__IXN.execute('stop', self.__ROOT + '/traffic')
+        print("[{}] Traffic now stopped".format(methodLocalName))       
+        return self.__ret_func(True,"success", "[{}] Success".format(methodLocalName) )
+ 
+ 
+ 
+ 
  
 
 
