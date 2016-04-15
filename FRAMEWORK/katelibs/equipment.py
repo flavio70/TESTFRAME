@@ -24,13 +24,12 @@ class Equipment:
         self.__type   = "unknown"
 
 
-    
     def get_id(self):
-       """ Get Equipment Id
-       """
-       return str(self.__id)
-        
-    
+        """ Get Equipment Id
+        """
+        return str(self.__id)
+
+
     def set_label(self, the_label):
         """ Initialize equipment name
             the_label : equipment name
@@ -93,17 +92,17 @@ class Equipment:
 
 if __name__ == '__main__':
     print("DEBUG Equipment")
-    nodeA = Equipment("nodeA", 1)
-    nodeB = Equipment("nodeB", 5)
+    NODEA = Equipment("nodeA", 1)
+    NODEB = Equipment("nodeB", 5)
     print("----")
-    print("Status: " + str(nodeA.get_status()))
-    nodeA.lock()
-    print("Status: " + str(nodeA.get_status()))
-    nodeA.unlock()
-    print("Status: " + str(nodeA.get_status()))
+    print("Status: " + str(NODEA.get_status()))
+    NODEA.lock()
+    print("Status: " + str(NODEA.get_status()))
+    NODEA.unlock()
+    print("Status: " + str(NODEA.get_status()))
     print("----")
-    print("Status: " + str(nodeB.get_status()))
-    nodeB.lock()
-    print("Status: " + str(nodeB.get_status()))
-    nodeB.unlock()
-    print("Status: " + str(nodeB.get_status()))
+    print("Status: " + str(NODEB.get_status()))
+    NODEB.lock()
+    print("Status: " + str(NODEB.get_status()))
+    NODEB.unlock()
+    print("Status: " + str(NODEB.get_status()))

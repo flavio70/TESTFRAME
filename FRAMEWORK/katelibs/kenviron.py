@@ -54,7 +54,7 @@ class KEnvironment():
         self.__test_fn = os.path.basename(testfilename)
 
         # Trace Management
-        self.ktrc = KTracer(self.__paths['LOGS'], level="ERROR", trunk=True)
+        self.ktrc = KTracer(self.__paths['LOGS'], filename=testfilename, level="ERROR", trunk=True)
 
         # Presets Management
         self.kprs = KPreset(self.__paths['TEST'], self.__test_fn)
@@ -113,6 +113,12 @@ class KEnvironment():
                                                         self.__paths['TL1E']))
 
 
+    def get_test_name(self):
+        """ Return the Test Name (i.e. the Test File Name without extension)
+        """
+        return os.path.splitext(self.__test_fn)[0]
+
+
     def get_test_file_name(self):
         """ Return the Test File Name
         """
@@ -162,6 +168,6 @@ class KEnvironment():
 if __name__ == '__main__':
     print("DEBUG KEnvironment")
 
-    kenv = KEnvironment()
+    KENV = KEnvironment()
 
     print("FINE")

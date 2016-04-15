@@ -293,6 +293,10 @@ class Plugin1850BM():
             info = self.read_remote_inventory(slot + 1, relaxed=True)
             if info != (None, None):
                 result[slot+1] = info
+            # Check for connection: skip if not present
+            if self.__active is None:
+                self.__trc_err("\nBOTH SLC ARE NOT AVAILABLE.\n")
+                return result
 
         return result
 
@@ -302,7 +306,7 @@ class Plugin1850BM():
         """
         if slot != 10 and slot != 11:
             return False
-        
+
         cmd = ": reboot".format(slot)
         res = self.__tunnel[slot].send_and_capture_bm_cmd(cmd)
         return res
@@ -333,17 +337,21 @@ class Plugin1850BM():
 if __name__ == "__main__":
     print("DEBUG")
 
-    trace = KTracer(level="ERROR")
+    TRACE = KTracer(level="ERROR")
 
-    bm = Plugin1850BM("135.221.125.79", ktrc=trace)
+    BM = Plugin1850BM("135.221.126.41", ktrc=TRACE)
+    print("connesso")
 
-    print(bm.get_active_slc())
-    #print(bm.get_active_slc())
-    #print(bm.send_command("help"))
-    #print(bm.send_command(": touch /tmp/PIPPO"))
-    print(bm.read_remote_inventory(11))
-    print(bm.read_complete_remote_inventory())
+    #print(BM.get_active_slc())
+    print("active slc valutata")
+    #print(BM.get_active_slc())
+    #print(BM.send_command("help"))
+    #print(BM.send_command(": touch /tmp/PIPPO"))
+    #print(BM.read_remote_inventory(11))
+    print("remote inventory per 11 ricevuta")
+    print(BM.read_complete_remote_inventory())
+    print("completa remote inventory ricevuta")
 
-    bm.clean_up()
+    BM.clean_up()
 
     print("FINE")

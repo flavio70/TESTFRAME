@@ -9,8 +9,9 @@
 ###############################################################################
 """
 
-import os
 import datetime
+import glob
+import os
 import time
 
 
@@ -28,12 +29,24 @@ class Kunit:
         self.__cnt  = 0     # counter of atomic test
         self.__st   = None  # test execution starting time
 
+        # Base path of logs area (Jenkins related)
+        try:
+            self.__logdir = "{}/logs".format(os.environ["WORKSPACE"])
+        except:
+            self.__logdir = None
+
+        # Jenkins Project URL
+        try:
+            self.__build_url = os.environ["BUILD_URL"]
+        except:
+            self.__build_url = "URL"
+
         # Base path of xml result area
         self.__dir  = path_repo
 
         # xml file name (path complete)
-        self.master_file_name = '{:s}/{:s}._main.XML'.format(path_repo,
-                                                             os.path.splitext(test_file_name)[0])
+        self.__test_name = os.path.splitext(test_file_name)[0]
+        self.__master_file_name = '{:s}/{:s}._main.XML'.format(path_repo, self.__test_name)
 
         # basic name of test, i.e. without path and suffix
         self.__clnm = { }
@@ -41,7 +54,7 @@ class Kunit:
         # Lista dei file di report
         self.__reports = { }
 
-        self.frame_open(self.master_file_name)
+        self.frame_open(self.__master_file_name)
 
 
     def frame_open(self, file_name):
@@ -167,16 +180,12 @@ class Kunit:
 
 
     def start_tps_block(self, dut_id, tps_area, tps_name):
-        '''
+        """
         Start an official block containg all code related to aspecific TPS (Test Procedure)
         calling this function into testcase object will generate a specific XML report file for each TPSName provided
-        '''
+        """
 
-        file_name = "{:s}/{:s}.[{:s}]_{:s}_{:s}.XML".format(self.__dir,
-                                                     os.path.splitext(os.path.splitext(self.__clnm[self.master_file_name])[0])[0],
-                                                     dut_id,
-                                                     tps_area,
-                                                     tps_name)
+        file_name = "{:s}/{:s}.[{}]_{:s}_{:s}.XML".format(self.__dir, os.path.splitext(os.path.splitext(self.__clnm[self.__master_file_name])[0])[0], dut_id, tps_area, tps_name)
 
         self.__reports[file_name] = None
         self.__clnm[file_name] = None
@@ -185,27 +194,24 @@ class Kunit:
 
 
     def stop_tps_block(self, dut_id, tps_area, tps_name):
-        '''
+        """
         Stop the block containing the code related to the specific TPS (test Procedure)
         This function will terminate the specific XML report file related to TPSName test id
-        '''
-        file_name = "{:s}/{:s}.[{:s}]_{:s}_{:s}.XML".format(self.__dir,
-                                                     os.path.splitext(os.path.splitext(self.__clnm[self.master_file_name])[0])[0],
-                                                     dut_id,
-                                                     tps_area,
-                                                     tps_name)
+        """
+        file_name = "{:s}/{:s}.[{}]_{:s}_{:s}.XML".format(self.__dir, os.path.splitext(os.path.splitext(self.__clnm[self.__master_file_name])[0])[0], dut_id, tps_area, tps_name)
         self.frame_close(file_name)
 
         self.__reports.pop(file_name)
         self.__clnm.pop(file_name)
 
 
-    def __make_test_case(self, ref_obj, clnm, title, elapsed_time, counter):
+    @staticmethod
+    def __make_test_case(ref_obj, clnm, title, elapsed_time, counter):
         """ INTERNAL USAGE
         """
         try:
             obj_name = ref_obj.get_label()
-        except Exception as eee:
+        except Exception:
             obj_name = ""
 
         t_title = '{:05n} [{:s}] {:.100}'.format(counter, obj_name, title.replace("&", "&amp;"))
@@ -219,7 +225,8 @@ class Kunit:
         return msg
 
 
-    def __make_system_out(self, out_text):
+    @staticmethod
+    def __make_system_out(out_text):
         """ INTERNAL USAGE
         """
         return  '\t\t<system-out>\n'    +\
@@ -229,7 +236,8 @@ class Kunit:
                 '\t\t</system-out>\n'
 
 
-    def __make_system_err(self, out_text):
+    @staticmethod
+    def __make_system_err(out_text):
         """ INTERNAL USAGE
         """
         return  '\t\t<system-err>\n'    +\
@@ -245,6 +253,12 @@ class Kunit:
         if out_text is None:
             out_text = ""
 
+        if self.__logdir is not None:
+            out_text = "{}\nLOG FILES:".format(out_text)
+            for logfile in sorted(glob.glob("{}/{}*.log".format(self.__logdir, self.__test_name))):
+                a_log ="{}/artifact/logs/{}".format(self.__build_url, os.path.basename(logfile))
+                out_text = "{}\n{}".format(out_text, a_log)
+
         return  '\t\t<failure>\n'       +\
                 '\t\t\t<![CDATA[\n'     +\
                 out_text                +\
@@ -252,7 +266,8 @@ class Kunit:
                 '\t\t</failure>\n'
 
 
-    def __make_skipped(self, out_text):
+    @staticmethod
+    def __make_skipped(out_text):
         """ INTERNAL USAGE
         """
         if out_text is None:
@@ -270,25 +285,25 @@ class Kunit:
 
 if __name__ == "__main__":
     print("DEBUG")
-    kun = Kunit("/users/ghelfc/domain.prova.py")
+    KUN = Kunit("/users/ghelfc", "domain.prova.py")
 
-    kun.start_time()
+    KUN.start_time()
     # simulo un tempo di esecuzione
     time.sleep(3)
 
-    kun.start_tps_block("DATA", "1.2.3")
-    kun.start_tps_block("TDM",  "5.3.6")
+    KUN.start_tps_block(1, "DATA", "1.2.3")
+    KUN.start_tps_block(1, "TDM",  "5.3.6")
 
-    kun.add_success(None, "TL1 AAA", None, "TESTO")
-    kun.add_failure(None, "TL1 BBB", "120.0", "DENY detected", "internal timeout", "traccia")
+    KUN.add_success(None, "TL1 AAA", None, "TESTO")
+    KUN.add_failure(None, "TL1 BBB", "120.0", "DENY detected", "internal timeout", "traccia")
 
-    kun.stop_tps_block("TDM",  "5.3.6")
+    KUN.stop_tps_block(1, "TDM",  "5.3.6")
 
-    kun.add_skipped(None, "CLI AAA", "0.0", "TESTO", "not applicable")
-    kun.add_success(None, "TL1 DDD", "2.3", "TESTO")
+    KUN.add_skipped(None, "CLI AAA", "0.0", "TESTO", "not applicable")
+    KUN.add_success(None, "TL1 DDD", "2.3", "TESTO")
 
-    kun.stop_tps_block("DATA", "1.2.3")
+    KUN.stop_tps_block(1, "DATA", "1.2.3")
 
-    kun.add_success(None, "TL1 EEE", "2.8", "TESTO")
+    KUN.add_success(None, "TL1 EEE", "2.8", "TESTO")
 
-    kun.frame_close()
+    KUN.frame_close()

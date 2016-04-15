@@ -14,8 +14,7 @@ import telnetlib
 import os
 import inspect
 
-myself = lambda: "__name__" + inspect.stack()[1][3]
-
+#myself = lambda: "__name__" + inspect.stack()[1][3]
 
 
 class SER1850:
@@ -42,7 +41,7 @@ class SER1850:
 
         try:
             self.__tn = telnetlib.Telnet(self.__ip, self.__port)
-            self.__expect(self.__klConnect, 2)    # da togliere ?
+            self.ser_expect(self.__klConnect, 2)    # da togliere ?
         except Exception as eee:
             print(str(eee))
 
@@ -56,7 +55,7 @@ class SER1850:
             self.__write("\n")
             retry = 1
             while retry == 1:
-                res = self.__expect(self.__klLogin, 10)
+                res = self.ser_expect(self.__klLogin, 10)
                 if   res[0] == 0:
                     self.__write("root")
                 elif res[0] == 1:
@@ -87,7 +86,7 @@ class SER1850:
             self.__write("\n")
             retry = 1
             while retry == 1:
-                res = self.__expect(self.__klLogin, 10)
+                res = self.ser_expect(self.__klLogin, 10)
                 if   res[0] == 0:
                     self.__write("root")
                 elif res[0] == 1:
@@ -113,7 +112,7 @@ class SER1850:
         discard_text = str.encode("{:s}\r\n".format(cmd))
 
         while True:
-            res = self.__expect([discard_text, b"\r\n", b"root@.*#"])
+            res = self.ser_expect([discard_text, b"\r\n", b"root@.*#"])
 
             if res[0] == 0:
                 # Command string detected - discard from output
@@ -142,7 +141,7 @@ class SER1850:
             self.__write("\n")
             retry = 1
             while retry == 1:
-                res = self.__expect(self.__klLogin, 10)
+                res = self.ser_expect(self.__klLogin, 10)
                 if   res[0] == 0:
                     self.__write("root")
                 elif res[0] == 1:
@@ -167,7 +166,7 @@ class SER1850:
             key_list = [b"root@.*#",str.encode(check_ok)]
             retry = 1
             while retry == 1:
-                res = self.__expect(key_list, 10)
+                res = self.ser_expect(key_list, 10)
                 if   res[0] == 0:
                     is_detected = False
                 elif res[0] == 1:
@@ -179,7 +178,7 @@ class SER1850:
             key_list = [b"root@.*#", str.encode(check_ok), str.encode(check_ko)]
             retry = 1
             while retry == 1:
-                res = self.__expect(key_list, 10)
+                res = self.ser_expect(key_list, 10)
                 if   res[0] == 0:
                     is_detected = False
                 elif res[0] == 1:
@@ -196,7 +195,7 @@ class SER1850:
 
 
 
-    def __expect(self, key_list, timeout=__DEFAULT_TIMEOUT):
+    def ser_expect(self, key_list, timeout=__DEFAULT_TIMEOUT):
         """ Wait on stream until an element of key_list will be detected
         """
         self.res  = self.__tn.expect(key_list, timeout=timeout)
@@ -356,6 +355,8 @@ class SSH1850():
 
 
     def __is_reachable_by_ip(self):
+        """ INTERNAL USAGE
+        """
         # Verify IP connection from network to this equipment
         cmd = "ping -c 2 {:s} >/dev/null".format(self.__ip)
         if os.system(cmd) == 0:

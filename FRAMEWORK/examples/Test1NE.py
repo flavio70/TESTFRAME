@@ -57,13 +57,13 @@ class Test(TestCase):
         DUT Setup section Implementation
         insert DUT SetUp code for your test below
         '''
-        THE_SWP = SWP1850TSS()
+        #THE_SWP = SWP1850TSS()
         # temporaneo
-        THE_SWP.init_from_db(swp_flv="FLV_ALC-TSS__BASE00.25.FD0491__VM")
+        #THE_SWP.init_from_db(swp_flv="FLV_ALC-TSS__BASE00.25.FD0491__VM")
 
         #NE1.flc_ip_config()
 
-        NE1.flc_load_swp(THE_SWP)
+        #NE1.flc_load_swp(THE_SWP)
 
         #NE1.flc_scratch_db()
         #NE1.flc_reboot()
@@ -88,6 +88,8 @@ class Test(TestCase):
         '''
         NE1.tl1.event_collection_start()
         NE1.tl1.do("ACT-USER::admin:::Alcatel1;")
+        # questo genera volutamente un errore
+        NE1.tl1.do("ACT-USER::admin:::Alcatel1;")
 
 
     def test_body(self):
@@ -111,6 +113,7 @@ class Test(TestCase):
         test Cleanup Section implementation
         insert CleanUp code for your test below
         '''
+        self.start_tps_block(NE1.id, "EM", "1-2-3")
         NE1.tl1.do("RMV-EQPT::8XSO-1-1-14;")
         NE1.tl1.do("DLT-EQPT::8XSO-1-1-14;")
         NE1.tl1.do("RTRV-EQPT::MDL-1-1-14;")
@@ -151,7 +154,7 @@ class Test(TestCase):
                 print("  EVENT : {} - {}".format(elem.get_eve_type(), elem.get_eve_body()))
 
 
-        #self.stop_tps_block("EM", "1-2-3")
+        self.stop_tps_block(NE1.id, "EM", "1-2-3")
 
 
 

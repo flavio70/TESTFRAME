@@ -178,6 +178,7 @@ class SerIF:
         """
         self.__ser_info = {}
 
+
     def set_serial_to_slot(self, slot, the_ip, the_port):
         """ Constructor
             slot     : equipment's slot number
@@ -186,10 +187,18 @@ class SerIF:
         """
         self.__ser_info[slot] = { 'IP' : the_ip, 'port' : the_port }
 
+
     def get_val(self, slot):
         """ Return the couple (IP, PORT) for specified slot number
         """
         return ( (self.__ser_info[slot]['IP']).get_val(), self.__ser_info[slot]['port'] )
+
+
+    def get_slots(self):
+        """ Return a list of managed slots
+        """
+        return self.__ser_info.keys()
+
 
     def __debug(self):
         """ INTERNAL USAGE
@@ -212,14 +221,14 @@ if __name__ == "__main__":
     #elem = NetIF(ip, nm, gw, "00:aa:bb:cc:11:22")
     #print(elem.__debug())
 
-    serIP = IP("192.168.1.25")
-    mySer = SerIF()
-    mySer.set_serial_to_slot( 1, serIP, 1001)
-    serIP = IP("192.168.80.12")
-    mySer.set_serial_to_slot(10, serIP, 1012)
+    SERIP = IP("192.168.1.25")
+    MYSER = SerIF()
+    MYSER.set_serial_to_slot( 1, SERIP, 1001)
+    SERIP = IP("192.168.80.12")
+    MYSER.set_serial_to_slot(10, SERIP, 1012)
     print("---")
-    print("seriale  1: " + str(mySer.get_val(1)))
+    print("seriale  1: " + str(MYSER.get_val(1)))
     print("---")
-    print("seriale 10: " + str(mySer.get_val(10)))
+    print("seriale 10: " + str(MYSER.get_val(10)))
     print("---")
-    #print(mySer.__debug())
+    #print(MYSER.__debug())

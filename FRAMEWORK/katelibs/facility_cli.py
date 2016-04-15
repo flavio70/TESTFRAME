@@ -88,13 +88,12 @@ class CLIcheck():
 if __name__ == "__main__":
     print("DEBUG")
 
-    mm = """
+    MM = """
 """
+    print("[{:s}]\n".format(MM))
 
-    print("[{:s}]\n".format(mm)
-
-    filt = CLIcheck()
-    filt.debug()
-    print(filt.evaluate_msg(mm))
+    FILT = CLIcheck()
+    FILT.debug()
+    print(FILT.evaluate_msg(MM))
 
     print("FINE")

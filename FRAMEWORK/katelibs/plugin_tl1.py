@@ -13,6 +13,7 @@ import telnetlib
 import re
 import threading
 import time
+import datetime
 import os
 
 from katelibs.kexception    import KFrameException
@@ -44,8 +45,10 @@ class TL1EventCollector():
             collector_fn = "collector.log"
         else:
             collector_fn = collector
-        
-        if os.path.isfile(collector_fn):os.remove(collector_fn)
+
+        if os.path.isfile(collector_fn):
+            os.remove(collector_fn)
+
         self.__f = open(collector_fn, "w")
         os.chmod(collector_fn, 0o666)
 
@@ -251,7 +254,7 @@ class TL1EventCollector():
             tl1_response  = ""
 
             while do_repeat:
-                result_list = self.__if_eve.expect([b"\n\>", b"\n\;"], timeout=3)
+                result_list = self.__if_eve.expect([rb"\n\>", rb"\n\;"], timeout=3)
 
                 if result_list[0] == -1:
                     # Timeout Detected
@@ -314,12 +317,12 @@ class TL1EventCollector():
 
         # Trash all trailing characters from stream
         if self.__eve_read_all() == False:
-            self.__trc_error("error [1] sending TL1 command [{:s}]".format(cmd))
+            self.__trc_err("error [1] sending TL1 command [{:s}]".format(cmd))
             return False
 
         # Sending command to interface
         if self.__eve_write(cmd) == False:
-            self.__trc_error("error [2] sending TL1 command [{:s}]".format(cmd))
+            self.__trc_err("error [2] sending TL1 command [{:s}]".format(cmd))
             return False
 
         tl1_response  = ""
@@ -328,10 +331,10 @@ class TL1EventCollector():
         keepalive_count = 0
 
         while True:
-            result_list = self.__eve_expect([b"\n\>", b"\n\;"])
+            result_list = self.__eve_expect([rb"\n\>", rb"\n\;"])
 
             if result_list == ([],[],[]):
-                self.__trc_error("error [3] sending TL1 command [{:s}]".format(cmd))
+                self.__trc_err("error [3] sending TL1 command [{:s}]".format(cmd))
                 return False
 
             msg_tmp = str(result_list[2], 'utf-8')
@@ -349,7 +352,7 @@ class TL1EventCollector():
                 elif msg_tmp.find("KEEP ALIVE MESSAGE") != -1:
                     keepalive_count = keepalive_count + 1
                     if keepalive_count == keepalive_count_max:
-                        self.__trc_error("error [4] sending TL1 command [{:s}]".format(cmd))
+                        self.__trc_err("error [4] sending TL1 command [{:s}]".format(cmd))
                         return False
                     continue
 
@@ -357,9 +360,9 @@ class TL1EventCollector():
                     tl1_response = tl1_response + re.sub('(\r\n)+', "\r\n", msg_tmp, 0)
                     if tl1_verb != "ed-pid"  and  tl1_verb != "act-user":
                         if tl1_response.count(";") > 1:
-                            self.__trc_error("error [5] sending TL1 command [{:s}]".format(cmd))
+                            self.__trc_err("error [5] sending TL1 command [{:s}]".format(cmd))
                             raise KFrameException("INVALID TL1 TERMINATION")
-                            return False
+                            #return False
                     if tl1_response.strip() == ";":
                         continue
                     break
@@ -436,7 +439,7 @@ class TL1EventCollector():
                 time.sleep(1)
 
         if not is_connected:
-            self.__trc_error("TL1: Timeout on connection")
+            self.__trc_err("TL1: Timeout on connection")
             raise KFrameException("TL1: Timeout on connection")
 
         return self.__if_eve
@@ -456,7 +459,7 @@ class TL1EventCollector():
             self.__ktrc.k_tracer_info(msg, level)
 
 
-    def __trc_error(self, msg, level=None):
+    def __trc_err(self, msg, level=None):
         """ INTERNAL USAGE
         """
         if self.__ktrc is not None:
@@ -472,13 +475,14 @@ class Plugin1850TL1():
     TL1_TIMEOUT = 1200   # default timeout for TL1 command interaction
 
 
-    def __init__(self, IP, PORT=3083, krepo=None, eRef=None, collector=None, ktrc=None):
+    def __init__(self, IP, PORT=3083, krepo=None, eRef=None, collector=None, log=None, ktrc=None):
         """
         Costructor for generic TL1 interface
         IP        : equipment's IP Address
         PORT      : TL1 interface Port
         krepo     : reference to KUnit reporting instance
         eRef      : reference to equipment (for label)
+        log       : file name for log collection
         collector : file name for event collector
         ktrc      : reference to Kate Tracer
         """
@@ -493,6 +497,11 @@ class Plugin1850TL1():
         self.__last_output = ""     # store the output of latest TL1 command sent
         self.__time_mark   = None   # Time mark to aborting a TL1 interaction (only for CMD)
         self.__collector   = None   # TL1 Event Collector
+        self.__logfile     = None   # File handler for logging purpose
+
+        # Opening log file
+        if log is not None:
+            self.__logfile = open(log, "w")
 
         # TL1 Event Scanner initialization
         self.__collector = TL1EventCollector(self.__the_ip, self.__the_port, collector, self.__ktrc)
@@ -504,6 +513,8 @@ class Plugin1850TL1():
         """ Closing all TL1 activities
         """
         self.__collector.thr_event_terminate()
+        if self.__logfile is not None:
+            self.__logfile.close()
 
 
     def get_last_outcome(self):
@@ -515,7 +526,7 @@ class Plugin1850TL1():
     def event_collection_start(self, reset=True, delay=5):
         """ Start TL1 event collection
             reset : if True, all previously collected events will be cleaned
-            delay : delay time (don't change) 
+            delay : delay time (don't change)
         """
         self.__collector.event_start(reset)
         time.sleep(delay)
@@ -577,7 +588,7 @@ class Plugin1850TL1():
                 time.sleep(2)
             else:
                 error_msg = "TIMEOUT ({:d}s) DETECTED in do_until '{:s}'".format(timeout, cmd)
-                self.__trc_error(error_msg)
+                self.__trc_err(error_msg)
                 result = False
                 #raise KFrameException(error_msg)
                 break
@@ -605,7 +616,7 @@ class Plugin1850TL1():
         """
 
         if policy == "COND" and cond is None:
-            self.__trc_error("An instance of TL1check is mandatory for policy=='COND'")
+            self.__trc_err("An instance of TL1check is mandatory for policy=='COND'")
             return False
 
         if cmd.find(';') == -1:
@@ -657,17 +668,17 @@ class Plugin1850TL1():
 
         # Trash all trailing characters from stream
         if self.__cmd_read_all() == False:
-            self.__trc_error("error [1] sending TL1 command [{:s}]".format(cmd))
+            self.__trc_err("error [1] sending TL1 command [{:s}]".format(cmd))
             self.__last_output = "TIMEOUT DETECTED ON TL1 INTERFACE"
             raise KFrameException(self.__last_output)
-            return False
+            #return False
 
         # Sending command to interface
         if self.__cmd_write(cmd) == False:
-            self.__trc_error("error [2] sending TL1 command [{:s}]".format(cmd))
+            self.__trc_err("error [2] sending TL1 command [{:s}]".format(cmd))
             self.__last_output = "TIMEOUT DETECTED ON TL1 INTERFACE"
             raise KFrameException(self.__last_output)
-            return False
+            #return False
 
 
         if cmd.lower() == "canc-user;":
@@ -679,18 +690,18 @@ class Plugin1850TL1():
             keepalive_count = 0
 
             while True:
-                result_list = self.__cmd_expect([b"\n\>", b"\n\;"])
+                result_list = self.__cmd_expect([rb"\n\>", rb"\n\;"])
 
                 if result_list == ([],[],[]):
                     if is_until:
-                        self.__trc_error("error [3] UNTIL sending TL1 command [{:s}]".format(cmd))
+                        self.__trc_err("error [3] UNTIL sending TL1 command [{:s}]".format(cmd))
                         self.__last_output = ""
                         return False
                     else:
-                        self.__trc_error("error [3] sending TL1 command [{:s}]".format(cmd))
+                        self.__trc_err("error [3] sending TL1 command [{:s}]".format(cmd))
                         self.__last_output = "TIMEOUT DETECTED ON TL1 INTERFACE"
                         raise KFrameException(self.__last_output)
-                        return False
+                        #return False
 
                 msg_tmp = str(result_list[2], 'utf-8')
 
@@ -707,20 +718,20 @@ class Plugin1850TL1():
                     elif msg_tmp.find("KEEP ALIVE MESSAGE") != -1:
                         keepalive_count = keepalive_count + 1
                         if keepalive_count == keepalive_count_max:
-                            self.__trc_error("error [4] sending TL1 command [{:s}]".format(cmd))
+                            self.__trc_err("error [4] sending TL1 command [{:s}]".format(cmd))
                             self.__last_output = "MAXIMUM KEEPALIVE ON TL1 RESPONSE REACHED"
                             raise KFrameException(self.__last_output)
-                            return False
+                            #return False
                         continue
 
                     else:
                         tl1_response = tl1_response + re.sub('(\r\n)+', "\r\n", msg_tmp, 0)
                         if tl1_verb != "ed-pid"  and  tl1_verb != "act-user":
                             if tl1_response.count(";") > 1:
-                                self.__trc_error("error [5] sending TL1 command [{:s}]".format(cmd))
+                                self.__trc_err("error [5] sending TL1 command [{:s}]".format(cmd))
                                 self.__last_output = "INVALID TL1 TERMINATION"
                                 raise KFrameException(self.__last_output)
-                                return False
+                                #return False
                         if tl1_response.strip() == ";":
                             continue
                         break
@@ -754,9 +765,12 @@ class Plugin1850TL1():
         """
         for _ in (1,2):
             try:
-                while str(self.__if_cmd.read_very_eager().strip(), 'utf-8') != "":
-                    pass
-                return True
+                while True:
+                    block = str(self.__if_cmd.read_very_eager().strip(), 'utf-8')
+                    if block == "":
+                        return True
+                    else:
+                        self.__logger(block)
             except Exception as eee:
                 self.__trc_dbg("exception in __cmd_read_all() - {}".format(eee))
                 self.__if_cmd = self.__cmd_connect()    # renewing interface
@@ -784,11 +798,13 @@ class Plugin1850TL1():
         """
         try:
             result_list = self.__if_cmd.expect(key_list, timeout=30)
-            return result_list
         except Exception as eee:
+            result_list = [],[],[]
             self.__trc_dbg("Exception in __cmd_expect() - {} - ignoring".format(eee))
 
-        return [],[],[]
+        self.__logger(str(result_list[2], 'utf-8'))
+
+        return result_list
 
 
     def __cmd_connect(self):
@@ -810,7 +826,7 @@ class Plugin1850TL1():
                 time.sleep(1)
 
         if not is_connected:
-            self.__trc_error("TL1: Timeout on connection")
+            self.__trc_err("TL1: Timeout on connection")
             raise KFrameException("TL1: Timeout on connection")
 
         return self.__if_cmd
@@ -823,15 +839,24 @@ class Plugin1850TL1():
             #self.__do("CANC-USER;", "COMPLD")
         #except Exception as eee:
             #msg = "Error in disconnection - {:s}".format(str(eee))
-            #self.__trc_error(msg)
+            #self.__trc_err(msg)
             #raise KFrameException(msg)
         try:
-            self.__trc_error("CLOSING TELNET SESSION")
+            self.__trc_err("CLOSING TELNET SESSION")
             self.__if_cmd.close()
         except Exception as eee:
-            self.__trc_error("ERROR ON CLOSING TELNET SESSION")
+            self.__trc_err("ERROR ON CLOSING TELNET SESSION - [{}]".format(eee))
 
         self.__if_cmd = None
+
+
+    def __logger(self, msg):
+        """ INTERNAL USAGE
+        """
+        if self.__logfile:
+            timestamp = datetime.datetime.now().isoformat(' ')
+            for row in msg.replace("\r","").split("\n"):
+                self.__logfile.write("[{}] {}\n".format(timestamp, row))
 
 
     def __t_success(self, title, elapsed_time, out_text):
@@ -869,7 +894,7 @@ class Plugin1850TL1():
             self.__ktrc.k_tracer_info(msg, level)
 
 
-    def __trc_error(self, msg, level=None):
+    def __trc_err(self, msg, level=None):
         """ INTERNAL USAGE
         """
         if self.__ktrc is not None:
@@ -882,36 +907,35 @@ if __name__ == "__main__":
 
     print("DEBUG")
 
-    trace = KTracer(level="DEBUG")
-    tl1 = Plugin1850TL1("135.221.125.79", ktrc=trace)
-    trace.k_tracer_error("PROVA", level=0)
+    TRACE = KTracer(level="DEBUG")
+    TL1 = Plugin1850TL1("135.221.125.79", ktrc=TRACE)
+    TRACE.k_tracer_error("PROVA", level=0)
 
     if False:
         # DB PULITO
-        tl1.do("ACT-USER::admin:MYTAG::Root1850;")
-        tl1.do("ED-PID::admin:::Root1850,Alcatel1,Alcatel1;")
+        TL1.do("ACT-USER::admin:MYTAG::Root1850;")
+        TL1.do("ED-PID::admin:::Root1850,Alcatel1,Alcatel1;")
         #
-        tl1.do("SET-PRMTR-NE::::::REGION=ETSI,PROVMODE=MANEQ-AUTOFC;")
-        tl1.do("RTRV-PRMTR-NE;")
-        tl1.do("SET-ATTR-SECUDFLT::::::MAXSESSION=6;")
-        tl1.do("ENT-EQPT::SHELF-1-1::::PROVISIONEDTYPE=UNVRSL320,SHELFNUM=1,SHELFROLE=MAIN;")
+        TL1.do("SET-PRMTR-NE::::::REGION=ETSI,PROVMODE=MANEQ-AUTOFC;")
+        TL1.do("RTRV-PRMTR-NE;")
+        TL1.do("SET-ATTR-SECUDFLT::::::MAXSESSION=6;")
+        TL1.do("ENT-EQPT::SHELF-1-1::::PROVISIONEDTYPE=UNVRSL320,SHELFNUM=1,SHELFROLE=MAIN;")
     else:
         # DB Inizializzato
-        tl1.do("ACT-USER::admin:MYTAG::Alcatel1;")
-        tl1.event_collection_start()
+        TL1.do("ACT-USER::admin:MYTAG::Alcatel1;")
+        TL1.event_collection_start()
         time.sleep(2)
-        filt = TL1check()
-        filt.add_pst("IS")
-        tl1.do("ENT-EQPT::PP1GE-1-1-18::::PROVISIONEDTYPE=PP1GE:IS;", policy="COND", cond=filt)
+        FILT = TL1check()
+        FILT.add_pst("IS")
+        TL1.do("ENT-EQPT::PP1GE-1-1-18::::PROVISIONEDTYPE=PP1GE:IS;", policy="COND", cond=FILT)
         time.sleep(15)
-        tl1.do("RTRV-EQPT::MDL-1-1-18;")
-        res = tl1.get_last_outcome()
-        print(res)
-        tl1.do("RMV-EQPT::PP1GE-1-1-18;")
-        tl1.do("DLT-EQPT::PP1GE-1-1-18;")
+        TL1.do("RTRV-EQPT::MDL-1-1-18;")
+        print(TL1.get_last_outcome())
+        TL1.do("RMV-EQPT::PP1GE-1-1-18;")
+        TL1.do("DLT-EQPT::PP1GE-1-1-18;")
 
     time.sleep(1)
 
-    tl1.thr_event_terminate()
+    #TL1.thr_event_terminate()
 
     print("FINE")

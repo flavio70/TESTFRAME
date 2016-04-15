@@ -21,7 +21,7 @@ def is_autonomous_msg(code):
         A   : autonomous non-alarm event
         I   " autonomous information message
     """
-    return (code == '*C' or code == '**' or code == '*' or code == 'A' or code == 'I')
+    return code == '*C' or code == '**' or code == '*' or code == 'A' or code == 'I'
 
 
 def is_any_alarm(code):
@@ -30,7 +30,7 @@ def is_any_alarm(code):
         **  : autonomous major alarm
         *   : autonomous minor or warning alarm
     """
-    return (code == '*C' or code == '**' or code == '*')
+    return code == '*C' or code == '**' or code == '*'
 
 
 
@@ -360,7 +360,7 @@ class TL1message():
                 break
 
 
-    def __encode_response_std(self):
+    def __encode_resp_std(self):
         """ INTERNAL USAGE
         """
         f_header = True
@@ -447,7 +447,7 @@ class TL1message():
                 break
 
 
-    def __encode_response_ent_crs(self):
+    def __encode_resp_ent_crs(self):
         """ INTERNAL USAGE
         """
         f_header = True
@@ -522,7 +522,7 @@ class TL1message():
                 break
 
 
-    def __encode_response_asap_prof(self):
+    def __encode_resp_asap_prof(self):
         """ INTERNAL USAGE
         """
         f_header = True
@@ -609,7 +609,7 @@ class TL1message():
                 break
 
 
-    def __encode_response_rtrv_cond(self):
+    def __encode_resp_rtrv_cond(self):
         """ INTERNAL USAGE
         """
         f_header = True
@@ -689,89 +689,7 @@ class TL1message():
                 break
 
 
-    def __encode_response_rtrv_cond_old(self):
-        """ INTERNAL USAGE
-        """
-        f_header = True
-        f_ident  = True
-        f_block  = True
-
-        f_skip_n = 0
-
-        pseudo_aid = 1  # Identifier for "emtpy-aid" response rows
-
-        for line in self.__m_plain.split('\n'):
-            if f_skip_n > 0:
-                # Skip one or more lines
-                f_skip_n = f_skip_n - 1
-                continue
-
-            if f_header:
-                if line.strip() == "":
-                    continue
-
-                self.__m_coded['C_SID']  = " ".join(line.split()[:-2]).replace('"', '')
-                self.__m_coded['C_DATE'] = line.split()[-2]
-                self.__m_coded['C_TIME'] = line.split()[-1]
-                f_header = False
-                continue
-
-            if f_ident:
-                words = line.split()
-                if is_autonomous_msg(words[0]):
-                    print("MESSAGGIO MALFORMATO")
-                    return
-
-                self.__m_coded['C_CODE']    = words[0]
-                self.__m_coded['C_TAG']     = words[1]
-                self.__m_coded['R_STATUS']  = words[2]
-                self.__m_coded['R_BODY_OK'] = {}
-                self.__m_coded['R_BODY_KO'] = []
-                self.__m_coded['R_ERROR']   = ""
-                f_ident = False
-                continue
-
-            if f_block:
-                # Command Response
-                stripped_line = line.strip()
-                if stripped_line == '>':
-                    f_skip_n = 2    # Long response - skip next 2 lines
-                    continue
-                if ( stripped_line.find('/*') != -1                                     and
-                     stripped_line.find("[{:s}]".format(self.__m_coded['C_TAG'])) != -1 and
-                     stripped_line.find('*/') != -1                                     ):
-                    # REMARK found - closing encoding
-                    tmp = stripped_line.replace("/* ","")
-                    tmp = tmp[:tmp.find(":")]
-                    self.__m_coded['R_BODY_CMD'] = tmp
-                    break
-                if self.__m_coded['R_STATUS'] == "COMPLD":
-                    words = stripped_line.replace('"', '').split(':')
-
-                    row = {}
-                    positional = 1
-                    attr_val_list = {}
-                    for elem in words[1].split(','):
-                        attr_val_list[ positional ] = elem
-                        positional = positional + 1
-                    row[ str(pseudo_aid) ] = {'VALUE' : attr_val_list}
-                    pseudo_aid = pseudo_aid + 1
-                    self.__m_coded['R_BODY_OK'].update(row)
-                elif self.__m_coded['R_STATUS'] == "DENY":
-                    if len(stripped_line) == 4:
-                        self.__m_coded['R_ERROR'] = stripped_line
-                    else:
-                        self.__m_coded['R_BODY_KO'].append(stripped_line)
-                else:
-                    print("[{:s}] NON ANCORA GESTITO".format(self.__m_coded['R_STATUS']))
-                continue
-
-            if line == ';':
-                # TERMINATOR found - closing encoding
-                break
-
-
-    def __encode_response_rtrv_no_status(self):
+    def __encode_resp_rtrv_no_status(self):
         """ INTERNAL USAGE
         """
         f_header = True
@@ -887,23 +805,23 @@ class TL1message():
         self.__m_coded = {}     # Reset internal coded message
 
         if response_type == "STD":
-            self.__encode_response_std()
+            self.__encode_resp_std()
             return
 
         if response_type == "ASAP_PROF":
-            self.__encode_response_asap_prof()
+            self.__encode_resp_asap_prof()
             return
 
         if response_type == "RTRV_COND":
-            self.__encode_response_rtrv_cond()
+            self.__encode_resp_rtrv_cond()
             return
 
         if response_type == "RTRV_LOPOOL":
-            self.__encode_response_rtrv_no_status()
+            self.__encode_resp_rtrv_no_status()
             return
 
         if response_type == "ENT_CRS":
-            self.__encode_response_ent_crs()
+            self.__encode_resp_ent_crs()
             return
 
         if is_event:
@@ -1103,24 +1021,7 @@ class TL1message():
 if __name__ == "__main__":
     print("DEBUG")
 
-    msg1 = """
-
-   PLEASE-SET-SID-C8A00 15-10-04 17:01:56
-*  243 REPT ALM EQPT
-   "MDL-1-1-18:MN,ABNORMAL,NSA,10-04,17-01-56,NEND"
-;
-"""
-
-    msg2 = """
-
-   PLEASE-SET-SID-C8A00 15-10-04 18:35:10
-M  379 COMPLD
-   "EC320-1-1-1::PROVISIONEDTYPE=EC320,ACTUALTYPE=EC320,AINSMODE=NOWAIT,ALMPROF=LBL-ASAPEQPT-SYSDFLT,REGION=ETSI,PROVMODE=MANEQ-AUTOFC:OOS-AU,WRK&FLT"
-   /* RTRV-EQPT::MDL-1-1-1 [379] (536871116) */
-;
-"""
-
-    msg3 = """
+    MSG3 = """
 
    PLEASE-SET-SID-C8A00 15-10-04 20:31:15
 M  165 COMPLD
@@ -1130,18 +1031,7 @@ M  165 COMPLD
 ;
 """
 
-    msg4 = """
-
-   PLEASE-SET-SID-C8A00 15-10-05 17:25:40
-M  792 DENY
-   IEAE
-   /* Input, Entity Already Exists */
-   /* Equipment is already Provisioned */
-   /* ENT-EQPT::PP1GE-1-1-18::::PROVISIONEDTYPE=PP1GE:IS [792] (536871116) */
-;
-"""
-
-    msg5 = """
+    MSG5 = """
 
    "nodeA - HFmCheckPomOnMVC4TU12-rg" 14-03-16 01:55:45
 M  780 COMPLD
@@ -1231,7 +1121,7 @@ M  780 COMPLD
 ;
 """
 
-    msg6 = """
+    MSG6 = """
 
    PLEASE-SET-SID-63880 15-09-18 05:11:48
 M  480 COMPLD
@@ -1283,16 +1173,7 @@ M  480 COMPLD
 ;
 """
 
-    msg7 = """
-
-PLEASE-SET-SID-CA200 31-08-02 09:45:34
-M 346 COMPLD
-   "STM1AU4-1-1-5-2-1,VC4:NR,UNEQ-P,NSA,08-02,08-47-30,NEND,TRMT"
-   /* RTRV-COND-VC4::STM1AU4-1-1-5-2-1:::UNEQ-P [346] (536870928) */
-;
-"""
-
-    msg8 = """
+    MSG8 = """
 
    PLEASE-SET-SID-10980 12-07-21 08:34:57
 M  693 COMPLD
@@ -1685,44 +1566,42 @@ M  693 COMPLD
 """
 
 
-    mm = TL1message(msg8)
-    print(mm.decode("JSON"))
+    MM = TL1message(MSG8)
+    print(MM.decode("JSON"))
 
     sys.exit(0)
 
     if True:
-        mm = TL1message(msg5)
-        print(mm.decode("JSON"))
-        print(mm.get_cmd_attr_value("MVC4-1-1-36-23", "TRC"))
-        filt = TL1check()
-        filt.add_aid("MVC4-1-1-36-33")
-        filt.add_aid("MVC4-1-1-36-23")
-        filt.add_aid("MVC4-1-1-36-49")
-        filt.add_aid("MVC4-1-1-36-3")
-        filt.add_pst("OOS-AU")
-        filt.add_sst("SGEO")
-        filt.add_sst("PMD")
-        filt.add_field("PTFTYPE", "MODVC4")
-        filt.add_field("TRC", "X010010011101010010010101110010")
-        filt.add_field("TRC", "PIPPO")
-        filt.debug()
-        print(filt.evaluate_msg(mm, sst='AND'))
+        MM = TL1message(MSG5)
+        print(MM.decode("JSON"))
+        print(MM.get_cmd_attr_value("MVC4-1-1-36-23", "TRC"))
+        FILT = TL1check()
+        FILT.add_aid("MVC4-1-1-36-33")
+        FILT.add_aid("MVC4-1-1-36-23")
+        FILT.add_aid("MVC4-1-1-36-49")
+        FILT.add_aid("MVC4-1-1-36-3")
+        FILT.add_pst("OOS-AU")
+        FILT.add_sst("SGEO")
+        FILT.add_sst("PMD")
+        FILT.add_field("PTFTYPE", "MODVC4")
+        FILT.add_field("TRC", "X010010011101010010010101110010")
+        FILT.add_field("TRC", "PIPPO")
+        FILT.debug()
+        print(FILT.evaluate_msg(MM, sst='AND'))
     else:
-        mm = TL1message(msg6)
-        print(mm.decode("JSON"))
-        print(mm.get_cmd_attr_values("9"))
-        print(mm.get_cmd_attr_value("9", 4))
+        MM = TL1message(MSG6)
+        print(MM.decode("JSON"))
+        print(MM.get_cmd_attr_values("9"))
+        print(MM.get_cmd_attr_value("9", 4))
 
     sys.exit(0)
 
-    #print("[{:s}]\n{:s}".format(msg1, "-" * 80))
-    mm = TL1message(msg3)
-    print(mm.decode("JSON"))
+    MM = TL1message(MSG3)
+    print(MM.decode("JSON"))
 
-    filt = TL1check()
-    filt.add_field("PTFRATE", "MODVC4")
-    filt.debug()
-    print(filt.evaluate_msg(mm))
+    FILT = TL1check()
+    FILT.add_field("PTFRATE", "MODVC4")
+    FILT.debug()
+    print(FILT.evaluate_msg(MM))
 
     print("FINE")
-
