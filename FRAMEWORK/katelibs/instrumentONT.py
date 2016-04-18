@@ -4202,6 +4202,162 @@ class InstrumentONT(Equipment):
 
 
 
+    def get_set_tx_C2_signal_label(self, portId, zqC2label=""):   # ONT-6xx only    ### krepo added ###       
+        """ ONT-6xx only
+            Get or Set the C2 signal label byte:
+		0 Unequipped ro supervisory unequipped
+		1 Reserved [Equipped non-specific]
+		2 TUG structure
+		3 Locked TU-n
+		4 Async. mapping of 34M/45M into container-3
+		5 Experimental mapping
+		18 Async. mapping of 140M into container-4
+		19 ATM mapping
+		20 MAN DQDB mapping
+		21 FDDI mapping
+		22 Mapping of HDLC/PPP framed signal
+		23 Reserved for proprietary use
+		24 Mapping of HDLC/LAPS framed signal
+		25 Reserved for proprietary use
+		26 Mapping of 10 Gbit/s Ethernet frames
+		27 GFP Mapping
+		28 Mapping of 10 Gbit/s Fibre Channel frames
+		32 Async. mapping of ODUk into VC-4-Xv
+		207 Reserved [unscrambled HDLC/PPP]
+		254 Test Signal, O.181 specific mapping
+		255 VC-AIS	
+            Return tuple: ( "True|False" , "< result/error list>)
+                True : command execution ok, current  C2 signal label string
+                False: error in command execution, details in error list string
+        """
+        methodLocalName = self.__lc_current_method_name(embedKrepoInit=True)
+        portId = self.__recover_port_to_use(portId)
+        if self.__ontType  == "6xx":
+            ONTCmdString=":SOUR:DATA:TEL:SDH:TRIB:SEL:C2SL"
+        else:
+            localMessage="Command supported by ONT-6xx only (current test equipment type:[{}]) ".format(self.__ontType)
+            self.__lc_msg(localMessage)
+            self.__method_failure(methodLocalName, None, "", localMessage)
+            return False, localMessage
+
+        if portId == "":
+            localMessage = "ERROR get_set_tx_C2_signal_label: portId  [{}] not specified".format(portId)
+            self.__lc_msg(localMessage)
+            self.__method_failure(methodLocalName, None, "", localMessage)
+            return False, localMessage
+        if zqC2label != '0'  and \
+           zqC2label != '1' and \
+           zqC2label != '2' and \
+           zqC2label != '3' and \
+           zqC2label != '4' and \
+           zqC2label != '5' and \
+           zqC2label != '18' and \
+           zqC2label != '19' and \
+           zqC2label != '20' and \
+           zqC2label != '21' and \
+           zqC2label != '22' and \
+           zqC2label != '23' and \
+           zqC2label != '24' and \
+           zqC2label != '25' and \
+           zqC2label != '26' and \
+           zqC2label != '27' and \
+           zqC2label != '28' and \
+           zqC2label != '32' and \
+           zqC2label != '207' and \
+           zqC2label != '254' and \
+           zqC2label != '255' and \
+           zqC2label != '':
+            localMessage = "ERROR get_set_tx_C2_signal_label: zqC2label  [{}] not valid [0x01|..|0xFF|''(to get status)]".format(auPathTraceMode)
+            self.__lc_msg(localMessage)
+            self.__method_failure(methodLocalName, None, "", localMessage)
+            return False, localMessage
+        if zqC2label == "":  # Get auPathTraceMode and exit
+            localCommand="{}?".format(ONTCmdString)
+            rawCallResult = self.__send_port_cmd(portId, localCommand)
+            sdhAnswer = self.__remove_dust(rawCallResult[1])
+            self.__method_success(methodLocalName, None, zqC2label)
+            return True, zqC2label
+        localCommand="{} {}".format(ONTCmdString, zqC2label)
+        rawCallResult = self.__send_port_cmd(portId, localCommand)
+        localCommand="{}?".format(ONTCmdString)
+        rawCallResult = self.__send_port_cmd(portId, localCommand)
+        sdhAnswer = self.__remove_dust(rawCallResult[1])
+        if sdhAnswer != zqC2label:
+            localMessage="C2 Signal Label mismatch: required [{}] but set [{}]".format(zqC2label,sdhAnswer)
+            self.__lc_msg(localMessage)
+            self.__method_failure(methodLocalName, None, "", localMessage)
+            return False, sdhAnswer
+        localMessage="Rx C2 signal Label:[{}]".format(sdhAnswer)
+        self.__lc_msg(localMessage)
+        self.__method_success(methodLocalName, None, localMessage)
+        return True, sdhAnswer
+
+
+
+
+    def get_set_tx_V5_signal_label(self, portId, zqV5label=""):   # ONT-6xx only    ### krepo added ###       
+        """ ONT-6xx only
+            Get or Set the V5 signal label byte:
+		0 Unequipped ro supervisory unequipped
+		1 Reserved [Equipped non-specific]
+		2 Asynchronous
+		3 Bit synchronous
+		4 Byte synchronous
+		5 Extended signal label
+		6 Test signal, O.181 specific mapping
+		7 VC AIS
+            Return tuple: ( "True|False" , "< result/error list>)
+                True : command execution ok, current  V5 signal label string
+                False: error in command execution, details in error list string
+        """
+        methodLocalName = self.__lc_current_method_name(embedKrepoInit=True)
+        portId = self.__recover_port_to_use(portId)
+        if self.__ontType  == "6xx":
+            ONTCmdString=":SOUR:DATA:TEL:SDH:TRIB:SEL:V5SL"
+        else:
+            localMessage="Command supported by ONT-6xx only (current test equipment type:[{}]) ".format(self.__ontType)
+            self.__lc_msg(localMessage)
+            self.__method_failure(methodLocalName, None, "", localMessage)
+            return False, localMessage
+
+        if portId == "":
+            localMessage = "ERROR get_set_tx_V5_signal_label: portId  [{}] not specified".format(portId)
+            self.__lc_msg(localMessage)
+            self.__method_failure(methodLocalName, None, "", localMessage)
+            return False, localMessage
+        if zqV5label != '0'  and \
+           zqV5label != '1' and \
+           zqV5label != '2' and \
+           zqV5label != '3' and \
+           zqV5label != '4' and \
+           zqV5label != '5' and \
+           zqV5label != '6' and \
+           zqV5label != '7' and \
+           zqV5label != '':
+            localMessage = "ERROR get_set_tx_V5_signal_label: zqV5label  [{}] not valid [0|1|..|7|''(to get status)]".format(auPathTraceMode)
+            self.__lc_msg(localMessage)
+            self.__method_failure(methodLocalName, None, "", localMessage)
+            return False, localMessage
+        if zqV5label == "":  # Get auPathTraceMode and exit
+            localCommand="{}?".format(ONTCmdString)
+            rawCallResult = self.__send_port_cmd(portId, localCommand)
+            sdhAnswer = self.__remove_dust(rawCallResult[1])
+            self.__method_success(methodLocalName, None, zqV5label)
+            return True, zqV5label
+        localCommand="{} {}".format(ONTCmdString, zqV5label)
+        rawCallResult = self.__send_port_cmd(portId, localCommand)
+        localCommand="{}?".format(ONTCmdString)
+        rawCallResult = self.__send_port_cmd(portId, localCommand)
+        sdhAnswer = self.__remove_dust(rawCallResult[1])
+        if sdhAnswer != zqV5label:
+            localMessage="V5 Signal Label mismatch: required [{}] but set [{}]".format(zqV5label,sdhAnswer)
+            self.__lc_msg(localMessage)
+            self.__method_failure(methodLocalName, None, "", localMessage)
+            return False, sdhAnswer
+        localMessage="Rx V5 signal Label:[{}]".format(sdhAnswer)
+        self.__lc_msg(localMessage)
+        self.__method_success(methodLocalName, None, localMessage)
+        return True, sdhAnswer
 
 
 
