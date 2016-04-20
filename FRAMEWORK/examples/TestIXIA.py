@@ -87,11 +87,11 @@ class Test(TestCase):
                             TCframeCount           = 9876)  # 9876 frames for this traffic (default 10000)
         IXIA.bind_all_phy_ports_to_vports(testPortList)
 
-        IXIA.start_traffic()
-        IXIA.stop_traffic(20)
+        #IXIA.start_traffic()
+        #IXIA.stop_traffic(20)
 
 
-        
+         
         # EXAMPLE WITH PORT 2/2->TX and PORT 2/3-RX with VLAN creation
         nomeTraffico = "Traffico di Test PORTA 2->3"
         testPortList  = [('135.221.113.142', 2, 2), ('135.221.113.142', 2, 3)]
@@ -106,9 +106,9 @@ class Test(TestCase):
                             VLanDestMacAddr        = "00:20:60:00:00:04")
         IXIA.bind_all_phy_ports_to_vports(testPortList)
 
-        IXIA.start_traffic()
-        IXIA.stop_traffic(20)
-
+        #IXIA.start_traffic()
+        #IXIA.stop_traffic(20)
+        
 
         # EXAMPLE WITH PORT 2/4 LOOPED TX->RX
         nomeTraffico = "Traffico di Test PORTA 4 LOOP"
@@ -118,7 +118,7 @@ class Test(TestCase):
         IXIA.create_traffic(vPortIdTx    = ('135.221.113.142', 2, 4), 
                             vPortIdRx    = ('135.221.113.142', 2, 4),
                             trafficName  = nomeTraffico,
-                            TCframeCount = 20000)  # 141281 frames for this traffic (default 10000)
+                            TCframeCount = 20000)  # 20000 frames for this traffic (default 10000)
         IXIA.bind_all_phy_ports_to_vports(testPortList)
 
         IXIA.start_traffic()
