@@ -118,7 +118,7 @@ class Test(TestCase):
         IXIA.create_traffic(vPortIdTx    = ('135.221.113.142', 2, 4), 
                             vPortIdRx    = ('135.221.113.142', 2, 4),
                             trafficName  = nomeTraffico,
-                            TCframeCount = 20000)  # 141281 frames for this traffic (default 10000)
+                            TCframeCount = 20000)  # 20000 frames for this traffic (default 10000)
         IXIA.bind_all_phy_ports_to_vports(testPortList)
 
         IXIA.start_traffic()
