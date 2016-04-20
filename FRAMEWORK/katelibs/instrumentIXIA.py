@@ -179,6 +179,7 @@ class InstrumentIXIA(Equipment):
                        frameSizeFixedSize     = 128,
                        frameRateType          = 'percentLineRate',
                        frameRateRate          = 10,
+                       useControlPlaneRate    = 'false',    # V. Sanvito credit
                        TCduration             = 1,
                        TCiterationCount       = 1,
                        TCstartDelayUnits      = 'bytes',
@@ -208,18 +209,19 @@ class InstrumentIXIA(Equipment):
             if self.__remapIds:
                 self.__globalTrafficItem = self.__IXN.remapIds(self.__globalTrafficItem)[0]
             self.__IXN.setMultiAttribute(self.__globalTrafficItem,
-                                         '-name'              ,trafficName,
-                                         '-trafficType'       ,trafficType,
-                                         '-allowSelfDestined' ,allowSelfDestined,
-                                         '-trafficItemType'   ,trafficItemType,
-                                         '-mergeDestinations' ,mergeDestinations,
-                                         '-egressEnabled'     ,egressEnabled,
-                                         '-srcDestMesh'       ,srcDestMesh,
-                                         '-enabled'           ,enabled,
-                                         '-routeMesh'         ,routeMesh,
-                                         '-transmitMode'      ,transmitMode,
-                                         '-biDirectional'     ,biDirectional,
-                                         '-hostsPerNetwork'   ,hostsPerNetwork)
+                                         '-name'                ,trafficName,
+                                         '-trafficType'         ,trafficType,
+                                         '-allowSelfDestined'   ,allowSelfDestined,
+                                         '-trafficItemType'     ,trafficItemType,
+                                         '-mergeDestinations'   ,mergeDestinations,
+                                         '-egressEnabled'       ,egressEnabled,
+                                         '-srcDestMesh'         ,srcDestMesh,
+                                         '-enabled'             ,enabled,
+                                         '-routeMesh'           ,routeMesh,
+                                         '-transmitMode'        ,transmitMode,
+                                         '-biDirectional'       ,biDirectional,
+                                         '-hostsPerNetwork'     ,hostsPerNetwork,
+                                         '-useControlPlaneRate' ,useControlPlaneRate)
             self.__IXN.commit()
             self.__IXN.add(self.__globalTrafficItem       ,'endpointSet',
                            '-sources'             ,localTxPort,
@@ -249,6 +251,26 @@ class InstrumentIXIA(Equipment):
                                          '-enableInterStreamGap'   ,TCenableInterStreamGap,
                                          '-startDelay'             ,TCstartDelay,
                                          '-burstPacketCount'       ,TCburstPacketCount)
+            
+            
+            self.__IXN.setMultiAttribute(self.__globalTrafficItem + '/highLevelStream:1/transmissionControl', # added for frame number locking to desired value
+                                         '-frameCount', TCframeCount, 
+                                         '-minGapBytes', '12', 
+                                         '-interStreamGap', '0', 
+                                         '-interBurstGap', '0', 
+                                         '-interBurstGapUnits', 'nanoseconds', 
+                                         '-type', 'fixedFrameCount', 
+                                         '-duration', '1', 
+                                         '-repeatBurst', '1', 
+                                         '-enableInterStreamGap', 'false', 
+                                         '-startDelayUnits', 'bytes', 
+                                         '-iterationCount', '1', 
+                                         '-burstPacketCount', '1', 
+                                         '-enableInterBurstGap', 'false', 
+                                         '-startDelay', '0')
+            
+            
+            
             self.__IXN.setMultiAttribute(self.__globalTrafficItem + "/tracking", '-trackBy', TrackBy)
             self.__IXN.commit()
         except Exception as excMsg:
