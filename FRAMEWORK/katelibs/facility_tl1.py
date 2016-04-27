@@ -689,7 +689,7 @@ class TL1message():
                 break
 
 
-    def __encode_resp_rtrv_pmmode(self):
+    def __encode_resp_rtrv_pm(self):
         """ INTERNAL USAGE
         """
         f_header = True
@@ -884,8 +884,8 @@ class TL1message():
                     response_type = "ENT_CRS"
                 elif self.__m_plain.find("RTRV-LOPOOL") != -1:
                     response_type = "RTRV_LOPOOL"
-                elif self.__m_plain.find("RTRV-PMMODE") != -1:
-                    response_type = "RTRV_PMMODE"
+                elif self.__m_plain.find("RTRV-PM") != -1:
+                    response_type = "RTRV_PM"
                 else:
                     response_type = "STD"
                 self.__m_event = False
@@ -909,8 +909,8 @@ class TL1message():
             self.__encode_resp_rtrv_no_status()
             return
 
-        if response_type == "RTRV_PMMODE":
-            self.__encode_resp_rtrv_pmmode()
+        if response_type == "RTRV_PM":
+            self.__encode_resp_rtrv_pm()
             #self.__encode_resp_rtrv_no_status()
             return
 
@@ -1656,6 +1656,15 @@ M  416 COMPLD
    "MVC4-1-1-7-383:NEND,P:TMPER=15-MIN,PMSTATE=ON,DIRN=RCV"
    "MVC4-1-1-7-384:NEND,P:TMPER=15-MIN,PMSTATE=ON,DIRN=RCV"
    /* RTRV-PMMODE-VC4::MVC4-1-1-7-1&&-384:::NEND,RCV:TMPER=15-MIN [416] (536871001) */
+;
+"""
+
+    MSG9 = """
+
+   PLEASE-SET-SID-10980 12-09-14 03:39:50
+M  519 COMPLD
+   "MVC4-1-1-7-1,VC4:UAS-HOVC,589,COMPL,NEND,RCV,15-MIN,09-14,03-30,00-09-49:ENDTIM=03-45"
+   /* RTRV-PM-VC4::MVC4-1-1-7-1:::,,NEND,RCV,15-MIN [519] (536871038) */
 ;
 """
 
