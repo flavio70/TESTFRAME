@@ -1,25 +1,18 @@
 #!/usr/bin/env python
-'''
+"""
 TestCase template for K@TE test developers
 
-[DESCRIPTION]
-    Put your test decription here
-[DESCRIPTION]
-[TOPOLOGY] 1 [TOPOLOGY]
-[DEPENDENCY]
-    Insert Test dependencies
-[DEPENDENCY]
-[LAB] Insert the lab referneces i.e. SW,SVT [LAB]
-[TPS]
-    insert here the Test mapping
-[TPS]
-[RUNSECTIONS]
-    Insert here the sections developed in this test i.e.
-    DUTSet,testSet,testBody,testClean,DutClean,all
-[RUNSECTIONS]
-[AUTHOR] ippolf [AUTHOR]
+:field Description: prova prova prova
+:field Description: prova prova prova
+:field Description: prova prova prova
+:field Topology: 8 
+:field Dependency:
+:field Lab: CI
+:field TPS: EM__1-2-3
+:field RunSections: 11111 
+:field Author: ghelfic
 
-'''
+"""
 
 from katelibs.testcase          import TestCase
 from katelibs.eqpt1850tss320    import Eqpt1850TSS320
