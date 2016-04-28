@@ -18,7 +18,7 @@
 ###############################################################################
 """
 
-import os
+# import os
 import time
 import inspect
 import telnetlib
@@ -306,7 +306,7 @@ class InstrumentSM3300(Equipment):
         self.__lc_msg("Function: __create_telnet_connection Socket [{}:{}]".format(self.__sm3300IpAddress,self.__sm3300TelnetPort))
         try:
             self.__telnetConnection = telnetlib.Telnet(self.__sm3300IpAddress,self.__sm3300TelnetPort,self.__telnetTimeout)
-            response = self.__send_cmd("*IDN? \n")
+            self.__send_cmd("*IDN? \n")
             localMessage = "Telnet connection established"
             self.__lc_msg(localMessage)
         except Exception as e:
@@ -317,35 +317,6 @@ class InstrumentSM3300(Equipment):
         return True, localMessage
 
 
-
-    #
-    #   ACCOUNT MANAGEMENT
-    #
-    def init(self):    ### krepo added ###
-        """ create a connection and authenticate the user """
-        methodLocalName = self.__lc_current_method_name(embedKrepoInit=True)
-        # Ping check
-        localResult = self.__is_reachable()
-        if not localResult[0]:
-            localMessage="SM3300 [{}]:not reachable. Bye...".format(self.__sm3300IpAddress)
-            self.__lc_msg(localMessage)
-            self.__method_failure(methodLocalName, None, "", localMessage)
-            return  localResult
-        else:
-            localMessage="SM3300 [{}]:reachable".format(self.__sm3300IpAddress)
-            self.__lc_msg(localMessage)
-        # Sm3300 Socket connection
-        localResult = self.__create_telnet_connection()
-        if not localResult[0]:
-            localMessage="SM3300 [{}]:telnet session open (port {}) failed. Bye...".format(self.__sm3300IpAddress, self.__sm3300TelnetPort)
-            self.__lc_msg(localMessage)
-            self.__method_failure(methodLocalName, None, "", localMessage)
-            return  localResult
-        else:
-            localMessage="SM3300 [{}]:telnet session opened (port {})".format(self.__sm3300IpAddress, self.__sm3300TelnetPort)
-            self.__lc_msg(localMessage)
-        self.__method_success(methodLocalName, None, localMessage)
-        return localResult
 
     #
     #  Reset SM3300  & utilities
