@@ -22,7 +22,7 @@ def get_eqpt_location(t_location, ident):
     l_row  = t_location.objects.get(id_location=ident).row
     l_rack = t_location.objects.get(id_location=ident).rack
     l_pos  = t_location.objects.get(id_location=ident).pos
-    if l_row is None:
+    if l_row == "FNone":
         return 'NULL'
     else:
         return '{}-{}/{}'.format(l_row, l_rack, l_pos)
@@ -106,12 +106,37 @@ def get_new_location(eqpt_id):
 
 
 
+def get_old_location(eqpt_id):
+    """ tbd """
+    cursor = connection.cursor()
+    query = "SELECT id_loc_old FROM T_EQUIPMENT WHERE id_equipment='{}'".format(eqpt_id)
+    cursor.execute(query)
+
+    result = cursor.fetchall()
+
+    return result[0][0]
+
+
+
+def get_eqpt_description(eqpt_id):
+    """ tbd """
+    cursor = connection.cursor()
+    query = "SELECT description FROM T_EQUIPMENT WHERE id_equipment='{}'".format(eqpt_id)
+    cursor.execute(query)
+
+    result = cursor.fetchall()
+
+    return result[0][0]
+
+
+
 if __name__ == "__main__":
 
     parser = argparse.ArgumentParser()
     parser.add_argument("--serials", help="get serials info", action="store_true")
     parser.add_argument("--boards", help="get boards info", action="store_true")
-    parser.add_argument("--newpos", help="get new location info", action="store_true")
+    parser.add_argument("--oldpos", help="get old location info", action="store_true")
+    parser.add_argument("--description", help="get description info", action="store_true")
     args = parser.parse_args()
 
     list_ip  = TNet.objects.all()
@@ -126,26 +151,40 @@ if __name__ == "__main__":
         eLoc  = get_eqpt_location(t_location, row.t_location_id_location.id_location)
         eIP   = get_eqpt_ip(list_ip, row.id_equipment)
 
-        if args.newpos:
-            new_loc_id = get_new_location(row.id_equipment)
-            if new_loc_id is not None:
-                eLoc_new = get_eqpt_location(t_location, new_loc_id)
+        if args.oldpos:
+            old_loc_id = get_old_location(row.id_equipment)
+            if old_loc_id is not None:
+                if old_loc_id == 9999:
+                    eLoc_old = "NULL"
+                else:
+                    eLoc_old = get_eqpt_location(t_location, old_loc_id)
             else:
-                eLoc_new = "NULL"
-            location = "{:10s} [{:10s}]".format(eLoc, eLoc_new)
+                eLoc_old = "NULL"
+            location = "{:10s} [{:10s}]".format(eLoc, eLoc_old)
         else:
             location = "{:10s}".format(eLoc)
 
+        if args.description:
+            desc_res = get_eqpt_description(row.id_equipment)
+            if desc_res is None:
+                eDesc = ""
+            else:
+                eDesc = desc_res[0:20]
+            eDesc = "[{:20}]".format(eDesc)
+        else:
+            eDesc = ""
+
         if args.serials:
             eSer = get_eqpt_serial(list_ser, row.id_equipment)
-            res='{:5s} {:12s} {} {:20s} {:20s} {:16} {:s}'.format(str(row.id_equipment),
-                                                                  eType,
-                                                                  location,
-                                                                  str(row.name),
-                                                                  eIP,
-                                                                  str(row.owner),
-                                                                  eSer
-                                                                 )
+            res='{:5s} {:12s} {} {:20s} {:20s} {:16} {} {:s}'.format(str(row.id_equipment),
+                                                                     eType,
+                                                                     location,
+                                                                     str(row.name),
+                                                                     eIP,
+                                                                     str(row.owner),
+                                                                     eDesc,
+                                                                     eSer
+                                                                    )
         elif args.boards:
             board_list = get_eqpt_boards(row.id_equipment, eType, board_type_list)
             if board_list is None:
@@ -153,20 +192,22 @@ if __name__ == "__main__":
             else:
                 board_list = "[{}]".format(board_list)
 
+            res='{:5s} {:12s} {} {:20s} {:20s} {:16} {} {}'.format(str(row.id_equipment),
+                                                                   eType,
+                                                                   location,
+                                                                   str(row.name),
+                                                                   eIP,
+                                                                   str(row.owner),
+                                                                   eDesc,
+                                                                   board_list
+                                                                  )
+        else:
             res='{:5s} {:12s} {} {:20s} {:20s} {:16} {}'.format(str(row.id_equipment),
                                                                 eType,
                                                                 location,
                                                                 str(row.name),
                                                                 eIP,
                                                                 str(row.owner),
-                                                                board_list
+                                                                eDesc
                                                                )
-        else:
-            res='{:5s} {:12s} {} {:20s} {:20s} {:16}'.format(str(row.id_equipment),
-                                                             eType,
-                                                             location,
-                                                             str(row.name),
-                                                             eIP,
-                                                             str(row.owner)
-                                                            )
         print(res)
