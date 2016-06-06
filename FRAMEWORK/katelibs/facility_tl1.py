@@ -11,6 +11,7 @@
 
 import sys
 import json
+import re
 
 
 def is_autonomous_msg(code):
@@ -1053,10 +1054,20 @@ class TL1message():
         if self.get_cmd_status() != (True, "COMPLD"):
             return None
 
-        try:
-            return self.__m_coded['R_BODY_OK'].get(aid)['VALUE'][attr]
-        except Exception as eee:
-            return None
+        if aid.find('*') == -1:
+            try:
+                return self.__m_coded['R_BODY_OK'].get(aid)['VALUE'][attr]
+            except Exception as eee:
+                return None
+        else:
+            try:
+                for the_key,the_val in self.__m_coded['R_BODY_OK'].items():
+                    if re.search(aid, the_key):
+                        return the_val['VALUE'][attr]
+                    else:
+                        return None
+            except Exception as eee:
+                return None
 
         return None
 
@@ -1672,6 +1683,8 @@ M  519 COMPLD
 
     MM = TL1message(MSG9)
     print(MM.decode("JSON"))
+    print(MM.get_cmd_attr_value("STM64AU4-1-1-13-1-36,MVC4-1-1-12-100", "1"))
+    print(MM.get_cmd_attr_value("STM64AU4-1-1-13-1-.*,MVC4-1-1-12-100", "1"))
 
     sys.exit(0)
 
