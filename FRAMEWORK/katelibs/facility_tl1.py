@@ -689,7 +689,7 @@ class TL1message():
                 break
 
 
-    def __encode_resp_rtrv_pm(self):
+    def __encode_resp_rtrv_pos_and_name(self):
         """ INTERNAL USAGE
         """
         f_header = True
@@ -885,7 +885,9 @@ class TL1message():
                 elif self.__m_plain.find("RTRV-LOPOOL") != -1:
                     response_type = "RTRV_LOPOOL"
                 elif self.__m_plain.find("RTRV-PM") != -1:
-                    response_type = "RTRV_PM"
+                    response_type = "RTRV_POS_AND_NAME"
+                elif self.__m_plain.find("RTRV-CRS") != -1:
+                    response_type = "RTRV_POS_AND_NAME"
                 else:
                     response_type = "STD"
                 self.__m_event = False
@@ -909,9 +911,8 @@ class TL1message():
             self.__encode_resp_rtrv_no_status()
             return
 
-        if response_type == "RTRV_PM":
-            self.__encode_resp_rtrv_pm()
-            #self.__encode_resp_rtrv_no_status()
+        if response_type == "RTRV_POS_AND_NAME":
+            self.__encode_resp_rtrv_pos_and_name()
             return
 
         if response_type == "ENT_CRS":
@@ -1663,13 +1664,13 @@ M  416 COMPLD
 
    PLEASE-SET-SID-10980 12-09-14 03:39:50
 M  519 COMPLD
-   "MVC4-1-1-7-1,VC4:UAS-HOVC,589,COMPL,NEND,RCV,15-MIN,09-14,03-30,00-09-49:ENDTIM=03-45"
-   /* RTRV-PM-VC4::MVC4-1-1-7-1:::,,NEND,RCV,15-MIN [519] (536871038) */
+   "STM64AU4-1-1-13-1-36,MVC4-1-1-12-100:2WAY:ACD=LOCAL:OOS-AU,SGEO"
+   /* RTRV-CRS-VC4::STM64AU4-1-1-13-1-36 [519] (536871038) */
 ;
 """
 
 
-    MM = TL1message(MSG8)
+    MM = TL1message(MSG9)
     print(MM.decode("JSON"))
 
     sys.exit(0)
