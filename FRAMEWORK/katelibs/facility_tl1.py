@@ -20,7 +20,7 @@ def is_autonomous_msg(code):
         **  : autonomous major alarm
         *   : autonomous minor or warning alarm
         A   : autonomous non-alarm event
-        I   " autonomous information message
+        I   : autonomous information message
     """
     return code == '*C' or code == '**' or code == '*' or code == 'A' or code == 'I'
 
