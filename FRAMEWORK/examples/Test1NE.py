@@ -79,8 +79,7 @@ class Test(TestCase):
         test Setup Section implementation
         insert general SetUp code for your test below
         '''
-        if aaa:
-            print("ciao")
+        print(NE1.flc_send_cmd_and_capture("ls -la"))
         NE1.tl1.event_collection_start()
         NE1.tl1.do("ACT-USER::admin:::Alcatel1;")
         # questo genera volutamente un errore

@@ -426,6 +426,31 @@ class Eqpt1850TSS320(Equipment):
         return True
 
 
+    def flc_send_cmd(self, cmd):
+        """ Send a specified command to equipment using SSH connection.
+            If connection is down, a reconnection is done
+            cmd : a UNIX command
+        """
+        return self.__net_con.send_cmd_simple(cmd)
+
+
+    def flc_send_cmd_and_check(self,cmd, check_ok):
+        """ Send a specified command to equipment using SSH connection.
+            If connection is down, a reconnection is done
+            cmd      : a UNIX command
+            check_ok : (optional) string to check on command stdout response
+        """
+        return self.__net_con.send_cmd_and_check(cmd, check_ok)
+
+
+    def flc_send_cmd_and_capture(self, cmd):
+        """ Send a specified command to equipment using SSH connection; the stdout result is returned to caller
+            If connection is down, a reconnection is done
+            cmd : a UNIX command
+        """
+        return self.__net_con.send_cmd_and_capture(cmd)
+ 
+
     def __is_ongoing_to_address(self, dest_ip):
         """ INTERNAL USAGE """
         # Check if this equipment is able to reach a specified IP address - Command sent to console interface
