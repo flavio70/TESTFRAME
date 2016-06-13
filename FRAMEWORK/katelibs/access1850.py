@@ -307,7 +307,7 @@ class SSH1850():
             If connection is down, a reconnection is done
             cmd : a UNIX command
         """
-        print("SSH1850::send_cmd_and_capture in")
+        #print("SSH1850::send_cmd_and_capture in")
 
         if not self.__is_reachable_by_ip():
             self.__setup_ssh()
@@ -319,9 +319,9 @@ class SSH1850():
 
         while not done:
             try:
-                print("provo ad eseguire [" + cmd + "]")
+                #print("provo ad eseguire [" + cmd + "]")
                 stdin,stdout,stderr = self.__sh.exec_command(cmd)
-                print("eseguito [" + cmd + "]")
+                #print("eseguito [" + cmd + "]")
                 done = True
             except Exception as eee:
                 msg = "SSH1850: error connectind '{:s}' ({:s}). Retrying...".format(self.__ip, str(eee))
