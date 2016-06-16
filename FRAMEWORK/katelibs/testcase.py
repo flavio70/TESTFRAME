@@ -144,11 +144,9 @@ class TestCase(object):
 
         self.close()
 
+        # TestCase return code to UNIX environment: the number of failed test
         cnt,cnt_ok,cnt_ko,cnt_sk = self.kenvironment.krepo.get_metrics()
-        if cnt_ko == 0:
-            sys.exit(0)
-        else:
-            sys.exit(10)
+        sys.exit(cnt_ko)
 
 
     def run_test(self, args):
