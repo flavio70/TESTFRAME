@@ -160,7 +160,7 @@ class Plugin1850BM():
     SLC_BM_PORT = 4000
 
 
-    def __init__(self, flc_ip, eRef=None, krepo=None, ktrc=None):
+    def __init__(self, flc_ip, eRef=None, krepo=None, ktrc=None, slc_a=10, slc_b=11):
         """
         Costructor for BM interface
         flc_ip : equipment's IP Address (FLC)
@@ -172,13 +172,15 @@ class Plugin1850BM():
         self.__krepo    = krepo
         self.__ktrc     = ktrc
         self.__eqpt_ref = eRef
+        self.__slc_a    = slc_a
+        self.__slc_b    = slc_b
 
         self.__tunnel   = {}
         self.__active   = None
         self.__relaxed  = False # False: force check for active SLC
 
-        self.__tunnel[10] = TunnelSSH(self.__flc_ip, 10, self.SLC_BM_PORT, ktrc=self.__ktrc)
-        self.__tunnel[11] = TunnelSSH(self.__flc_ip, 11, self.SLC_BM_PORT, ktrc=self.__ktrc)
+        self.__tunnel[self.__slc_a] = TunnelSSH(self.__flc_ip, self.__slc_a, self.SLC_BM_PORT, ktrc=self.__ktrc)
+        self.__tunnel[self.__slc_b] = TunnelSSH(self.__flc_ip, self.__slc_b, self.SLC_BM_PORT, ktrc=self.__ktrc)
 
         self.__trc_inf("Plugin BM available")
 
@@ -188,14 +190,14 @@ class Plugin1850BM():
         """
         self.__trc_dbg("CLEAN UP")
 
-        if self.__tunnel[11] is not None:
-            self.__tunnel[11].clean_up()
+        if self.__tunnel[self.__slc_b] is not None:
+            self.__tunnel[self.__slc_b].clean_up()
 
-        if self.__tunnel[10] is not None:
-            self.__tunnel[10].clean_up()
+        if self.__tunnel[self.__slc_a] is not None:
+            self.__tunnel[self.__slc_a].clean_up()
 
-        self.__tunnel[11] = None
-        self.__tunnel[10] = None
+        self.__tunnel[self.__slc_b] = None
+        self.__tunnel[self.__slc_a] = None
 
 
     def send_command(self, cmd):
@@ -225,12 +227,12 @@ class Plugin1850BM():
         self.__trc_dbg("\nGET ACTIVE SLC...")
 
         if self.__active is None:
-            slc_list = [10,11]
+            slc_list = [self.__slc_a, self.__slc_b]
         else:
-            if self.__active == 10:
-                slc_list = [10,11]
+            if self.__active == self.__slc_a:
+                slc_list = [self.__slc_a, self.__slc_b]
             else:
-                slc_list = [11,10]
+                slc_list = [self.__slc_b, self.__slc_a]
 
         for slc in slc_list:
             self.__trc_dbg("\nTRYING TO REACH SLC 100.0.1.{:d}".format(slc))
@@ -304,7 +306,7 @@ class Plugin1850BM():
     def slc_reboot(self, slot):
         """ Force a SLC reboot using BM command
         """
-        if slot != 10 and slot != 11:
+        if slot != self.__slc_a  and  slot != self.__slc_b:
             return False
 
         cmd = ": reboot".format(slot)
