@@ -93,20 +93,6 @@ class Eqpt1850TSS320(Equipment):
 
 
 
-    def __set_flc_slots(self, slot_a, slot_b):
-        """ INTERNAL USAGE
-        """
-        self.__flc_a = slot_a
-        self.__flc_b = slot_b
-
-
-    def __set_slc_slots(self, slot_a, slot_b):
-        """ INTERNAL USAGE
-        """
-        self.__slc_a = slot_a
-        self.__slc_b = slot_b
-
-
     def get_flc_slot_a(self):
         """ Return slot number for FLC A
         """
@@ -187,6 +173,9 @@ class Eqpt1850TSS320(Equipment):
                 else:
                     self.__trc_dbg("Equipment IP configuration OK. Waiting for external reachability")
                     break
+
+            self.__trc_dbg("Configuring firewall in order to accept ping from anywhere")
+            self.__ser_con.send_cmd_simple("iptables -I INPUT  -p icmp --icmp-type any -j ACCEPT")
 
             for i in range(1, max_iterations+1):
                 if not self.__is_reachable_by_ip():
@@ -287,7 +276,8 @@ class Eqpt1850TSS320(Equipment):
         """ Check for DUAL FLC configuration.
             Force FLC 1 to be active
         """
-        pass
+        # TODO
+        return True
 
 
     def flc_wait_in_service(self):
@@ -494,7 +484,7 @@ class Eqpt1850TSS320(Equipment):
             cmd : a UNIX command
         """
         return self.__net_con.send_cmd_and_capture(cmd)
- 
+
 
     def __is_ongoing_to_address(self, dest_ip):
         """ INTERNAL USAGE """
@@ -525,6 +515,15 @@ class Eqpt1850TSS320(Equipment):
         return str(None),str(None),str(None)
 
 
+    def __set_slots(self, flc_a, flc_b, slc_a, slc_b):
+        """ INTERNAL USAGE
+        """
+        self.__flc_a = flc_a
+        self.__flc_b = flc_b
+        self.__slc_a = slc_a
+        self.__slc_b = slc_b
+
+
     def __get_eqpt_info_from_db(self):
         """ INTERNAL USAGE """
         self.__trc_inf("CONFIGURATION EQUIPMENT ID := {}".format(self.id))
@@ -539,30 +538,25 @@ class Eqpt1850TSS320(Equipment):
             raise KFrameException("ERROR: Equipment Type {} inconsistency (DB vs Preset).".format(e_type))
 
         if   e_type_id == 1  or  e_type_id == 3:
+            self.__set_slots(flc_a=1, flc_b=20, slc_a=10, slc_b=11)
             self.__arch = "STD"
             eth_adapter = "eth1"
-            self.__set_flc_slots( 1, 20)
-            self.__set_slc_slots(10, 11)
         elif e_type_id == 4  or  e_type_id == 5:
+            self.__set_slots(flc_a=1, flc_b=20, slc_a=10, slc_b=11)
             self.__arch = "ENH"
             eth_adapter = "dbg"
-            self.__set_flc_slots( 1, 20)
-            self.__set_slc_slots(10, 11)
         elif e_type_id == 11:
+            self.__set_slots(flc_a=73, flc_b=75, slc_a=71, slc_b=72)
             self.__arch = "320T"
             eth_adapter = "oamp"
-            self.__set_flc_slots(73, 75)
-            self.__set_slc_slots(71, 72)
         elif e_type_id == 15:
+            self.__set_slots(flc_a=1, flc_b=20, slc_a=10, slc_b=11)
             self.__arch = "SIM"
             eth_adapter = "q"
-            self.__set_flc_slots( 1, 20)
-            self.__set_slc_slots(10, 11)
         elif e_type_id == 16:
+            self.__set_slots(flc_a=73, flc_b=75, slc_a=71, slc_b=72)
             self.__arch = "SIMT"
             eth_adapter = "q"
-            self.__set_flc_slots(73, 75)
-            self.__set_slc_slots(71, 72)
         else:
             raise KFrameException("ERROR: Equipment Type {} not managed.".format(e_type))
 
