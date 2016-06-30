@@ -26,8 +26,11 @@ class Kunit:
         path_repo      : Base path for XML reporting
         test_file_name : Test file name
         """
-        self.__cnt  = 0     # counter of atomic test
-        self.__st   = None  # test execution starting time
+        self.__cnt      = 0     # counter of atomic test
+        self.__cnt_ok   = 0     # counter of succesfull atomic test
+        self.__cnt_ko   = 0     # counter of failed atomic test
+        self.__cnt_sk   = 0     # counter of skipped atomic test
+        self.__st       = None  # test execution starting time
 
         # Base path of logs area (Jenkins related)
         try:
@@ -99,6 +102,7 @@ class Kunit:
 
         self.__st = None
         self.__cnt = self.__cnt + 1
+        self.__cnt_ok = self.__cnt_ok + 1
 
         for elem in self.__reports:
             file_desc = self.__reports[elem]
@@ -126,6 +130,7 @@ class Kunit:
 
         self.__st = None
         self.__cnt = self.__cnt + 1
+        self.__cnt_ko = self.__cnt_ko + 1
 
         for elem in self.__reports:
             file_desc = self.__reports[elem]
@@ -156,6 +161,7 @@ class Kunit:
 
         self.__st = None
         self.__cnt = self.__cnt + 1
+        self.__cnt_sk = self.__cnt_sk + 1
 
         for elem in self.__reports:
             file_desc = self.__reports[elem]
@@ -177,6 +183,23 @@ class Kunit:
             on above add_success(),... methods
         """
         self.__st = datetime.datetime.now()
+
+
+    def get_metrics(self):
+        """ Return a tuple of test counters: (num_of_test, num_of_success, num_of_fail, num_of_skip)
+        """
+        return self.__cnt, self.__cnt_ok, self.__cnt_ko, self.__cnt_sk
+
+
+    def print_metrics(self):
+        """ Report a test result summary
+        """
+        print("#" * 80)
+        print("## TEST CASE {}".format(self.__test_name))
+        print("##   Elementary test : {:3d}".format(self.__cnt))
+        print("##           Passed  : {:3d}".format(self.__cnt_ok))
+        print("##           Skipped : {:3d}".format(self.__cnt_sk))
+        print("##           Failed  : {:3d}".format(self.__cnt_ko))
 
 
     def start_tps_block(self, dut_id, tps_area, tps_name):

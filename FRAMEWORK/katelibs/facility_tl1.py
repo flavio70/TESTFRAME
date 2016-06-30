@@ -889,6 +889,8 @@ class TL1message():
                     response_type = "RTRV_POS_AND_NAME"
                 elif self.__m_plain.find("RTRV-CRS") != -1:
                     response_type = "RTRV_POS_AND_NAME"
+                elif self.__m_plain.find("RTRV-ALM-VC") != -1:
+                    response_type = "RTRV_COND"
                 else:
                     response_type = "STD"
                 self.__m_event = False
@@ -1673,18 +1675,17 @@ M  416 COMPLD
 
     MSG9 = """
 
-   PLEASE-SET-SID-10980 12-09-14 03:39:50
-M  519 COMPLD
-   "STM64AU4-1-1-13-1-36,MVC4-1-1-12-100:2WAY:ACD=LOCAL:OOS-AU,SGEO"
-   /* RTRV-CRS-VC4::STM64AU4-1-1-13-1-36 [519] (536871038) */
-;
-"""
+   PLEASE-SET-SID-10980 16-05-01 01:13:16
+M  103 COMPLD
+   "MVC4-1-1-7-34,VC4:WR,T-SES-HOVC-15-MIN,NSA,05-01,11-49-06,NEND,RCV,15,15,15-MIN"
+   /* RTRV-ALM-VC4::MVC4-1-1-7-34:::WR,T-SES-HOVC-15-MIN,NSA,NEND,RCV [103] (536871054) */
+;"""
 
 
     MM = TL1message(MSG9)
     print(MM.decode("JSON"))
-    print(MM.get_cmd_attr_value("STM64AU4-1-1-13-1-36,MVC4-1-1-12-100", "1"))
-    print(MM.get_cmd_attr_value("STM64AU4-1-1-13-1-.*,MVC4-1-1-12-100", "1"))
+    #print(MM.get_cmd_attr_value("STM64AU4-1-1-13-1-36,MVC4-1-1-12-100", "1"))
+    #print(MM.get_cmd_attr_value("STM64AU4-1-1-13-1-.*,MVC4-1-1-12-100", "1"))
 
     sys.exit(0)
 

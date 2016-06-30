@@ -9,6 +9,7 @@
 
 import argparse
 import traceback
+import sys
 
 from katelibs.kenviron import KEnvironment
 from katelibs.kexception import KUserException, KFrameException
@@ -59,6 +60,8 @@ class TestCase(object):
         '''
         function used to finalize test execution
         '''
+        self.kenvironment.krepo.print_metrics()
+
         self.trc_inf('\nFinalizing  ...')
         self.kenvironment.clean_up()
         self.trc_inf('DONE \n')
@@ -120,32 +123,30 @@ class TestCase(object):
         parser.add_argument("--runId", help="Reference to MySQL runtable entry",default=None,metavar="id")
         args = parser.parse_args()
 
-        # For debugging, change to False
-        if True:
-            try:
-                self.init()
-                self.run_test(args)
-
-            except KFrameException as eee:
-                traceback.print_exc()
-                msg = "KATE FRAMEWORK EXCEPTION CAUGHT - {}".format(eee)
-                self.trc_err(msg)
-
-            except KUserException as eee:
-                traceback.print_exc()
-                msg = "KATE USER EXCEPTION CAUGHT - {}".format(eee)
-                self.trc_err(msg)
-
-            except Exception as eee:
-                traceback.print_exc()
-                msg = "GENERIC EXCEPTION CAUGHT - {}".format(eee)
-                self.trc_err(msg)
-        else:
+        try:
             self.init()
             self.run_test(args)
-            self.close()
+
+        except KFrameException as eee:
+            traceback.print_exc()
+            msg = "KATE FRAMEWORK EXCEPTION CAUGHT - {}".format(eee)
+            self.trc_err(msg)
+
+        except KUserException as eee:
+            traceback.print_exc()
+            msg = "KATE USER EXCEPTION CAUGHT - {}".format(eee)
+            self.trc_err(msg)
+
+        except Exception as eee:
+            traceback.print_exc()
+            msg = "GENERIC EXCEPTION CAUGHT - {}".format(eee)
+            self.trc_err(msg)
 
         self.close()
+
+        # TestCase return code to UNIX environment: the number of failed test
+        cnt,cnt_ok,cnt_ko,cnt_sk = self.kenvironment.krepo.get_metrics()
+        sys.exit(cnt_ko)
 
 
     def run_test(self, args):
