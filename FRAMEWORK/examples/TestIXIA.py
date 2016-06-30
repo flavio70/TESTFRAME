@@ -72,17 +72,16 @@ class Test(TestCase):
         test Body Section implementation
         insert Main body code for your test below
         '''
-
         IXIA.start_all_protocols()
 
 
         # EXAMPLE WITH PORT 2/1 LOOPED TX->RX
         nomeTraffico = "Traffico di Test PORTA 1 LOOP"
-        testPortList  = [('135.221.113.142', 2, 1)]
+        testPortList = [('151.98.130.42', 2, 1)]
         IXIA.create_all_vports(testPortList)
         
-        IXIA.create_traffic(vPortIdTx   = ('135.221.113.142', 2, 1), 
-                            vPortIdRx   = ('135.221.113.142', 2, 1),
+        IXIA.create_traffic(vPortIdTx   = ('151.98.130.42', 2, 1), 
+                            vPortIdRx   = ('151.98.130.42', 2, 1),
                             trafficName = nomeTraffico,
                             TCframeCount           = 9876)  # 9876 frames for this traffic (default 10000)
         IXIA.bind_all_phy_ports_to_vports(testPortList)
@@ -94,10 +93,10 @@ class Test(TestCase):
          
         # EXAMPLE WITH PORT 2/2->TX and PORT 2/3-RX with VLAN creation
         nomeTraffico = "Traffico di Test PORTA 2->3"
-        testPortList  = [('135.221.113.142', 2, 2), ('135.221.113.142', 2, 3)]
+        testPortList  = [('151.98.130.42', 2, 2), ('151.98.130.42', 2, 3)]
         IXIA.create_all_vports(testPortList)
-        IXIA.create_traffic(vPortIdTx   = ('135.221.113.142', 2, 2), 
-                            vPortIdRx   = ('135.221.113.142', 2, 3),
+        IXIA.create_traffic(vPortIdTx   = ('151.98.130.42', 2, 2), 
+                            vPortIdRx   = ('151.98.130.42', 2, 3),
                             trafficName = nomeTraffico,
                             VLanId                 = 144,
                             VLanCFI                = 1,
@@ -112,11 +111,11 @@ class Test(TestCase):
 
         # EXAMPLE WITH PORT 2/4 LOOPED TX->RX
         nomeTraffico = "Traffico di Test PORTA 4 LOOP"
-        testPortList  = [('135.221.113.142', 2, 4)]
+        testPortList  = [('151.98.130.42', 2, 4)]
         IXIA.create_all_vports(testPortList)
         
-        IXIA.create_traffic(vPortIdTx    = ('135.221.113.142', 2, 4), 
-                            vPortIdRx    = ('135.221.113.142', 2, 4),
+        IXIA.create_traffic(vPortIdTx    = ('151.98.130.42', 2, 4), 
+                            vPortIdRx    = ('151.98.130.42', 2, 4),
                             trafficName  = nomeTraffico,
                             TCframeCount = 20000)  # 20000 frames for this traffic (default 10000)
         IXIA.bind_all_phy_ports_to_vports(testPortList)
@@ -129,13 +128,13 @@ class Test(TestCase):
   
         #IXIA.check_traffic()
         #dizionario=dict()
-        #dizionario = IXIA.get_port_statistic('135.221.113.142', 2, 2)[1]
+        #dizionario = IXIA.get_port_statistic('151.98.130.42', 2, 2)[1]
         #print("=======================================")
         #print("{}".format(dizionario))
         #print("=======================================")
         #print("Tx Frames port 2 [{}]".format(dizionario.get("Frames Tx.")))
 
-        #dizionario = IXIA.get_port_statistic('135.221.113.142', 2, 3)[1]
+        #dizionario = IXIA.get_port_statistic('151.98.130.42', 2, 3)[1]
         #print("=======================================")
         #print("{}".format(dizionario))
         #print("=======================================")
@@ -160,20 +159,20 @@ class Test(TestCase):
         #print("=======================================")
         
         
-        #dizionario = IXIA.get_port_cpu_statistic('135.221.113.142', 2, 2)[1]
+        #dizionario = IXIA.get_port_cpu_statistic('151.98.130.42', 2, 2)[1]
         #print("=======================================")
         #print("{}".format(dizionario))
         #print("=======================================")
         
          
         
-        #dizionario = IXIA.get_global_protocol_statistic('135.221.113.142', 2, 2)[1]
+        #dizionario = IXIA.get_global_protocol_statistic('151.98.130.42', 2, 2)[1]
         #print("=======================================")
         #print("{}".format(dizionario))
         #print("=======================================")
          
         
-        #dizionario = IXIA.get_l2l3_test_summary_statistic('135.221.113.142', 2, 2)[1]
+        #dizionario = IXIA.get_l2l3_test_summary_statistic('151.98.130.42', 2, 2)[1]
         #print("=======================================")
         #print("{}".format(dizionario))
         #print("=======================================")
@@ -182,7 +181,7 @@ class Test(TestCase):
         #
         #   SI blocca: forse va invocato a traffico running...boh
         #
-        #dizionario = IXIA.get_flow_detective_statistic('135.221.113.142', 2, 2)[1]
+        #dizionario = IXIA.get_flow_detective_statistic('151.98.130.42', 2, 2)[1]
         #print("=======================================")
         #print("{}".format(dizionario))
         #print("=======================================")
