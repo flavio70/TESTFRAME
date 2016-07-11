@@ -7,11 +7,9 @@ Script used to store 1850TSS SWP info to KATE DB
 @DATE  : 10/02/2016
 """
 
-import os
 import sys
 import argparse
 
-from katelibs.plugin_bm import Plugin1850BM
 from katelibs.database  import *
 from django.db          import connection
 
