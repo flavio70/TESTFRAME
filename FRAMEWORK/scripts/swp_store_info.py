@@ -103,7 +103,7 @@ if __name__ == "__main__":
         sys.exit(10)
 
     if not check_product(args):
-        print("Invalid Product [{}]".format(args.swrel[0]))
+        print("Invalid Product [{}]".format(args.prod[0]))
         sys.exit(10)
 
     print(args)
