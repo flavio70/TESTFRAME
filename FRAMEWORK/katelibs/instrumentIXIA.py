@@ -43,7 +43,8 @@ class InstrumentIXIA(Equipment):
         self.__krepo                = kenv.krepo       # result report (Kunit class instance)
         self.__prs                  = kenv.kprs        # Presets for running environment
         # Bridge Connection
-        self.__ixNetworkServerAddress      = "135.221.116.175"  # ixnetwork server address v8.01
+        #self.__ixNetworkServerAddress      = "135.221.116.175"  # ixnetwork server address v8.01
+        self.__ixNetworkServerAddress      = "151.98.141.200"    # New ixnetwork server address v8.01 (since June 2016)
         self.__ixNetworkServerPort         = 8009             # ixnetwork server port
         self.__ixNetworkServerVersion      = '8.00'             # ixnetwork server port
         #Data model (DM) main hooks
@@ -354,7 +355,15 @@ class InstrumentIXIA(Equipment):
         methodLocalName = self.__lc_current_method_name(embedKrepoInit=True)
         self.__lc_msg("[{}] Start traffic and wait for {}sec".format(methodLocalName, timeToWait))
         self.__IXN.execute('generate', self.__globalTrafficItem)
+        #time.sleep(timeToWait)
+        #print("*************************************************************")   
+        #print("*************************************************************")   
+        #print("*************************************************************")   
         self.__IXN.execute('apply', self.__ROOT + '/traffic')
+        #time.sleep(timeToWait)
+        #print("*************************************************************")   
+        #print("*************************************************************")   
+        #print("*************************************************************")   
         self.__IXN.execute('start', self.__ROOT + '/traffic')
         self.__lc_msg("[{}] Traffic now started".format(methodLocalName))
         time.sleep(timeToWait)
