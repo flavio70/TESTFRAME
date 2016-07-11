@@ -79,6 +79,8 @@ def store_swp_info(args):
 
     cursor.execute(query)
 
+    print("SWP for [{}] and [{}] CORRECTLY STORED on Kate's DB".format(args.arch[0], args.labref[0]))
+
 
 if __name__ == "__main__":
 
@@ -107,3 +109,5 @@ if __name__ == "__main__":
     print(args)
 
     store_swp_info(args)
+
+    sys.exit(0)

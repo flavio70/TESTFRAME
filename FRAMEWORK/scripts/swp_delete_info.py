@@ -16,7 +16,7 @@ from django.db          import connection
 def delete_swp_info(args):
     cursor = connection.cursor()
 
-    query = "DELETE FROM T_PACKAGES WHERE author='{}' AND ts_build='{}'".format(args.author[0], args.tsbuild[0])
+    query = "DELETE FROM T_PACKAGES WHERE author='{}' AND ts_build='{}' AND label_ref='%s' AND arch='%s'".format(args.author[0], args.tsbuild[0], args.labref[0], args.arch[0])
 
     print(query)
     cursor.execute(query)
@@ -24,7 +24,11 @@ def delete_swp_info(args):
 
 if __name__ == "__main__":
 
+    l_arch = ['gccpp', 'gccwrp', 'gccli']
+
     parser = argparse.ArgumentParser()
+    parser.add_argument("--arch",    nargs=1, required=True, help="architecture", choices=l_arch)
+    parser.add_argument("--labref",  nargs=1, required=True, help="reference label")
     parser.add_argument("--author",  nargs=1, required=True, help="author")
     parser.add_argument("--tsbuild", nargs=1, required=True, help="build timestamp")
     args = parser.parse_args()
