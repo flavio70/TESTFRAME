@@ -121,7 +121,7 @@ if __name__ == "__main__":
 
     res,swp_id = get_swp_id(args)
     if not res:
-        print("Packege for [{}] and [{}] not found.".format(args.arch[0], args.labref[0]))
+        print("Package for [{}] and [{}] not found.".format(args.arch[0], args.labref[0]))
         sys.exit(10)
 
     update_swp_info(swp_id, args)
