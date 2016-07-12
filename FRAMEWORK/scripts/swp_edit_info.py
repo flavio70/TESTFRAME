@@ -86,7 +86,7 @@ def update_ts_valid(swp_id, timestamp):
     return (cursor.rowcount == 1)
 
 
-def update_ts_valid(swp_id, timestamp):
+def update_ts_final(swp_id, timestamp):
     cursor = connection.cursor()
     query = ' '.join( ( "UPDATE T_PACKAGES",
                         "  SET  ts_final='{}'".format(timestamp),
@@ -103,21 +103,33 @@ def update_swp_info(swp_id, args):
 
     if args.tsdevel is not None:
         if not update_ts_devel(swp_id, args.tsdevel[0]):
-            print("Invalid date")
+            print("Invalid date for Developers")
+
+    if args.tsvalid is not None:
+        if not update_ts_valid(swp_id, args.tsvalid[0]):
+            print("Invalid date for Validation")
+
+    if args.tsfinal is not None:
+        if not update_ts_final(swp_id, args.tsfinal[0]):
+            print("Invalid date for Customer")
+
 
 
 if __name__ == "__main__":
 
     l_arch = ['gccpp', 'gccwrp', 'gccli']
+    the_desc = """ Edit some SWP information for a specified Package.
+                   The package must be identified by Architeture and Label Reference
+               """
 
-    parser = argparse.ArgumentParser()
+    parser = argparse.ArgumentParser(description=the_desc)
     parser.add_argument("--arch",    nargs=1, required=True,  help="architecture", choices=l_arch)
-    parser.add_argument("--labref",  nargs=1, required=True,  help="reference label")
-    parser.add_argument("--labswp",  nargs=1, required=False, help="release label")
-    parser.add_argument("--tsdevel", nargs=1, required=False, help="release timestamp")
+    parser.add_argument("--labref",  nargs=1, required=True,  help="reference label (like V7.20.00-0499)")
+    parser.add_argument("--labswp",  nargs=1, required=False, help="release label (like FLV_ALC-TSS__BASE00.26.FD0499__VM)")
+    parser.add_argument("--tsdevel", nargs=1, required=False, help="release timestamp to Developers")
+    parser.add_argument("--tsvalid", nargs=1, required=False, help="release timestamp to Validation")
+    parser.add_argument("--tsfinal", nargs=1, required=False, help="release timestamp to Customer")
     args = parser.parse_args()
-
-    print(args)
 
     res,swp_id = get_swp_id(args)
     if not res:
