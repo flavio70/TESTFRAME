@@ -25,14 +25,15 @@ def delete_swp_info(args):
 if __name__ == "__main__":
 
     l_arch = ['gccpp', 'gccwrp', 'gccli']
+    the_desc = """ Delete a specified SWP from Kate DB.
+                   The package must be identified by Architeture, Label Reference, Author and Build Timestamp
+               """
 
-    parser = argparse.ArgumentParser()
+    parser = argparse.ArgumentParser(description=the_desc)
     parser.add_argument("--arch",    nargs=1, required=True, help="architecture", choices=l_arch)
-    parser.add_argument("--labref",  nargs=1, required=True, help="reference label")
+    parser.add_argument("--labref",  nargs=1, required=True, help="reference label (like V7.20.00-0499)")
     parser.add_argument("--author",  nargs=1, required=True, help="author")
     parser.add_argument("--tsbuild", nargs=1, required=True, help="build timestamp")
     args = parser.parse_args()
-
-    print(args)
 
     delete_swp_info(args)
