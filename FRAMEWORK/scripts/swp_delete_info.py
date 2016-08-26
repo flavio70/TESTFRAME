@@ -16,7 +16,7 @@ from django.db          import connection
 def delete_swp_info(args):
     cursor = connection.cursor()
 
-    query = "DELETE FROM T_PACKAGES WHERE author='{}' AND ts_build='{}' AND label_ref='%s' AND arch='%s'".format(args.author[0], args.tsbuild[0], args.labref[0], args.arch[0])
+    query = "DELETE FROM T_PACKAGES WHERE author='{}' AND ts_build='{}' AND label_ref='{}' AND arch='{}'".format(args.author[0], args.tsbuild[0], args.labref[0], args.arch[0])
 
     print(query)
     cursor.execute(query)

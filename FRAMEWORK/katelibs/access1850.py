@@ -53,6 +53,7 @@ class SER1850:
         """
         try:
             self.__write("\n")
+            num_retry = 0
             retry = 1
             while retry == 1:
                 res = self.ser_expect(self.__klLogin, 10)
@@ -66,6 +67,10 @@ class SER1850:
                     self.__write("alcatel")
                 elif res[0] == 4:
                     retry = 0
+                num_retry = num_retry + 1
+                if num_retry == 3:
+                    print("Error in serial connecting (TIMEOUT)")
+                    return False
         except Exception as eee:
             print("Error in serial connecting - " + str(eee))
             return False
