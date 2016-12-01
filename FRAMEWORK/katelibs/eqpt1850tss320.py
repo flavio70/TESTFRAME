@@ -12,6 +12,7 @@
 import os
 import time
 
+from katelibs.kexception    import KFrameException
 from katelibs.kenviron      import KEnvironment
 from katelibs.klogger       import Klogger1850
 from katelibs.equipment     import Equipment
@@ -48,6 +49,10 @@ class Eqpt1850TSS320(Equipment):
         self.__ser_con  = None          # main 1850 Serial Connection (i.e. FLC 1 console)
         self.__net      = {}            # IP address informations (from DB)
         self.__ser      = {}            # Serial(s) informations (from DB)
+        self.__flc_a    = None          # Slot number for FLC A
+        self.__flc_b    = None          # Slot number for FLC B
+        self.__slc_a    = None          # Slot number for SLC A
+        self.__slc_b    = None          # Slot number for SLC B
 
         self.id = self.__prs.get_id(label)
 
@@ -80,10 +85,36 @@ class Eqpt1850TSS320(Equipment):
         self.bm  = Plugin1850BM(    self.__net.get_ip_str(),
                                     eRef=self,
                                     krepo=self.__krepo,
-                                    ktrc=self.__kenv.ktrc)
+                                    ktrc=self.__kenv.ktrc,
+                                    slc_a=self.__slc_a,
+                                    slc_b=self.__slc_b)
 
         self.__serial_log = Klogger1850(self.__ser, kenv.path_logs(), kenv.get_test_file_name(), label)
 
+
+
+    def get_flc_slot_a(self):
+        """ Return slot number for FLC A
+        """
+        return self.__flc_a
+
+
+    def get_flc_slot_b(self):
+        """ Return slot number for FLC B
+        """
+        return self.__flc_b
+
+
+    def get_slc_slot_a(self):
+        """ Return slot number for SLC A
+        """
+        return self.__slc_a
+
+
+    def get_slc_slot_b(self):
+        """ Return slot number for SLC B
+        """
+        return self.__slc_b
 
 
     def clean_up(self):
@@ -142,6 +173,9 @@ class Eqpt1850TSS320(Equipment):
                 else:
                     self.__trc_dbg("Equipment IP configuration OK. Waiting for external reachability")
                     break
+
+            self.__trc_dbg("Configuring firewall in order to accept ping from anywhere")
+            self.__ser_con.send_cmd_simple("iptables -I INPUT  -p icmp --icmp-type any -j ACCEPT")
 
             for i in range(1, max_iterations+1):
                 if not self.__is_reachable_by_ip():
@@ -242,7 +276,8 @@ class Eqpt1850TSS320(Equipment):
         """ Check for DUAL FLC configuration.
             Force FLC 1 to be active
         """
-        pass
+        # TODO
+        return True
 
 
     def flc_wait_in_service(self):
@@ -389,11 +424,11 @@ class Eqpt1850TSS320(Equipment):
                 self.__trc_err("INSTALL ABORTED")
                 return False
 
-            if not self.slc_reboot(10):
+            if not self.slc_reboot(self.get_slc_slot_a()):
                 self.__trc_err("INSTALL ABORTED")
                 return False
 
-            if not self.slc_reboot(11):
+            if not self.slc_reboot(self.get_slc_slot_b()):
                 self.__trc_err("INSTALL ABORTED")
                 return False
 
@@ -449,7 +484,7 @@ class Eqpt1850TSS320(Equipment):
             cmd : a UNIX command
         """
         return self.__net_con.send_cmd_and_capture(cmd)
- 
+
 
     def __is_ongoing_to_address(self, dest_ip):
         """ INTERNAL USAGE """
@@ -480,6 +515,15 @@ class Eqpt1850TSS320(Equipment):
         return str(None),str(None),str(None)
 
 
+    def __set_slots(self, flc_a, flc_b, slc_a, slc_b):
+        """ INTERNAL USAGE
+        """
+        self.__flc_a = flc_a
+        self.__flc_b = flc_b
+        self.__slc_a = slc_a
+        self.__slc_b = slc_b
+
+
     def __get_eqpt_info_from_db(self):
         """ INTERNAL USAGE """
         self.__trc_inf("CONFIGURATION EQUIPMENT ID := {}".format(self.id))
@@ -488,24 +532,43 @@ class Eqpt1850TSS320(Equipment):
         e_type_id = TEquipment.objects.get(id_equipment=self.id).t_equip_type_id_type.id_type
         e_type    = TEquipment.objects.get(id_equipment=self.id).t_equip_type_id_type.name
 
-        e_ip,e_nm,e_gw  = self.__get_net_info()
+        if self.get_preset("TYPE") == e_type:
+            self.set_type(e_type)
+        else:
+            raise KFrameException("ERROR: Equipment Type {} inconsistency (DB vs Preset).".format(e_type))
 
         if   e_type_id == 1  or  e_type_id == 3:
+            self.__set_slots(flc_a=1, flc_b=20, slc_a=10, slc_b=11)
             self.__arch = "STD"
             eth_adapter = "eth1"
         elif e_type_id == 4  or  e_type_id == 5:
+            self.__set_slots(flc_a=1, flc_b=20, slc_a=10, slc_b=11)
             self.__arch = "ENH"
             eth_adapter = "dbg"
-        else:
+        elif e_type_id == 11:
+            self.__set_slots(flc_a=73, flc_b=75, slc_a=71, slc_b=72)
+            self.__arch = "320T"
+            eth_adapter = "oamp"
+        elif e_type_id == 15:
+            self.__set_slots(flc_a=1, flc_b=20, slc_a=10, slc_b=11)
             self.__arch = "SIM"
             eth_adapter = "q"
+        elif e_type_id == 16:
+            self.__set_slots(flc_a=73, flc_b=75, slc_a=71, slc_b=72)
+            self.__arch = "SIMT"
+            eth_adapter = "q"
+        else:
+            raise KFrameException("ERROR: Equipment Type {} not managed.".format(e_type))
+
+
+        e_ip,e_nm,e_gw  = self.__get_net_info()
 
         the_ip  = IP(e_ip)
         the_nm  = IP(e_nm)
         the_gw  = IP(e_gw)
 
         self.__trc_inf("  Name   : {:s}".format(e_name))
-        self.__trc_inf("  Type   : {:s}".format(e_type))
+        self.__trc_inf("  Type   : {:s}".format(self.get_type()))
         self.__trc_inf("  Net    : {:s} {:s} {:s} {:s} {:s}".format(eth_adapter,
                                                                     the_ip.get_val(),
                                                                     the_nm.get_val(),
