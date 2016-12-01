@@ -3121,7 +3121,7 @@ class InstrumentONT(Equipment):
         localCommand="{}?".format(ONTCmdString)
         rawCallResult = self.__send_port_cmd(portId, localCommand)
         sdhAnswer = self.__remove_dust(rawCallResult[1])
-        if sdhAnswer != burstErroredFramesNumberRequired:
+        if int(sdhAnswer) != burstErroredFramesNumberRequired:
             localMessage="Set the number of errored burst frames: required [{}] but set [{}]".format(burstErroredFramesNumberRequired,sdhAnswer)
             self.__lc_msg(localMessage)
             self.__method_failure(methodLocalName, None, "", localMessage)
@@ -3173,7 +3173,7 @@ class InstrumentONT(Equipment):
         localCommand="{}?".format(ONTCmdString)
         rawCallResult = self.__send_port_cmd(portId, localCommand)
         sdhAnswer = self.__remove_dust(rawCallResult[1])
-        if sdhAnswer != burstNotErroredFramesNumberRequired:
+        if int(sdhAnswer) != burstNotErroredFramesNumberRequired:
             localMessage="Set the number of not errored burst frames: required [{}] but set [{}]".format(burstNotErroredFramesNumberRequired,sdhAnswer)
             self.__lc_msg(localMessage)
             self.__method_failure(methodLocalName, None, "", localMessage)
