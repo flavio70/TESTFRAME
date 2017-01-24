@@ -891,6 +891,8 @@ class TL1message():
                     response_type = "RTRV_POS_AND_NAME"
                 elif self.__m_plain.find("RTRV-ALM-VC") != -1:
                     response_type = "RTRV_COND"
+                elif self.__m_plain.find("RTRV-FFP-STM") != -1:
+                    response_type = "ASAP_PROF"
                 else:
                     response_type = "STD"
                 self.__m_event = False
