@@ -667,15 +667,20 @@ class TL1message():
                 if self.__m_coded['R_STATUS'] == "COMPLD":
                     words = stripped_line.replace('"', '').split(':')
                     the_aid = words[0]
-
                     row = {}
                     positional = 1
                     attr_val_list = {}
                     for elem in words[1].split(','):
                         attr_val_list[ positional ] = elem
                         positional = positional + 1
-                    row[ the_aid ] = {'VALUE' : attr_val_list}
-                    self.__m_coded['R_BODY_OK'].update(row)
+
+                    if the_aid in self.__m_coded['R_BODY_OK'].keys():
+                        #aid already present in the R_BODY_OK dict structure
+                        self.__m_coded['R_BODY_OK'][the_aid].append({'VALUE' : attr_val_list})
+                    else:
+                        #aid is not present in the R_BODY_OK dict structure
+                        row[ the_aid ] = {'VALUE' : attr_val_list}
+                        self.__m_coded['R_BODY_OK'].update(row)
                 elif self.__m_coded['R_STATUS'] == "DENY":
                     if len(stripped_line) == 4:
                         self.__m_coded['R_ERROR'] = stripped_line
@@ -889,7 +894,7 @@ class TL1message():
                     response_type = "RTRV_POS_AND_NAME"
                 elif self.__m_plain.find("RTRV-CRS") != -1:
                     response_type = "RTRV_POS_AND_NAME"
-                elif self.__m_plain.find("RTRV-ALM-VC") != -1:
+                elif self.__m_plain.find("RTRV-ALM") != -1:
                     response_type = "RTRV_COND"
                 elif self.__m_plain.find("RTRV-FFP-STM") != -1:
                     response_type = "ASAP_PROF"
