@@ -679,7 +679,8 @@ class TL1message():
                         self.__m_coded['R_BODY_OK'][the_aid].append({'VALUE' : attr_val_list})
                     else:
                         #aid is not present in the R_BODY_OK dict structure
-                        row[ the_aid ] = {'VALUE' : attr_val_list}
+                        row[ the_aid ]=[]
+                        row[ the_aid ].append({'VALUE' : attr_val_list})
                         self.__m_coded['R_BODY_OK'].update(row)
                 elif self.__m_coded['R_STATUS'] == "DENY":
                     if len(stripped_line) == 4:
