@@ -419,7 +419,7 @@ class TL1message():
                 if self.__m_coded['R_STATUS'] == "COMPLD":
                     words = stripped_line.replace('"', '').split(':')
                     row = {}
-
+                    the_aid = words[0]
                     attr_val_list = {}
                     if words[2] != "":
                         for elem in words[2].split(','):
@@ -431,9 +431,17 @@ class TL1message():
                     else:
                         my_pst_list = words[3].split('&')
                         my_sst_list = ""
-                    row[ words[0] ] = {'VALUE' : attr_val_list, 'PST' : my_pst_list, 'SST' : my_sst_list}
-
-                    self.__m_coded['R_BODY_OK'].update(row)
+                        
+                        
+                    if the_aid in self.__m_coded['R_BODY_OK'].keys():
+                        #aid already present in the R_BODY_OK dict structure
+                        self.__m_coded['R_BODY_OK'][the_aid].append({'VALUE' : attr_val_list, 'PST' : my_pst_list, 'SST' : my_sst_list})
+                    else:
+                        #aid is not present in the R_BODY_OK dict structure
+                        row[ the_aid ]=[]
+                        row[ the_aid ].append({'VALUE' : attr_val_list, 'PST' : my_pst_list, 'SST' : my_sst_list})
+                        self.__m_coded['R_BODY_OK'].update(row)         
+                        
                 elif self.__m_coded['R_STATUS'] == "DENY":
                     if len(stripped_line) == 4:
                         self.__m_coded['R_ERROR'] = stripped_line
@@ -506,9 +514,19 @@ class TL1message():
                 if self.__m_coded['R_STATUS'] == "COMPLD":
                     words = stripped_line.replace('"', '').split(':')
                     row = {}
-                    row[ words[0] ] = {}
-
-                    self.__m_coded['R_BODY_OK'].update(row)
+                    the_aid=words[0]
+                    #row[ words[0] ] = {}
+                    
+                                          
+                    if the_aid in self.__m_coded['R_BODY_OK'].keys():
+                        #aid already present in the R_BODY_OK dict structure
+                        self.__m_coded['R_BODY_OK'][the_aid].append({})
+                    else:
+                        #aid is not present in the R_BODY_OK dict structure
+                        row[ the_aid ]=[]
+                        row[ the_aid ].append({})
+                        self.__m_coded['R_BODY_OK'].update(row)         
+              
                 elif self.__m_coded['R_STATUS'] == "DENY":
                     if len(stripped_line) == 4:
                         self.__m_coded['R_ERROR'] = stripped_line
@@ -586,16 +604,36 @@ class TL1message():
                         attr_val_list = {}
                         for elem in words[2].split(','):
                             attr_val_list[elem.split('=')[0]] = elem.split('=')[1]
-                        row[ words[0] ] = {'VALUE' : attr_val_list}
+                            
+                                                
+                        if words[0] in self.__m_coded['R_BODY_OK'].keys():
+                            #aid already present in the R_BODY_OK dict structure
+                            self.__m_coded['R_BODY_OK'][words[0]].append({'VALUE' : attr_val_list})
+                        else:
+                            #aid is not present in the R_BODY_OK dict structure
+                            row[ words[0] ]=[]
+                            row[ words[0] ].append({'VALUE' : attr_val_list})
+                            self.__m_coded['R_BODY_OK'].update(row)                                    
                     else:
                         positional = 1
                         attr_val_list = {}
                         for elem in words[2].split(','):
                             attr_val_list[ positional ] = elem
                             positional = positional + 1
-                        row[ str(pseudo_aid) ] = {'VALUE' : attr_val_list}
+  
+  
+                                              
+                        if pseudo_aid in self.__m_coded['R_BODY_OK'].keys():
+                            #aid already present in the R_BODY_OK dict structure
+                            self.__m_coded['R_BODY_OK'][pseudo_aid].append({'VALUE' : attr_val_list})
+                        else:
+                            #aid is not present in the R_BODY_OK dict structure
+                            row[ pseudo_aid ]=[]
+                            row[ pseudo_aid ].append({'VALUE' : attr_val_list})
+                            self.__m_coded['R_BODY_OK'].update(row)
+
                         pseudo_aid = pseudo_aid + 1
-                    self.__m_coded['R_BODY_OK'].update(row)
+                        
                 elif self.__m_coded['R_STATUS'] == "DENY":
                     if len(stripped_line) == 4:
                         self.__m_coded['R_ERROR'] = stripped_line
@@ -765,8 +803,15 @@ class TL1message():
                     if words[2] != "":
                         for elem in words[2].split(','):
                             attr_val_list[elem.split('=')[0]] = elem.split('=')[1]
-
-                    row[ words[0] ] = {'VALUE' : attr_val_list}
+                                           
+                        if words[0] in self.__m_coded['R_BODY_OK'].keys():
+                            #aid already present in the R_BODY_OK dict structure
+                            self.__m_coded['R_BODY_OK'][words[0]].append({'VALUE' : attr_val_list})
+                        else:
+                            #aid is not present in the R_BODY_OK dict structure
+                            row[ words[0] ]=[]
+                            row[ words[0] ].append({'VALUE' : attr_val_list})
+                            self.__m_coded['R_BODY_OK'].update(row)
 
                     self.__m_coded['R_BODY_OK'].update(row)
                 elif self.__m_coded['R_STATUS'] == "DENY":
@@ -847,9 +892,21 @@ class TL1message():
                         for elem in words[2].split(','):
                             attr_val_list[elem.split('=')[0]] = elem.split('=')[1]
 
-                    row[ words[0] ] = {'VALUE' : attr_val_list }
 
-                    self.__m_coded['R_BODY_OK'].update(row)
+                        if words[0] in self.__m_coded['R_BODY_OK'].keys():
+                            #aid already present in the R_BODY_OK dict structure
+                            self.__m_coded['R_BODY_OK'][words[0]].append({'VALUE' : attr_val_list})
+                        else:
+                            #aid is not present in the R_BODY_OK dict structure
+                            row[ words[0] ]=[]
+                            row[ words[0] ].append({'VALUE' : attr_val_list})
+                            self.__m_coded['R_BODY_OK'].update(row)
+
+
+
+                    #row[ words[0] ] = {'VALUE' : attr_val_list }
+
+                    #self.__m_coded['R_BODY_OK'].update(row)
                 elif self.__m_coded['R_STATUS'] == "DENY":
                     if len(stripped_line) == 4:
                         self.__m_coded['R_ERROR'] = stripped_line
@@ -1010,12 +1067,19 @@ class TL1message():
         if self.get_cmd_status() != (True, "COMPLD"):
             return None
 
-        the_elem = self.__m_coded['R_BODY_OK'].get(aid)
-        if the_elem is None:
+        if aid not in self.__m_coded['R_BODY_OK'].keys():
+            #aid not present in the Body result
+            return None
+   
+        the_elem_list = self.__m_coded['R_BODY_OK'][aid]
+        if not the_elem_list:
+            #the list is empty
             return None
 
         try:
-            return the_elem['PST']
+            res=[]
+            for elem in the_elem_list:res.append(elem['PST'])
+            return res
         except Exception as eee:
             return None
 
@@ -1030,12 +1094,19 @@ class TL1message():
         if self.get_cmd_status() != (True, "COMPLD"):
             return None
 
-        the_elem = self.__m_coded['R_BODY_OK'].get(aid)
-        if the_elem is None:
+        if aid not in self.__m_coded['R_BODY_OK'].keys():
+            #aid not present in the Body results
+            return None
+  
+        the_elem_list = self.__m_coded['R_BODY_OK'][aid]
+        if not the_elem_list:
+            #the list is empty
             return None
 
         try:
-            return the_elem['SST']
+            res=[]
+            for elem in the_elem_list:res.append(elem['SST'])
+            return res
         except Exception as eee:
             return None
 
@@ -1063,17 +1134,35 @@ class TL1message():
 
         if self.get_cmd_status() != (True, "COMPLD"):
             return None
-
+            
+        if aid not in self.__m_coded['R_BODY_OK'].keys():
+            #aid not present in the Body result
+            return None
+	    	 
         if aid.find('*') == -1:
+            the_elem_list = self.__m_coded['R_BODY_OK'][aid]
+	    if not the_elem_list:
+                #the list is empty
+                return None      
             try:
-                return self.__m_coded['R_BODY_OK'].get(aid)['VALUE'][attr]
+                res=[]
+                for elem in the_elem_list:res.append(elem['VALUE'][attr])
+                return res
+                #return self.__m_coded['R_BODY_OK'].get(aid)['VALUE'][attr]
             except Exception as eee:
                 return None
         else:
             try:
                 for the_key,the_val in self.__m_coded['R_BODY_OK'].items():
                     if re.search(aid, the_key):
-                        return the_val['VALUE'][attr]
+                        #the_val is the item list to be processed
+                        if not the_elem_list:
+                            #the list is empty
+                            return None
+                        res=[]
+                        for elem in the_val:res.append(elem['VALUE'][attr])
+                        return res
+                        #return the_val['VALUE'][attr]
                     else:
                         return None
             except Exception as eee:
@@ -1094,8 +1183,20 @@ class TL1message():
         if self.get_cmd_status() != (True, "COMPLD"):
             return None
 
-        try:
-            return self.__m_coded['R_BODY_OK'].get(aid)['VALUE']
+        if aid not in self.__m_coded['R_BODY_OK'].keys():
+            #aid not present in the Body result
+            return None
+
+
+        the_elem_list = self.__m_coded['R_BODY_OK'][aid]
+        if not the_elem_list:
+            #the list is empty
+            return None
+        try:        
+            res=[]
+            for elem in the_elem_list:res.append(elem['VALUE'])
+            return res
+        
         except Exception as eee:
             return None
 
