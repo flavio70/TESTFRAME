@@ -1138,10 +1138,10 @@ class TL1message():
         if aid not in self.__m_coded['R_BODY_OK'].keys():
             #aid not present in the Body result
             return None
-	    	 
+
         if aid.find('*') == -1:
             the_elem_list = self.__m_coded['R_BODY_OK'][aid]
-	    if not the_elem_list:
+            if not the_elem_list:
                 #the list is empty
                 return None      
             try:
