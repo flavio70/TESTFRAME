@@ -288,7 +288,6 @@ class TL1message():
                 'C_TIME'    : timestamp (time)
                 'C_CODE'    : 'M' / '*C' / '**' / '*' / 'A' / 'I'
                 'C_TAG'     : the message TAG
-                'R_TYPE'    : the message response type 'STD'|'RTRV-COND'|....
             - only for Commands Response:
                 'R_STATUS'  : COMPLD / DELAY / DENY / PRTL / RTRV
                 'R_BODY_OK' : Body Section(Only for successfull command response)
@@ -308,7 +307,7 @@ class TL1message():
         self.__m_plain = tl1_msg    # Plain ascii TL1 Message Response
         self.__m_coded = None       # Coded Tl1 Message Response (dictionary)
         self.__m_event = None       # True is the message is a Spontaneous Message
-        self.__m_type = None        # Response type coding 'STD'|RTRV-COND...
+        self.__m_type = None        # Response type code used for parsing different output scenarious: 'STD'|RTRV-COND...
 
         if tl1_msg is not None  and  tl1_msg != "":
             self.__encode()
