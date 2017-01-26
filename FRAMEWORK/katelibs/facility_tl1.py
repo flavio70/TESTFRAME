@@ -158,21 +158,25 @@ class TL1check():
 
                 match_list = []
 
-                match_pst = self.__evaluate_pst(msg.get_cmd_pst(the_aid), rule=pst)
-                match_sst = self.__evaluate_sst(msg.get_cmd_sst(the_aid), rule=sst)
+                match_pst = self.__evaluate_pst(msg.get_cmd_pst(the_aid)[0], rule=pst)
+                match_sst = self.__evaluate_sst(msg.get_cmd_sst(the_aid)[0], rule=sst)
+                #the assumption is that we find pst and sst fields only to the first element list
+                #because in case of presence of pst and sst the message is made by only one element list
 
                 if match_pst[0] and match_sst[0]:
 
                     #print("messaggio := {}".format(msg.get_cmd_attr_values(the_aid)))
                     #print(" da filtr := {}".format(self.__fld_l))
-
-                    for the_attr,the_val in msg.get_cmd_attr_values(the_aid).items():
-
-                        match_attr_val = self.__evaluate_attr_val(the_attr, the_val, rule=fld)
-                        print("<{},{}> : {}".format(the_attr,the_val, match_attr_val))
-
-                        if match_attr_val[0]:
-                            match_list.append(match_attr_val[1])
+                    
+                    zq_aid_list = msg.get_cmd_attr_values(the_aid)
+                    for zq_i in range(len(zq_aid_list)):
+                        for the_attr,the_val in zq_aid_list[zq_i].items():
+    
+                            match_attr_val = self.__evaluate_attr_val(the_attr, the_val, rule=fld)
+                            print("<{},{}> : {}".format(the_attr,the_val, match_attr_val))
+    
+                            if match_attr_val[0]:
+                                match_list.append(match_attr_val[1])
 
                     if match_pst[1] != {}:
                         match_list.append(match_pst[1])
@@ -284,6 +288,7 @@ class TL1message():
                 'C_TIME'    : timestamp (time)
                 'C_CODE'    : 'M' / '*C' / '**' / '*' / 'A' / 'I'
                 'C_TAG'     : the message TAG
+                'R_TYPE'    : the message response type 'STD'|'RTRV-COND'|....
             - only for Commands Response:
                 'R_STATUS'  : COMPLD / DELAY / DENY / PRTL / RTRV
                 'R_BODY_OK' : Body Section(Only for successfull command response)
@@ -303,6 +308,7 @@ class TL1message():
         self.__m_plain = tl1_msg    # Plain ascii TL1 Message Response
         self.__m_coded = None       # Coded Tl1 Message Response (dictionary)
         self.__m_event = None       # True is the message is a Spontaneous Message
+        self.__m_type = None        # Response type coding 'STD'|RTRV-COND...
 
         if tl1_msg is not None  and  tl1_msg != "":
             self.__encode()
@@ -942,22 +948,31 @@ class TL1message():
             if marker == "M":
                 if   self.__m_plain.find("RTRV-ASAP-PROF") != -1:
                     response_type = "ASAP_PROF"
+                    self.__m_type = "ASAP_PROF"
                 elif self.__m_plain.find("RTRV-COND") != -1:
                     response_type = "RTRV_COND"
+                    self.__m_type = "RTRV-COND"
                 elif self.__m_plain.find("ENT-CRS") != -1:
                     response_type = "ENT_CRS"
+                    self.__m_type = "ENT_CRS"
                 elif self.__m_plain.find("RTRV-LOPOOL") != -1:
                     response_type = "RTRV_LOPOOL"
+                    self.__m_type = "RTRV_LOPOOL"
                 elif self.__m_plain.find("RTRV-PM") != -1:
                     response_type = "RTRV_POS_AND_NAME"
+                    self.__m_type = "RTRV_POS_AND_NAME"
                 elif self.__m_plain.find("RTRV-CRS") != -1:
                     response_type = "RTRV_POS_AND_NAME"
+                    self.__m_type = "RTRV_POS_AND_NAME"
                 elif self.__m_plain.find("RTRV-ALM") != -1:
                     response_type = "RTRV_COND"
+                    self.__m_type = "RTRV_COND"
                 elif self.__m_plain.find("RTRV-FFP-STM") != -1:
                     response_type = "ASAP_PROF"
+                    self.__m_type = "ASAP_PROF"
                 else:
                     response_type = "STD"
+                    self.__m_type = "STD"
                 self.__m_event = False
                 break
 
@@ -1141,7 +1156,7 @@ class TL1message():
 	    	 
         if aid.find('*') == -1:
             the_elem_list = self.__m_coded['R_BODY_OK'][aid]
-	    if not the_elem_list:
+            if not the_elem_list:
                 #the list is empty
                 return None      
             try:
@@ -1234,6 +1249,10 @@ class TL1message():
 
 
 
+    def get_msg_type(self):
+        """ Get Message type
+        """
+        return self.__m_type
 
 if __name__ == "__main__":
     print("DEBUG")
