@@ -87,6 +87,9 @@ class InstrumentONT(Equipment):
         # Unique 5xx sessionName generation bound to start date&time (UTC)  Comment next row if a single static name needed
         #self.__sessionName          = "Session__" + datetime.datetime.utcnow().strftime("%d%b_%H%M%S") + "__UTC"
 
+    def __str__(self):
+        return '%s IP address: %s'%(self.__ontType,self.__ontIpAddress)
+
 
 
     def clean_up(self):
