@@ -420,6 +420,197 @@ class InstrumentONT(Equipment):
         localMessage="[{}]: init_instrument: instrument correctly initialized".format(self.__ontType)
         self.__lc_msg(localMessage)
         return True, localMessage
+    
+    #def init_instrument(self, localUser, localPwd, localOntIpAddress, portId):
+    def init_instrument_withoutUnload(self, portId):
+        """
+            INITALIZES THE ONT INSTRUMENT TO GET READY TO ACCEPT USER (Library) COMMANDS
+            after this inizialization the user can start to send commands to 
+            the ONT (5xx/6xx) instrument
+            portId user's naming convention: P1, P2,...
+        """
+        # portId = self.__recover_port_to_use(portId)
+
+        localPortId = self.__prs.get_elem(self.get_label(), portId)
+        self.__labelToPortId[portId]=localPortId
+        localMethodName = inspect.stack()[0][3]   # init_instrument
+        callResult = self.connect()
+        if self.__check_method_execution("connect") == False: 
+            localMessage="Error in method [{}] call \n".format(localMethodName)
+            self.__lc_msg(localMessage)
+            return False, "Error in method "+ localMethodName +" call "
+            self.__lc_msg("Step 1 ++++++++++++++++++++++++++")
+
+        # Check declared and found instrument type
+        self.init_ont_type()  # init ONT TYPE asking it witn *IDN? cmd
+        localMessage="Instrument type answer: [{}] (*** connect moved outside ***)".format(self.__ontType)
+        self.__lc_msg(localMessage)
+
+        
+        if self.__ontType  == "6xx":   # ONT-6xx Init
+            localUser = self.__ontUser  
+            localPwd = self.__ontPassword 
+            localOntIpAddress = self.__ontIpAddress
+            myApplication="New-Application"
+
+            # 6xx init
+            #tester = InstrumentONT(localUser,localPwd,localOntIpAddress, krepo=r)
+            #callResult = self.connect() # moved outside if case
+            #if self.__check_method_execution("connect") == False: 
+            #    localMessage="Error in method [{}] call \n".format(localMethodName)
+            #    self.__lc_msg(localMessage)
+            #    return False, "Error in method "+ localMethodName +" call "
+            #self.__lc_msg("Step 1 ++++++++++++++++++++++++++")
+
+            callResult = self.open_port_channel(portId)
+            if self.__check_method_execution("open_port_channel") == False: 
+                localMessage="Error in method [{}] call \n".format(localMethodName)
+                self.__lc_msg(localMessage)
+                return False, "Error in method "+ localMethodName +" call "
+            self.__lc_msg("Step 2 ++++++++++++++++++++++++++")
+
+           
+            #declaredOntType = self.__ontType
+            #callResult = self.get_instrument_id()
+            #if self.__check_method_execution("get_instrument_id") == False: 
+            #    localMessage="Error in method [{}] call \n".format(localMethodName)
+            #    self.__lc_msg(localMessage)
+            #    return False, "Error in method "+ localMethodName +" call "
+            #self.__lc_msg("Step 3 ++++++++++++++++++++++++++")
+            #if declaredOntType == self.__ontType: 
+            #    localMessage="Instrument declared [{}] and found [{}] consistency verified".format(declaredOntType, self.__ontType)
+            #    self.__lc_msg(localMessage)
+            #else:
+            #    localMessage="Instrument declared [{}] but not found [{}] please verify DB data for id [{}]".format(declaredOntType, self.__ontType)
+            #    self.__lc_msg(localMessage)
+            #    return False, localMessage
+
+            callResult = self.get_currently_loaded_app(portId)
+            print("===> get_currently_loaded_app", callResult)
+            currentLoadedApp = callResult[1]
+            if (currentLoadedApp == myApplication):
+                print (" ===> already loaded: go on")
+            else:
+                if (currentLoadedApp != "" ):
+                    # Unload Application to clean wrong situations...
+                    callResult = self.unload_app(portId, myApplication)
+                    time.sleep(10)
+                
+                #callResult = self.get_currently_loaded_app(portId)
+                callResult = self.load_app(portId, myApplication)
+                if self.__check_method_execution("load_app") == False: 
+                    localMessage="Error in method [{}] call \n".format(localMethodName) 
+                    self.__lc_msg(localMessage)
+                    return False, "Error in method "+ localMethodName +" call "
+                time.sleep(20)
+                self.__lc_msg("Step 4 ++++++++++++++++++++++++++")
+                callResult = self.set_current_signal_structure(portId,"PHYS_SDH")  
+                if self.__check_method_execution("set_current_signal_structure") == False: 
+                    localMessage="Error in method [{}] call \n".format(localMethodName) 
+                    self.__lc_msg(localMessage)
+                    return False, "Error in method "+ localMethodName +" call "
+    
+                self.__lc_msg("Step 5 ++++++++++++++++++++++++++")
+        else:                         # ONT-5xx Init
+            # 5xx init
+            myApplication="SdhBert"
+            #tester = InstrumentONT(localUser,localPwd, krepo=r)
+            
+            #callResult = self.connect()   # moved outside if case
+            #if self.__check_method_execution("connect") == False: 
+            #    localMessage="Error in method [{}] call \n".format(localMethodName)
+            #    self.__lc_msg(localMessage)
+            #    return False, "Error in method "+ localMethodName +" call "
+            #self.__lc_msg("Step 1 ++++++++++++++++++++++++++")
+           
+            callResult = self.create_session(self.__sessionName)
+            if self.__check_method_execution("create_session") == False: 
+                localMessage="Error in method [{}] call \n".format(localMethodName)
+                self.__lc_msg(localMessage)
+                return False, "Error in method "+ localMethodName +" call "
+
+            self.__lc_msg("Step 2 ++++++++++++++++++++++++++")
+
+            callResult = self.select_port(portId)
+            if self.__check_method_execution("select_port") == False: 
+                callResult = self.deselect_port(portId)    # uncomment to deselect the specified port
+                localMessage="Error in method [{}] call \n".format(localMethodName)
+                self.__lc_msg(localMessage)
+                return False, "Error in method "+ localMethodName +" call "
+
+            self.__lc_msg("Step 3 ++++++++++++++++++++++++++")
+            
+            callResult = self.get_selected_ports("")
+            if self.__check_method_execution("get_selected_ports") == False: 
+                localMessage="Error in method [{}] call \n".format(localMethodName)
+                self.__lc_msg(localMessage)
+                return False, "Error in method "+ localMethodName +" call "
+                
+            self.__lc_msg("Step 4 ++++++++++++++++++++++++++")
+
+            # Check declared and found instrument type
+            #declaredOntType = self.__ontType
+            
+            #callResult = self.get_instrument_id()
+            #if self.__check_method_execution("get_instrument_id") == False: 
+            #    localMessage="Error in method [{}] call \n".format(localMethodName)
+            #    self.__lc_msg(localMessage)
+            #    return False, "Error in method "+ localMethodName +" call "
+            
+            #self.__lc_msg("Step 5 ++++++++++++++++++++++++++")
+            
+            #if declaredOntType == self.__ontType: 
+            #    localMessage="Instrument declared [{}] and found [{}] consistency verified".format(declaredOntType, self.__ontType)
+            #    self.__lc_msg(localMessage)
+            #else:
+            #    localMessage="Instrument declared [{}] but found [{}] please verify DB data for id [{}]".format(declaredOntType, self.__ontType)
+            #    self.__lc_msg(localMessage)
+            #    return False, localMessage
+            
+            self.__lc_msg("Step 6 ++++++++++++++++++++++++++")
+            
+            callResult = self.init_port_to_socket_map()
+            if self.__check_method_execution("init_port_to_socket_map") == False: 
+                localMessage="Error in method [{}] call \n".format(localMethodName)
+                self.__lc_msg(localMessage)
+                return False, "Error in method "+ localMethodName +" call "
+            
+            self.__lc_msg("Step 7 ++++++++++++++++++++++++++")
+            
+            callResult = self.open_port_channel(portId)
+            if self.__check_method_execution("open_port_channel") == False: 
+                localMessage="Error in method [{}] call \n".format(localMethodName)
+                self.__lc_msg(localMessage)
+                return False, "Error in method "+ localMethodName +" call "
+            
+            self.__lc_msg("Step 8 ++++++++++++++++++++++++++")
+            
+            #callResult = self.get_currently_loaded_app(portId)
+            #if self.__check_method_execution("get_currently_loaded_app") == False: 
+            #    print("Error in method [{}] call \n".format(localMethodName))
+            #    return False, "Error in method "+ localMethodName +" call "
+            
+            self.__lc_msg("Step 9 ++++++++++++++++++++++++++")
+            
+            callResult = self.unload_app(portId, myApplication)
+            time.sleep(10)
+            
+            self.__lc_msg("Step 10 ++++++++++++++++++++++++++")
+            
+            callResult = self.load_app(portId, myApplication)
+            if self.__check_method_execution("load_app") == False: 
+                localMessage="Error in method [{}] call \n".format(localMethodName) 
+                self.__lc_msg(localMessage)
+                return False, "Error in method "+ localMethodName +" call "
+            
+            
+        localMessage=" ####  #### Current callMethodStatus content:  [ {} ] ####".format(self.__calledMethodStatus)
+        self.__lc_msg(localMessage)
+            
+        localMessage="[{}]: init_instrument: instrument correctly initialized".format(self.__ontType)
+        self.__lc_msg(localMessage)
+        return True, localMessage
+    
 
 
 
