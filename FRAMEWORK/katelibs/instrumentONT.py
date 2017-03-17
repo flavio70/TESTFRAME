@@ -1437,15 +1437,16 @@ class InstrumentONT(Equipment):
             self.__lc_msg(localMessage)
             return False, localMessage
 
-        if self.__ontType  == "6xx":
-            # port-level authentication is a need ONLY for ONT-6xx
-            # to allow the port to accept further commands
-            localMessage = "[{}]: port authentication in progress".format(self.__ontType)
-            self.__lc_msg(localMessage)
-            self.__authenticate_user_on_6xx_port(portId)
-            response = self.__send_port_cmd(portId,"*PROMPT ON")
-            localMessage = "Port [{}] connection established via [{}][{}] socket".format(portId,self.__ontIpAddress, tcpPortNumber)
-            self.__lc_msg(localMessage)
+        print ("===> Port autentication removed go on...")
+#         if self.__ontType  == "6xx":
+#             # port-level authentication is a need ONLY for ONT-6xx
+#             # to allow the port to accept further commands
+#             localMessage = "[{}]: port authentication in progress".format(self.__ontType)
+#             self.__lc_msg(localMessage)
+#             #self.__authenticate_user_on_6xx_port(portId)
+#             response = self.__send_port_cmd(portId,"*PROMPT ON")
+#             localMessage = "Port [{}] connection established via [{}][{}] socket".format(portId,self.__ontIpAddress, tcpPortNumber)
+#             self.__lc_msg(localMessage)
         return True, localMessage
 
 
