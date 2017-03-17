@@ -453,15 +453,7 @@ class InstrumentONT(Equipment):
             localOntIpAddress = self.__ontIpAddress
             myApplication="New-Application"
 
-            # 6xx init
-            #tester = InstrumentONT(localUser,localPwd,localOntIpAddress, krepo=r)
-            #callResult = self.connect() # moved outside if case
-            #if self.__check_method_execution("connect") == False: 
-            #    localMessage="Error in method [{}] call \n".format(localMethodName)
-            #    self.__lc_msg(localMessage)
-            #    return False, "Error in method "+ localMethodName +" call "
-            #self.__lc_msg("Step 1 ++++++++++++++++++++++++++")
-
+            
             callResult = self.open_port_channel(portId)
             if self.__check_method_execution("open_port_channel") == False: 
                 localMessage="Error in method [{}] call \n".format(localMethodName)
@@ -470,26 +462,12 @@ class InstrumentONT(Equipment):
             self.__lc_msg("Step 2 ++++++++++++++++++++++++++")
 
            
-            #declaredOntType = self.__ontType
-            #callResult = self.get_instrument_id()
-            #if self.__check_method_execution("get_instrument_id") == False: 
-            #    localMessage="Error in method [{}] call \n".format(localMethodName)
-            #    self.__lc_msg(localMessage)
-            #    return False, "Error in method "+ localMethodName +" call "
-            #self.__lc_msg("Step 3 ++++++++++++++++++++++++++")
-            #if declaredOntType == self.__ontType: 
-            #    localMessage="Instrument declared [{}] and found [{}] consistency verified".format(declaredOntType, self.__ontType)
-            #    self.__lc_msg(localMessage)
-            #else:
-            #    localMessage="Instrument declared [{}] but not found [{}] please verify DB data for id [{}]".format(declaredOntType, self.__ontType)
-            #    self.__lc_msg(localMessage)
-            #    return False, localMessage
-
+            # Add this test to avoid to unload the app if present
             callResult = self.get_currently_loaded_app(portId)
             print("===> get_currently_loaded_app", callResult)
             currentLoadedApp = callResult[1]
             if (currentLoadedApp == myApplication):
-                print (" ===> already loaded: go on")
+                print ("===> already loaded: go on")
             else:
                 if (currentLoadedApp != "" ):
                     # Unload Application to clean wrong situations...
@@ -591,17 +569,26 @@ class InstrumentONT(Equipment):
             #    return False, "Error in method "+ localMethodName +" call "
             
             self.__lc_msg("Step 9 ++++++++++++++++++++++++++")
+
+            # Add this test to avoid to unload the app if present
+            callResult = self.get_currently_loaded_app(portId)
+            print("===> get_currently_loaded_app", callResult)
+            currentLoadedApp = callResult[1]
+            if (currentLoadedApp == myApplication):
+                print ("===> already loaded: go on")
+            else:
+                if (currentLoadedApp != "" ):
+                    # Unload Application to clean wrong situations...
+                    callResult = self.unload_app(portId, myApplication)
+                    time.sleep(10)
             
-            callResult = self.unload_app(portId, myApplication)
-            time.sleep(10)
+                self.__lc_msg("Step 10 ++++++++++++++++++++++++++")
             
-            self.__lc_msg("Step 10 ++++++++++++++++++++++++++")
-            
-            callResult = self.load_app(portId, myApplication)
-            if self.__check_method_execution("load_app") == False: 
-                localMessage="Error in method [{}] call \n".format(localMethodName) 
-                self.__lc_msg(localMessage)
-                return False, "Error in method "+ localMethodName +" call "
+                callResult = self.load_app(portId, myApplication)
+                if self.__check_method_execution("load_app") == False: 
+                    localMessage="Error in method [{}] call \n".format(localMethodName) 
+                    self.__lc_msg(localMessage)
+                    return False, "Error in method "+ localMethodName +" call "
             
             
         localMessage=" ####  #### Current callMethodStatus content:  [ {} ] ####".format(self.__calledMethodStatus)
