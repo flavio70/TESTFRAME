@@ -346,6 +346,7 @@ class TL1message():
             if f_block:
                 # Event Response
                 #print("EVENT {}".format(line.strip().replace('"', '')))
+                self.__m_coded['S_AID'] = ""
                 if is_any_alarm(self.__m_coded['C_CODE']):
                     words = line.strip().replace('"', '').split(':')
                     self.__m_coded['S_AID']  = words[0]
