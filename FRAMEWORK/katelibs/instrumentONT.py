@@ -1,4 +1,3 @@
-#!/usr/bin/env python
 """
 ###############################################################################
 #
@@ -423,6 +422,194 @@ class InstrumentONT(Equipment):
         localMessage="[{}]: init_instrument: instrument correctly initialized".format(self.__ontType)
         self.__lc_msg(localMessage)
         return True, localMessage
+    
+    #def init_instrument(self, localUser, localPwd, localOntIpAddress, portId):
+    def init_instrument_withoutUnload(self, portId):
+        """
+            INITALIZES THE ONT INSTRUMENT TO GET READY TO ACCEPT USER (Library) COMMANDS
+            after this inizialization the user can start to send commands to 
+            the ONT (5xx/6xx) instrument
+            portId user's naming convention: P1, P2,...
+        """
+        # portId = self.__recover_port_to_use(portId)
+
+        localPortId = self.__prs.get_elem(self.get_label(), portId)
+        self.__labelToPortId[portId]=localPortId
+        localMethodName = inspect.stack()[0][3]   # init_instrument
+        callResult = self.connect()
+        if self.__check_method_execution("connect") == False: 
+            localMessage="Error in method [{}] call \n".format(localMethodName)
+            self.__lc_msg(localMessage)
+            return False, "Error in method "+ localMethodName +" call "
+            self.__lc_msg("Step 1 ++++++++++++++++++++++++++")
+
+        # Check declared and found instrument type
+        self.init_ont_type()  # init ONT TYPE asking it witn *IDN? cmd
+        localMessage="Instrument type answer: [{}] (*** connect moved outside ***)".format(self.__ontType)
+        self.__lc_msg(localMessage)
+
+        
+        if self.__ontType  == "6xx":   # ONT-6xx Init
+            localUser = self.__ontUser  
+            localPwd = self.__ontPassword 
+            localOntIpAddress = self.__ontIpAddress
+            myApplication="New-Application"
+
+            
+            callResult = self.open_port_channel(portId)
+            if self.__check_method_execution("open_port_channel") == False: 
+                localMessage="Error in method [{}] call \n".format(localMethodName)
+                self.__lc_msg(localMessage)
+                return False, "Error in method "+ localMethodName +" call "
+            self.__lc_msg("Step 2 ++++++++++++++++++++++++++")
+
+           
+            # Add this test to avoid to unload the app if present
+            callResult = self.get_currently_loaded_app(portId)
+            print("===> get_currently_loaded_app", callResult)
+            currentLoadedApp = callResult[1]
+            if (currentLoadedApp == myApplication):
+                print ("===> already loaded: go on")
+            else:
+                if (currentLoadedApp != "" ):
+                    # Unload Application to clean wrong situations...
+                    callResult = self.unload_app(portId, myApplication)
+                    time.sleep(10)
+                
+                #callResult = self.get_currently_loaded_app(portId)
+                callResult = self.load_app(portId, myApplication)
+                if self.__check_method_execution("load_app") == False: 
+                    localMessage="Error in method [{}] call \n".format(localMethodName) 
+                    self.__lc_msg(localMessage)
+                    return False, "Error in method "+ localMethodName +" call "
+                time.sleep(20)
+                self.__lc_msg("Step 4 ++++++++++++++++++++++++++")
+                res, option = self.getOption(portId)
+                print (option)
+                if (option == "\"3076/63.85\""):
+                    print ("option ok")
+                    # four port option present: PortConfiguration ( only valid on port 1 or 3)
+                    callResult = self.setApplicationConfiguration (portId, "PORT_LOAD", "TERM", "PHYS_SDH")
+                    localMessage = "setApplicationConfiguration: ".format(callResult)
+                    self.__lc_msg(localMessage)
+                else:
+                    print ("option ko")
+                    callResult = self.set_current_signal_structure(portId,"PHYS_SDH")  
+                    if self.__check_method_execution("set_current_signal_structure") == False: 
+                        localMessage="Error in method [{}] call \n".format(localMethodName) 
+                        self.__lc_msg(localMessage)
+                        return False, "Error in method "+ localMethodName +" call "
+    
+                self.__lc_msg("Step 5 ++++++++++++++++++++++++++")
+        else:                         # ONT-5xx Init
+            # 5xx init
+            myApplication="SdhBert"
+            #tester = InstrumentONT(localUser,localPwd, krepo=r)
+            
+            #callResult = self.connect()   # moved outside if case
+            #if self.__check_method_execution("connect") == False: 
+            #    localMessage="Error in method [{}] call \n".format(localMethodName)
+            #    self.__lc_msg(localMessage)
+            #    return False, "Error in method "+ localMethodName +" call "
+            #self.__lc_msg("Step 1 ++++++++++++++++++++++++++")
+           
+            callResult = self.create_session(self.__sessionName)
+            if self.__check_method_execution("create_session") == False: 
+                localMessage="Error in method [{}] call \n".format(localMethodName)
+                self.__lc_msg(localMessage)
+                return False, "Error in method "+ localMethodName +" call "
+
+            self.__lc_msg("Step 2 ++++++++++++++++++++++++++")
+
+            callResult = self.select_port(portId)
+            if self.__check_method_execution("select_port") == False: 
+                callResult = self.deselect_port(portId)    # uncomment to deselect the specified port
+                localMessage="Error in method [{}] call \n".format(localMethodName)
+                self.__lc_msg(localMessage)
+                return False, "Error in method "+ localMethodName +" call "
+
+            self.__lc_msg("Step 3 ++++++++++++++++++++++++++")
+            
+            callResult = self.get_selected_ports("")
+            if self.__check_method_execution("get_selected_ports") == False: 
+                localMessage="Error in method [{}] call \n".format(localMethodName)
+                self.__lc_msg(localMessage)
+                return False, "Error in method "+ localMethodName +" call "
+                
+            self.__lc_msg("Step 4 ++++++++++++++++++++++++++")
+
+            # Check declared and found instrument type
+            #declaredOntType = self.__ontType
+            
+            #callResult = self.get_instrument_id()
+            #if self.__check_method_execution("get_instrument_id") == False: 
+            #    localMessage="Error in method [{}] call \n".format(localMethodName)
+            #    self.__lc_msg(localMessage)
+            #    return False, "Error in method "+ localMethodName +" call "
+            
+            #self.__lc_msg("Step 5 ++++++++++++++++++++++++++")
+            
+            #if declaredOntType == self.__ontType: 
+            #    localMessage="Instrument declared [{}] and found [{}] consistency verified".format(declaredOntType, self.__ontType)
+            #    self.__lc_msg(localMessage)
+            #else:
+            #    localMessage="Instrument declared [{}] but found [{}] please verify DB data for id [{}]".format(declaredOntType, self.__ontType)
+            #    self.__lc_msg(localMessage)
+            #    return False, localMessage
+            
+            self.__lc_msg("Step 6 ++++++++++++++++++++++++++")
+            
+            callResult = self.init_port_to_socket_map()
+            if self.__check_method_execution("init_port_to_socket_map") == False: 
+                localMessage="Error in method [{}] call \n".format(localMethodName)
+                self.__lc_msg(localMessage)
+                return False, "Error in method "+ localMethodName +" call "
+            
+            self.__lc_msg("Step 7 ++++++++++++++++++++++++++")
+            
+            callResult = self.open_port_channel(portId)
+            if self.__check_method_execution("open_port_channel") == False: 
+                localMessage="Error in method [{}] call \n".format(localMethodName)
+                self.__lc_msg(localMessage)
+                return False, "Error in method "+ localMethodName +" call "
+            
+            self.__lc_msg("Step 8 ++++++++++++++++++++++++++")
+            
+            #callResult = self.get_currently_loaded_app(portId)
+            #if self.__check_method_execution("get_currently_loaded_app") == False: 
+            #    print("Error in method [{}] call \n".format(localMethodName))
+            #    return False, "Error in method "+ localMethodName +" call "
+            
+            self.__lc_msg("Step 9 ++++++++++++++++++++++++++")
+
+            # Add this test to avoid to unload the app if present
+            callResult = self.get_currently_loaded_app(portId)
+            print("===> get_currently_loaded_app", callResult)
+            currentLoadedApp = callResult[1]
+            if (currentLoadedApp == myApplication):
+                print ("===> already loaded: go on")
+            else:
+                if (currentLoadedApp != "" ):
+                    # Unload Application to clean wrong situations...
+                    callResult = self.unload_app(portId, myApplication)
+                    time.sleep(10)
+            
+                self.__lc_msg("Step 10 ++++++++++++++++++++++++++")
+            
+                callResult = self.load_app(portId, myApplication)
+                if self.__check_method_execution("load_app") == False: 
+                    localMessage="Error in method [{}] call \n".format(localMethodName) 
+                    self.__lc_msg(localMessage)
+                    return False, "Error in method "+ localMethodName +" call "
+            
+            
+        localMessage=" ####  #### Current callMethodStatus content:  [ {} ] ####".format(self.__calledMethodStatus)
+        self.__lc_msg(localMessage)
+            
+        localMessage="[{}]: init_instrument: instrument correctly initialized".format(self.__ontType)
+        self.__lc_msg(localMessage)
+        return True, localMessage
+    
 
 
 
@@ -1173,6 +1360,7 @@ class InstrumentONT(Equipment):
 
 
 
+
     #
     #   GENERAL
     #
@@ -1262,15 +1450,16 @@ class InstrumentONT(Equipment):
             self.__lc_msg(localMessage)
             return False, localMessage
 
-        if self.__ontType  == "6xx":
-            # port-level authentication is a need ONLY for ONT-6xx
-            # to allow the port to accept further commands
-            localMessage = "[{}]: port authentication in progress".format(self.__ontType)
-            self.__lc_msg(localMessage)
-            self.__authenticate_user_on_6xx_port(portId)
-            response = self.__send_port_cmd(portId,"*PROMPT ON")
-            localMessage = "Port [{}] connection established via [{}][{}] socket".format(portId,self.__ontIpAddress, tcpPortNumber)
-            self.__lc_msg(localMessage)
+        print ("===> Port autentication removed go on...")
+#         if self.__ontType  == "6xx":
+#             # port-level authentication is a need ONLY for ONT-6xx
+#             # to allow the port to accept further commands
+#             localMessage = "[{}]: port authentication in progress".format(self.__ontType)
+#             self.__lc_msg(localMessage)
+#             #self.__authenticate_user_on_6xx_port(portId)
+#             response = self.__send_port_cmd(portId,"*PROMPT ON")
+#             localMessage = "Port [{}] connection established via [{}][{}] socket".format(portId,self.__ontIpAddress, tcpPortNumber)
+#             self.__lc_msg(localMessage)
         return True, localMessage
 
 
@@ -4363,10 +4552,341 @@ class InstrumentONT(Equipment):
         return True, sdhAnswer
 
 
+    # Function added for SNCP
+
+    def getOption(self, portId):    ### krepo not added ###
+        """ Gets the instrument identification
+            Return tuple:
+            True, < instrument identification string, e.g. JDSU,ONT-XXX,...
+            False, <empty list> if there is no suitable port """
+        # wait until no operation is in progress...
+        callResult = self.wait_ops_completed()
+        if not callResult[0]:  # False: operation pending: unable to proceed
+            localMessage="Instrument busy: unable to proceed [{}]".format(callResult[1])
+            self.__calledMethodStatus["get_instrument_id"]= "failed"  #
+            self.__lc_msg(localMessage)
+            return callResult, localMessage
+        
+        methodLocalName = self.__lc_current_method_name(embedKrepoInit=True)
+        if portId == "":
+            localMessage = "{} error: portId  [{}] not valid (empty value)".format(methodLocalName,portId)
+            self.__lc_msg(localMessage)
+            self.__method_failure(methodLocalName, None, "", localMessage)
+            return False, localMessage        
+        portId = self.__recover_port_to_use(portId)
+      
+        localCommand = "*OPT?"
+        rawCallResult = self.__send_port_cmd(portId, localCommand)
+        callResult = self.__remove_dust(rawCallResult[1])
+        if callResult == "":
+            self.__calledMethodStatus["getOption"]= "failed"  #
+            return False, ""
+        self.__calledMethodStatus["getOption"]= "success"  #
+        localMessage="option: [{}]".format(callResult)
+        self.__lc_msg(localMessage)
+        return True, callResult
+
+    def setApplicationConfiguration(self, portId, PortCfg="", DevMode="", SigStruct=""):   ### krepo added ###    
+        """ 
+            Return tuple: ( "True|False" , "< result/error list>)
+        """
+        methodLocalName = self.__lc_current_method_name(embedKrepoInit=True)
+        if portId == "":
+            localMessage = "{} error: portId  [{}] not valid (empty value)".format(methodLocalName,portId)
+            self.__lc_msg(localMessage)
+            self.__method_failure(methodLocalName, None, "", localMessage)
+            return False, localMessage        
+        portId = self.__recover_port_to_use(portId)
+
+        if self.__ontType  == "5xx":
+            print ( " Function not valid")
+            return False, localMessage        
+
+        localCommand = ":INST:CONF:EDIT:OPEN ON"
+        rawCallResult = self.__send_port_cmd(portId, localCommand)
+        callResult = self.__remove_dust(rawCallResult[1]).replace(">","")
+        localMessage="Get result:[{}]".format(callResult)
+        self.__lc_msg(localMessage)
+        localCommand = "*WAI"
+        rawCallResult = self.__send_port_cmd(portId, localCommand)
+
+        # // PortConfiguration ( only valid on port 1 or 3)         
+        ONTCmdString = ":INST:CONF:EDIT:PORT:CONF"
+        localCommand="{} {}".format(ONTCmdString, PortCfg)        
+        rawCallResult = self.__send_port_cmd(portId, localCommand)
+        callResult = self.__remove_dust(rawCallResult[1]).replace(">","")
+        localMessage="PortConfiguration:[{}]".format(callResult)
+        self.__lc_msg(localMessage)
+        #self.__method_success(methodLocalName, None, localMessage)
+
+        #// Device Mode
+        ONTCmdString = ":INST:CONF:EDIT:DEV:MODE"
+        localCommand="{} {}".format(ONTCmdString, DevMode)        
+        rawCallResult = self.__send_port_cmd(portId, localCommand)
+        callResult = self.__remove_dust(rawCallResult[1]).replace(">","")
+        localMessage="Device Mode:[{}]".format(callResult)
+        self.__lc_msg(localMessage)
+        #self.__method_success(methodLocalName, None, localMessage)
+
+        #//Signal Structure
+        ONTCmdString = ":INST:CONF:EDIT:LAY:STAC"
+        localCommand="{} {}".format(ONTCmdString, SigStruct)        
+        rawCallResult = self.__send_port_cmd(portId, localCommand)
+        callResult = self.__remove_dust(rawCallResult[1]).replace(">","")
+        localMessage="Signal Structure:[{}]".format(callResult)
+        self.__lc_msg(localMessage)
+        #self.__method_success(methodLocalName, None, localMessage)
+        
+        localCommand = ":INST:CONF:EDIT:APPL ON"
+        rawCallResult = self.__send_port_cmd(portId, localCommand)
+        callResult = self.__remove_dust(rawCallResult[1]).replace(">","")
+        localMessage="Apply:[{}]".format(callResult)
+        self.__lc_msg(localMessage)
+        #self.__method_success(methodLocalName, None, localMessage)
+        
+        localCommand = "*OPC?"
+        rawCallResult = self.__send_cmd(localCommand)
+        print (rawCallResult)
+        callResult = self.__remove_dust(rawCallResult[1])
+        print (callResult)
+#         rawCallResult = self.__send_port_cmd(portId, localCommand)
+#         callResult = self.__remove_dust(rawCallResult[1]).replace(">","")
+        localMessage="*OPC?:[{}]".format(callResult)
+        self.__lc_msg(localMessage)
+        
+        callResult = self.wait_ops_completed()
+        if not callResult[0]:  # False: operation pending: unable to proceed
+            localMessage="Instrument busy: unable to proceed [{}]".format(callResult[1])
+            self.__lc_msg(localMessage)
+            return callResult, localMessage
+        
+        return True, callResult
 
 
+    def get_set_enableServiceDisruption(self, portId, enableSDTest=""):   # ONT-5xx  Only   ### krepo added ###    
+        """ 
+            Return tuple: ( "True|False" , "< result/error list>)
+        """
+        methodLocalName = self.__lc_current_method_name(embedKrepoInit=True)
+        if portId == "":
+            localMessage = "{} error: portId  [{}] not valid (empty value)".format(methodLocalName,portId)
+            self.__lc_msg(localMessage)
+            self.__method_failure(methodLocalName, None, "", localMessage)
+            return False, localMessage        
+        portId = self.__recover_port_to_use(portId)
+
+        if self.__ontType  == "5xx":
+            print ( " Function not yet implemented")
+        else:
+            localCommand = ":SENS:DATA:TEL:SDH:SDIS:MODE?"
+        
+        if enableSDTest  == "": # get request
+            rawCallResult = self.__send_port_cmd(portId, localCommand)
+            callResult = self.__remove_dust(rawCallResult[1]).replace(">","")
+            localMessage="Get result:[{}]".format(callResult)
+            self.__lc_msg(localMessage)
+            self.__method_success(methodLocalName, None, localMessage)
+            return True, callResult
+        
+        localCommand=":SENS:DATA:TEL:SDH:SDIS:MODE {}".format(enableSDTest)        
+        rawCallResult = self.__send_port_cmd(portId, localCommand)
+        callResult = self.__remove_dust(rawCallResult[1]).replace(">","")
+        localMessage="Enable Service Disruption Test:[{}]".format(enableSDTest)
+        self.__lc_msg(localMessage)
+        self.__method_success(methodLocalName, None, localMessage)
+        return True, callResult
+
+    def getServiceDisruptionConfig(self, portId):   # ONT-5xx  Only   ### krepo added ###    
+        """
+        Get the configuration setting for Service Disruption
+            Return tuple: ( "True|False" , "< result/error list>)
+        """
+        serviceDisruptionParam = []
+        methodLocalName = self.__lc_current_method_name(embedKrepoInit=True)
+        if portId == "":
+            localMessage = "{} error: portId  [{}] not valid (empty value)".format(methodLocalName,portId)
+            self.__lc_msg(localMessage)
+            self.__method_failure(methodLocalName, None, "", localMessage)
+            return False, localMessage        
+        portId = self.__recover_port_to_use(portId)
+
+        if self.__ontType  == "5xx":
+            localMessage = " Function not yet implemented"
+            self.__lc_msg(localMessage)
+            return False, localMessage        
+        
+        #// Separation time
+        localCommand = ":SENS:DATA:TEL:SDH:SDIS:SEP:TIME?"  
+        rawCallResult = self.__send_port_cmd(portId, localCommand)
+        callResult = self.__remove_dust(rawCallResult[1]).replace(">","")
+        localMessage="Separation time:[{}]".format(callResult)
+        self.__lc_msg(localMessage)
+        serviceDisruptionParam.append(callResult)
+        
+        #// Threshold Time  
+        localCommand = ":SENS:DATA:TEL:SDH:SDIS:THR:TIME?"
+        rawCallResult = self.__send_port_cmd(portId, localCommand)
+        callResult = self.__remove_dust(rawCallResult[1]).replace(">","")
+        localMessage="Threshold Time:[{}]".format(callResult)
+        self.__lc_msg(localMessage)
+        serviceDisruptionParam.append(callResult)
+
+        #// Sensor:  SDH Alarms SDH Errors Payload
+        localCommand = ":SENS:DATA:TEL:SDH:SDIS:EVEN?"
+        rawCallResult = self.__send_port_cmd(portId, localCommand)
+        callResult = self.__remove_dust(rawCallResult[1]).replace(">","")
+        localMessage="Sensor:  SDH Alarms SDH Errors Payload:[{}]".format(callResult)
+        self.__lc_msg(localMessage)
+        serviceDisruptionParam.append(callResult)
+
+        #// Logging Mode
+        localCommand = ":SENS:DATA:TEL:SDH:SDIS:LOG:MODE?"
+        rawCallResult = self.__send_port_cmd(portId, localCommand)
+        callResult = self.__remove_dust(rawCallResult[1]).replace(">","")
+        localMessage="Sensor:  SDH Alarms SDH Errors Payload:[{}]".format(callResult)
+        self.__lc_msg(localMessage)
+        serviceDisruptionParam.append(callResult)
+
+        return True, serviceDisruptionParam
+    
+    
+    def setServiceDisruptionConfig(self, portId, separationTime="", trhesTime="", logMode="", sensor=""):   # ONT-5xx  Only   ### krepo added ###,    
+        """
+        Get the configuration setting for Service Disruption
+            Return tuple: ( "True|False" , "< result/error list>)
+        """
+        print (separationTime, trhesTime, logMode, sensor )
+        methodLocalName = self.__lc_current_method_name(embedKrepoInit=True)
+        if portId == "":
+            localMessage = "{} error: portId  [{}] not valid (empty value)".format(methodLocalName,portId)
+            self.__lc_msg(localMessage)
+            self.__method_failure(methodLocalName, None, "", localMessage)
+            return False, localMessage        
+        portId = self.__recover_port_to_use(portId)
+
+        if self.__ontType  == "5xx":
+            localMessage = " Function not yet implemented"
+            self.__lc_msg(localMessage)
+            return False, localMessage        
+        
+        #// Separation time
+        localCommand = ":SENS:DATA:TEL:SDH:SDIS:SEP:TIME"
+        localCommand = "{} {}".format(localCommand,separationTime)
+        rawCallResult = self.__send_port_cmd(portId, localCommand)
+        callResult = self.__remove_dust(rawCallResult[1]).replace(">","")
+        localMessage="Separation time:[{}]".format(separationTime)
+        self.__lc_msg(localMessage)
+
+        #// Threshold Time  
+        localCommand = ":SENS:DATA:TEL:SDH:SDIS:THR:TIME"
+        localCommand = "{} {}".format(localCommand,trhesTime)    
+        rawCallResult = self.__send_port_cmd(portId, localCommand)
+        callResult = self.__remove_dust(rawCallResult[1]).replace(">","")
+        localMessage="Threshold Time:[{}]".format(trhesTime)
+        self.__lc_msg(localMessage)
+
+        #// Sensor:  SDH Alarms SDH Errors Payload
+        localCommand = ":SENS:DATA:TEL:SDH:SDIS:EVEN"
+        localCommand = "{} {}".format(localCommand,sensor)    
+        rawCallResult = self.__send_port_cmd(portId, localCommand)
+        callResult = self.__remove_dust(rawCallResult[1]).replace(">","")
+        localMessage="Sensor:  SDH Alarms SDH Errors Payload:[{}]".format(sensor)
+        self.__lc_msg(localMessage)
+
+        #// Logging Mode
+        localCommand = ":SENS:DATA:TEL:SDH:SDIS:LOG:MODE"
+        localCommand = "{} {}".format(localCommand,logMode)    
+        rawCallResult = self.__send_port_cmd(portId, localCommand)
+        callResult = self.__remove_dust(rawCallResult[1]).replace(">","")
+        localMessage="Logging Mode:[{}]".format(logMode)
+        self.__lc_msg(localMessage)
+        
+        return True, callResult
 
 
+    def getServiceDisruptionResult(self, portId):      ### krepo added ###    
+        """
+        Get the result for Service Disruption 
+            Return tuple: ( "True|False" , "< result/error list>)
+        """
+        serviceDisruptionParam = []
+        methodLocalName = self.__lc_current_method_name(embedKrepoInit=True)
+        if portId == "":
+            localMessage = "{} error: portId  [{}] not valid (empty value)".format(methodLocalName,portId)
+            self.__lc_msg(localMessage)
+            self.__method_failure(methodLocalName, None, "", localMessage)
+            return False, localMessage        
+        portId = self.__recover_port_to_use(portId)
+
+        if self.__ontType  == "5xx":
+            localMessage = " Function not yet implemented"
+            self.__lc_msg(localMessage)
+            return False, localMessage        
+
+        #// threshold evaluation 
+        localCommand = ":SDH:SD:SEL:THR:EXCE?"
+        rawCallResult = self.__send_port_cmd(portId, localCommand)
+        callResult = self.__remove_dust(rawCallResult[1]).replace(">","")
+        if (callResult != "-1,9.91E37"):
+            responseArray = callResult.split ((','))
+            if (responseArray[1] == "0"):
+                # Limit not exceeded. The duration of all disruptions is below or equal to the configured threshold.
+                print ( "Limit not exceeded")
+            else:
+                # Limit exceeded. The duration of at least one disruption is above the configured threshold.
+                print ( "Limit exceeded")
+                            
+            localMessage=" threshold evaluation:[{}]".format(responseArray[1])
+            serviceDisruptionParam.append(responseArray[1])            
+        else:
+            localMessage="invalid threshold evaluation"
+            serviceDisruptionParam.append(callResult)                   
+        self.__lc_msg(localMessage)
+        
+        #// number of disruption
+        localCommand = ":SDH:SD:SEL:DISR:COUN?"  
+        rawCallResult = self.__send_port_cmd(portId, localCommand)
+        callResult = self.__remove_dust(rawCallResult[1]).replace(">","")
+        if (callResult != "-1,9.91E37"):
+            # split the string
+            responseArray = callResult.split ((','))
+#            resultItemsArray=sdhAnswer.split(",")
+            localMessage="number of disruption:[{}]".format(responseArray[1])
+            serviceDisruptionParam.append(responseArray[1])
+        else:
+            localMessage="invalid number of disruption"
+            serviceDisruptionParam.append(callResult)            
+        self.__lc_msg(localMessage)
+        
+
+        # Begin of first Disruption
+        #// :SDH:SD:SEL:FIRS:STAR:TIME:ABS?
+        localCommand = ":SDH:SD:SEL:FIRS:STAR:TIME:ABS?"
+        rawCallResult = self.__send_port_cmd(portId, localCommand)
+        callResult = self.__remove_dust(rawCallResult[1]).replace(">","")
+        if (callResult != "-1,9.91E37"):
+            responseArray = callResult.split ((','))            
+            localMessage="Begin of first Disruption:[{}]".format(responseArray[1])
+            serviceDisruptionParam.append(responseArray[1])
+        else:
+            localMessage="invalid Begin of first Disruption"        
+            serviceDisruptionParam.append(callResult)
+        self.__lc_msg(localMessage)
+
+        #// End of last Disruption
+        localCommand = ":SDH:SD:SEL:LAST:STOP:TIME:ABS?"
+        rawCallResult = self.__send_port_cmd(portId, localCommand)
+        callResult = self.__remove_dust(rawCallResult[1]).replace(">","")
+        if (callResult != "-1,9.91E37"):
+            responseArray = callResult.split ((','))            
+            localMessage="End of last Disruption:[{}]".format(responseArray[1])
+            serviceDisruptionParam.append(responseArray[1])
+        else:
+            localMessage="invalid End of last Disruption"        
+            serviceDisruptionParam.append(callResult)
+        self.__lc_msg(localMessage)
+
+        return True, serviceDisruptionParam
 
 
 
