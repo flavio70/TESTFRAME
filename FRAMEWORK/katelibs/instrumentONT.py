@@ -1,22 +1,11 @@
-"""
-###############################################################################
-#
-# MODULE:  InstrumentONT.py
-#
-# AUTHOR:  L.Cutilli
-#
-# DATE  :  16/10/2015
-#
-#
-# DETAILS: Python management module of the following test equipments:
-#          - 5xx... Ont-50, Ont-506, Ont-512
-#          - 6xx... Ont-601
-#
-# MODULE: InstrumentONT.py  created to drive the connections and common low-level operations
-#                           involving JDSU Optical Network Tester ONT-50/506/512/601
-#
-###############################################################################
-"""
+'''
+.. module::instrumentONT
+   :platform: Unix
+   :synopsis:created to drive the connections and common low-level operations involving JDSU Optical Network Tester ONT-50/506/512/601
+
+.. moduleauthor:: Lorenzo Cutilli <lorenzo.cutilli@sm-optics.com>
+ 
+'''
 
 import os
 import sys
@@ -24,8 +13,10 @@ import time
 import string
 import getpass
 import inspect
+import json
 import telnetlib
 import datetime
+
 
 from katelibs.equipment import Equipment
 from katelibs.kenviron import KEnvironment
@@ -33,14 +24,22 @@ from katelibs.kunit import Kunit
 from katelibs.database import *
 
 
-class InstrumentONT(Equipment):
+from katelibs import frmkLog
+currLog=frmkLog()
 
+logger = currLog.getLogger(__name__)
+
+
+class InstrumentONT(Equipment):
+    '''ONT Instrument General class definition
+    '''
+    ''
     def __init__(self, label, kenv):
         """ label   : equipment name used on Report file
             kenv    : instance of KEnvironment (initialized by K@TE FRAMEWORK)
         """
- 
         # Enviroment
+        self.__label = label
         self.__kenv                 = kenv             # Kate Environment
         self.__krepo                = kenv.krepo       # result report (Kunit class instance)
         self.__prs                  = kenv.kprs        # Presets for running environment
@@ -61,7 +60,7 @@ class InstrumentONT(Equipment):
         self.__telnetConnection     = None             #  Handler of the established telnet connection
         self.__pingRetryNumber      = 1                #  Retry number for -c ping option
         self.__telnetExpectedPrompt = [b'> ']          #  it must be specified as keys LIST...
-        self.__telnetTimeout        = 2
+        self.__telnetTimeout        = 10               #  timeout (Seconds) used for connection
         # Ont command execution
         self.__ontSleepTimeForRetry = 0.5              # one retry every 0.5 second
         self.__ontCmdMaxRetry       = 120              # max 120 retries
@@ -74,9 +73,11 @@ class InstrumentONT(Equipment):
         #self.VcToAu={"VC11":"AU4_C11", "VC12":"AU4_C12", "VC2":"NOTSUPPORTED", "VC3":"AU3_C3", "VC4":"AU4_C4", "VC4_4C":"AU4_4C", "VC4_16C":"AU4_16C", "VC4_64C":"AU4_64C"}
         self.VcToAu={"VC11":"AU4_C11", "VC12":"AU4_C12", "VC2":"NOTSUPPORTED", "VC3":"AU4_C3", "VC4":"AU4_C4", "VC4_4C":"AU4_4C", "VC4_16C":"AU4_16C", "VC4_64C":"AU4_64C"}
         self.E_TAG = "-10"
-
+        
+        self.__logfile = open("{}/{}_{}_ont.log".format(kenv.path_logs(), kenv.get_test_name(), label), "w")
         super().__init__(label, self.__prs.get_id(label))
         self.__get_instrument_info_from_db(self.__prs.get_id(label)) # inizializza i dati di IP, tipo di ONT..dal DB
+        
         #self.init_ont_type()  # inizializza i dati di IP, tipo di ONT..leggendo da strumento
         
         
@@ -89,24 +90,44 @@ class InstrumentONT(Equipment):
     def __str__(self):
         return '%s IP address: %s'%(self.__ontType,self.__ontIpAddress)
 
-
-
-    def clean_up(self):
+    def __logger(self, msg):
         """ INTERNAL USAGE
         """
-        print("clean_up called [{}]".format(self.__ontType))
+        if self.__logfile:
+            timestamp = datetime.datetime.now().isoformat(' ')
+            for row in msg.replace("\r","").split("\n"):
+                self.__logfile.write("[{}] {}\n".format(timestamp, row))
 
+    def clean_up(self):
+        """ INTERNAL USAGE"""
+        self.__lc_msg('Calling ONT clean_up Function for %s...'%(self.__label))
+        if self.__telnetConnection:
+            localMessage = "\tChassis Telnet connection Found: checking ports connections..."
+            self.__lc_msg(localMessage)
+            for elem in self.__portConnection:
+                self.__portConnection[elem].close()
+                self.__lc_msg('\t\tsocket to port %s Closed.'%(elem))
+            self.__telnetConnection.close()
+            self.__lc_msg("\tChassis Telnet connection Closed")
+            self.__lc_msg("\tlog file Closed")
+            self.__logfile.close()
+            return True, localMessage
+        else:
+            localMessage = "\tChassis Telnet connection not Found: nothing to do."
+            self.__lc_msg(localMessage)
+            self.__lc_msg("\tlog file Closed")
+            self.__logfile.close()
+            return False, localMessage
 
     #     
     # Krepo-related     
     #    
+
     def __t_success(self, title, elapsed_time, out_text):
         """ INTERNAL USAGE
         """
         if self.__krepo:
             self.__krepo.add_success(self, title, elapsed_time, out_text)
-
-
 
     def __t_failure(self, title, e_time, out_text, err_text, log_text=None):
         """ INTERNAL USAGE
@@ -114,15 +135,11 @@ class InstrumentONT(Equipment):
         if self.__krepo:
             self.__krepo.add_failure(self, title, e_time, out_text, err_text, log_text)
 
-
-
     def __t_skipped(self, title, e_time, out_text, err_text, skip_text=None):
         """ INTERNAL USAGE
         """
         if self.__krepo:
             self.__krepo.add_skipped(self, title, e_time, out_text, err_text, skip_text)
-
-
 
     def __method_success(self, title, elapsed_time, out_text):
         """ INTERNAL USAGE
@@ -132,7 +149,6 @@ class InstrumentONT(Equipment):
         self.__calledMethodStatus[title]= "success"  #
         self.__t_success(title, elapsed_time, out_text)  # CG tracking
 
-
     def __method_failure(self, title, e_time, out_text, err_text):
         """ INTERNAL USAGE
         """
@@ -141,8 +157,6 @@ class InstrumentONT(Equipment):
         self.__calledMethodStatus[title]= "error"  #
         self.__t_failure(title, e_time, out_text, err_text) # CG tracking
 
-
- 
     def __method_skipped(self, title, e_time, out_text, err_text):
         """ INTERNAL USAGE
         """
@@ -150,7 +164,6 @@ class InstrumentONT(Equipment):
         #self.__lastCallSuccess = False            # Don't mark current execution as successfully
         self.__calledMethodStatus[title]= "skip"  #
         self.__t_skipped(title, e_time, out_text, err_text) # CG tracking
-
 
     def __check_method_execution(self,methodToCheck):
         """ INTERNAL USAGE
@@ -180,6 +193,7 @@ class InstrumentONT(Equipment):
     #
     #  K@TE INTERFACE
     #
+
     def __get_net_info(self, n):
         tabNet = TNet
 
@@ -189,8 +203,6 @@ class InstrumentONT(Equipment):
                     return r.ip
 
         return str(None)
-
-
 
     def __get_user_from_db(self,myid):
         """
@@ -203,9 +215,6 @@ class InstrumentONT(Equipment):
         row=tabCred.objects.get(t_equipment_id_equipment__id_equipment=myid,t_eqpt_cred_type_id_cred_type__idt_eqpt_cred_type=instr_credId)
         return row
         
-        
-
-
     def __get_instrument_info_from_db(self, ID):
         tabEqpt  = TEquipment
         # get Equipment Type ID for selected ID (i.e. 50 (for ONT506))
@@ -235,19 +244,23 @@ class InstrumentONT(Equipment):
         
         #localMessage = "__get_instrument_info_from_db: instrument type specified :ID [{}] Instrument:[{}] IpAddr[{}]".format(ID,instr_type_name,instr_ip)
         localMessage = "__get_instrument_info_from_db: instrument type specified : Instrument:[{}] IpAddr[{}]".format(instr_type_name,instr_ip)
-        print(localMessage) 
+        #print(localMessage) 
         self.__lc_msg(localMessage)
+        logger.info(localMessage)
         return  
  
 
 
     #def init_instrument(self, localUser, localPwd, localOntIpAddress, portId):
+    
     def init_instrument(self, portId):
-        """
-            INITALIZES THE ONT INSTRUMENT TO GET READY TO ACCEPT USER (Library) COMMANDS
+        """ INITALIZES THE ONT INSTRUMENT TO GET READY TO ACCEPT USER (Library) COMMANDS
             after this inizialization the user can start to send commands to 
-            the ONT (5xx/6xx) instrument
-            portId user's naming convention: P1, P2,...
+            the ONT (5xx/6xx) instrument.
+
+        :param portId: Instrument port indentifier user's naming convention: P1, P2,...
+
+        >>> ONT1.init_instrument('/0/0/1')
         """
         # portId = self.__recover_port_to_use(portId)
 
@@ -272,6 +285,7 @@ class InstrumentONT(Equipment):
             localPwd = self.__ontPassword 
             localOntIpAddress = self.__ontIpAddress
             myApplication="New-Application"
+            logger.debug('calling init for 6xx ONT : %s , user: %s, password: %s'%(self.__ontIpAddress,self.__ontUser,self.__ontPassword))
 
             # 6xx init
             #tester = InstrumentONT(localUser,localPwd,localOntIpAddress, krepo=r)
@@ -424,6 +438,7 @@ class InstrumentONT(Equipment):
         return True, localMessage
     
     #def init_instrument(self, localUser, localPwd, localOntIpAddress, portId):
+
     def init_instrument_withoutUnload(self, portId):
         """
             INITALIZES THE ONT INSTRUMENT TO GET READY TO ACCEPT USER (Library) COMMANDS
@@ -610,12 +625,6 @@ class InstrumentONT(Equipment):
         self.__lc_msg(localMessage)
         return True, localMessage
     
-
-
-
-
-
-
     def __recover_port_to_use(self, portId):
         """ Smart port translator (5xx/6xx):
             if portId=/rack/slot/portNo  --> return      /rack/slot/portNo  
@@ -630,13 +639,6 @@ class InstrumentONT(Equipment):
         localMessage = "Port fixed: [{}]-->[{}]".format(portId, originalPortId )
         self.__lc_msg(localMessage)
         return originalPortId  
-
-
-
-
-
-
- 
 
     def deinit_instrument(self, portId):
         """
@@ -669,11 +671,10 @@ class InstrumentONT(Equipment):
     #
     #  INTERNAL UTILITIES
     #
+
     def __remove_dust(self,stringToClean):
         #  remove the "> " prompt and "\n" from a string
         return str(stringToClean).replace("\n","").replace("\\n","").replace("> ","").replace(">","")
-
-
 
     def __get_result_TF(self,callResultToParse):
         #  Extract True/False result from last call result tuple
@@ -682,16 +683,12 @@ class InstrumentONT(Equipment):
         #self.__lc_msg(localMessage)
         return firstElement
 
-
-
     def __get_result_string(self,callResultToParse):
         #  Extract result string from last call result tuple
         secondElement = callResultToParse[1]
         #localMessage = "secondElement [{}] ".format(secondElement)
         #self.__lc_msg(localMessage)
         return secondElement
-
-
 
     def __lc_msg(self,messageForDebugPurposes):
         # Print debug messages: verbose mode in test only
@@ -701,7 +698,7 @@ class InstrumentONT(Equipment):
         #   insert HERE the new logging method (still in progress...)   
         print ("{:s}".format(messageForDebugPurposes))
 
-
+        self.__logger("{:s}".format(messageForDebugPurposes))
 
     def __lc_current_method_name(self, embedKrepoInit=False):
         # Print current method name: verbose mode in test only
@@ -720,7 +717,6 @@ class InstrumentONT(Equipment):
         if self.__krepo and embedKrepoInit == True:
             self.__krepo.start_time()
         return methodName 
-
 
     def __verify_presence_in_csv_format_answer(self, commandAnswer, valueToFind):
         """ process ONT command answer, and check if present """
@@ -743,19 +739,26 @@ class InstrumentONT(Equipment):
     #
     #  TELNET CONNECTIONS UTILITIES
     #
+
+    '''
     def __del__(self):
-        self.__lc_msg("Function: __del__")
+        self.__lc_msg('Calling ONT destructor Function for %s...'%(self.__label))
         if self.__telnetConnection:
-            localMessage = "Telnet connection open: close now"
+            localMessage = "\tMain Telnet connection Found: closing now..."
             self.__lc_msg(localMessage)
+            for elem in self.__portConnection:
+                elem.close()
+                self.__lc_msg('\t\tclosing socket to %s...'%(elem))
             self.__telnetConnection.close()
+            self.__lc_msg("\tMain Telnet connection Closed")
+            self.__logfile.close()
             return True, localMessage
         else:
-            localMessage = "Telnet connection not openened: skip close"
+            localMessage = "\tMain Telnet connection not Found: skip close"
             self.__lc_msg(localMessage)
+            self.__logfile.close()
             return False, localMessage
-
-
+    '''
 
     def __is_reachable(self):
         self.__lc_msg("Function: __is_reachable")
@@ -767,8 +770,6 @@ class InstrumentONT(Equipment):
         localMessage = "IP Address [{}]: no answer received".format(self.__ontIpAddress)
         self.__lc_msg(localMessage)
         return False, localMessage
-
-
 
     def __send_cmd(self, command):
         if command == "":
@@ -791,8 +792,6 @@ class InstrumentONT(Equipment):
             self.__lc_msg(localMessage)
             return False, localMessage
 
-
-
     def __create_telnet_connection(self):
         self.__lc_msg("Function: __create_telnet_connection Socket [{}:{}]".format(self.__ontIpAddress,self.__ontTelnetPort))
         try:
@@ -806,8 +805,6 @@ class InstrumentONT(Equipment):
             self.__lc_msg(localMessage)
             return False, localMessage
         return True, localMessage
-
-
 
     def __authenticate_user(self):
         """ Recognizes user as valid user and try to authenticate him """
@@ -859,8 +856,6 @@ class InstrumentONT(Equipment):
                 self.__lc_msg(localMessage)
             return False, localMessage
 
-
-
     def __authenticate_user_on_6xx_port(self, portId):  # On ONT6xx the authentication is at port level
         """ Recognizes user as valid user and try to authenticate him """
         #portId = self.__recover_port_to_use(portId)
@@ -890,8 +885,6 @@ class InstrumentONT(Equipment):
             self.__lc_msg(localMessage)
             return False, localMessage
 
-
-
     def __string_to_TR16(self,stringToConvert):
         spacesString="                  "
         tempStr=stringToConvert+spacesString
@@ -909,8 +902,6 @@ class InstrumentONT(Equipment):
         self.__lc_msg(localMessage)
         return asciiCsvResult
 
-
-
     def __TR16_to_string(self,tr16ToConvert):
         stringResult=""
         for element in tr16ToConvert.split(","):
@@ -922,6 +913,7 @@ class InstrumentONT(Equipment):
     #
     #   ACCOUNT MANAGEMENT
     #
+
     def connect(self):    ### krepo added ###
         """ create a connection and authenticate the user """
         methodLocalName = self.__lc_current_method_name(embedKrepoInit=True)
@@ -966,6 +958,7 @@ class InstrumentONT(Equipment):
     #
     #   SESSION MANAGEMENT
     #
+
     def create_session(self, sessionName):       ### krepo added ###
         """ create a new <sessionName> session """
         methodLocalName = self.__lc_current_method_name(embedKrepoInit=True)
@@ -1000,7 +993,6 @@ class InstrumentONT(Equipment):
     def set_application(self,appName='SdhBert'):
         """ Set current application to be loaded """
         self.__ontApplication = appName
-
 
     def delete_session(self, sessionName):  ### krepo added ###
         """ delete a <sessionName> session if present """
@@ -1044,6 +1036,7 @@ class InstrumentONT(Equipment):
     #
     #   PORT MANAGEMENT
     #
+
     def get_available_ports(self):   ### krepo not added ###
         """ Gets the ports available for the use.
             Return tuple:
@@ -1060,8 +1053,6 @@ class InstrumentONT(Equipment):
         if callResult == "":
             return False, ""
         return True, callResult
-
-
 
     def init_port_to_socket_map(self):   ### krepo not added ###
         """ It Initializes the self.__portToSocketMap dictionary
@@ -1104,8 +1095,6 @@ class InstrumentONT(Equipment):
         self.__calledMethodStatus[methodLocalName]= "success"   
         return True, localMessage
 
-
-
     def init_ont_type(self):  ### krepo not added ###
         """ It Initializes the self.__ontType to switch the proper commands
         depending on ONT-5xx or ONT-6xx (or ...) test instrument usage  """
@@ -1133,23 +1122,17 @@ class InstrumentONT(Equipment):
             return False, localMessage
         return True, localMessage
 
-
-
     def print_port_to_socket_map(self):  ### krepo not added ###
         # just a check print...in debug mode only...to check if map dictionary is initialized
         localMessage = "Current Port-Map dictionary: [{}]".format(self.__portToSocketMap)
         self.__lc_msg(localMessage)
         return True
 
-
-
     def print_ont_type(self):  ### krepo not added ###
         # just a check print...in debug mode only...to check if Ont Type has been correctly detected
         localMessage = "Detected Ont Type : [{}]".format(self.__ontType)
         self.__lc_msg(localMessage)
         return True
-
-
 
     def select_port(self, portId):  ### krepo added ###
         """ Select the portId ( /rack/slotNo/portNo ) port
@@ -1194,8 +1177,6 @@ class InstrumentONT(Equipment):
         else:
             self.__method_failure(methodLocalName, None, "", localMessage)
         return portAllocated, localMessage
-
-
 
     def deselect_port(self, portId): ### krepo added ###
         """ Deselect the portId ( /rack/slotNo/portNo ) port
@@ -1244,7 +1225,6 @@ class InstrumentONT(Equipment):
             self.__method_failure(methodLocalName, None, "", localMessage)
         return portDeselected, localMessage
 
-
     def get_selected_ports(self, portId):  ### krepo not added ###
         """ Gets the list of TCP ports selected and ready for the use.
             Return tuple:
@@ -1275,8 +1255,6 @@ class InstrumentONT(Equipment):
             return False, errorCode
         self.__method_success(methodLocalName, None, localMessage)
         return True, localMessage
-
-
 
     def reboot_slot(self,portId):    ### krepo not added ###
         """ Reboot the ONT or a specified port
@@ -1313,6 +1291,7 @@ class InstrumentONT(Equipment):
     #
     #   COMMON COMMANDS
     #
+
     def wait_ops_completed(self):    ### krepo not added ###
         """ waits untill all ONT operations pending are completed
             True, <  info string >
@@ -1332,8 +1311,6 @@ class InstrumentONT(Equipment):
             localMessage="Operation still in progress after [{}] retry)".format(n)
             time.sleep(self.__ontSleepTimeForRetry)
         return operationCompleted, localMessage
-
-
 
     def get_instrument_id(self):    ### krepo not added ###
         """ Gets the instrument identification
@@ -1364,6 +1341,7 @@ class InstrumentONT(Equipment):
     #
     #   GENERAL
     #
+
     def __get_last_error(self):   ### krepo not added ###
         """ Provides info about the last error
             True,  < info string about error >  (string format" <code>,"<message>"    )
@@ -1379,7 +1357,6 @@ class InstrumentONT(Equipment):
             return False ,  callResult
         #self.__method_success(methodLocalName, None, localMessage)
         return True, callResult
-
 
     def get_last_error(self):  ### krepo added ###
         """ Provides info about the last error
@@ -1402,6 +1379,7 @@ class InstrumentONT(Equipment):
     #
     #   APPLICATION CONTROL: APPLICATION HANDLING
     #
+
     def __send_port_cmd(self, portId, command):    ### krepo not added ###
         ### GHELFI ##portId = self.__recover_port_to_use(portId)
         # send a command to an instrument port specified by its portId ( /rack/slotNo/portNo ) port
@@ -1429,8 +1407,6 @@ class InstrumentONT(Equipment):
             localMessage = "send_port_cmd [{}] command ERROR".format(portId)
             self.__lc_msg(localMessage)
             return False, localMessage
-
-
 
     def __create_port_connection(self,portId):    ### krepo not added ###
         # create a telnet connection with the portId custom TCP port of the ONT for Application cmd issue ( /rack/slotNo/portNo ) port
@@ -1462,8 +1438,6 @@ class InstrumentONT(Equipment):
 #             self.__lc_msg(localMessage)
         return True, localMessage
 
-
-
     def open_port_channel(self, portId):    ### krepo not added ###
         # open a TCP channel to Port specified by portId( /rack/slotNo/portNo )
         portId = self.__recover_port_to_use(portId)
@@ -1475,8 +1449,6 @@ class InstrumentONT(Equipment):
         callResult = self.__create_port_connection(portId)
         self.__calledMethodStatus["open_port_channel"]= "success"   
         return True, callResult
-
-
 
     def __get_currently_loaded_app(self, portId):   ### krepo not added ###
         """ Provides the name of the application currently loaded in <portId> port.
@@ -1496,8 +1468,6 @@ class InstrumentONT(Equipment):
             callRetCode = True
         self.__lc_msg(localMessage)
         return callRetCode, callResult
-
-
 
     def get_currently_loaded_app(self, portId): ### krepo added ###
         """ Provides the name of the application currently loaded in <portId> port.
@@ -1520,8 +1490,6 @@ class InstrumentONT(Equipment):
             self.__lc_msg(localMessage)
             self.__method_success(methodLocalName, None, localMessage)
         return callRetCode, callResult
-
-
 
     def load_app(self, portId, applicationName):  ### krepo added ###
         """ It loads the <applicationName> application in <portId> port and waits until
@@ -1586,8 +1554,6 @@ class InstrumentONT(Equipment):
         else:
             self.__method_failure(methodLocalName, None, "", localMessage)
         return applicationLoaded, callResult
-
-
 
     def unload_app(self, portId, applicationName):  ### krepo added ###
         """ It deletes the <applicationName> application in <portId> port and waits until
@@ -1658,6 +1624,7 @@ class InstrumentONT(Equipment):
     #
     #   APPLICATION CONTROL: APPLICATION CONFIGURATION - LAYER EDITOR
     #
+
     def open_edit_session(self, portId, command):   # ONT-6xx  Only  ### krepo not added ###
         """ UNDER TESTING: ONT-6XX only
             It opens edit session for new application configuration.
@@ -1691,8 +1658,6 @@ class InstrumentONT(Equipment):
         #self.__method_success(methodLocalName, None, localMessage)
         return True, callResult
 
-
-
     def apply_edit_session(self, portId, command):   # ONT-6xx  Only    ### krepo added ###
         """ UNDER TESTING: ONT-6XX only
             It applies settings of the edit session and closes the edit session. """
@@ -1724,8 +1689,6 @@ class InstrumentONT(Equipment):
         self.__lc_msg(localMessage)
         #self.__method_success(methodLocalName, None, localMessage)
         return True, callResult
-
-
 
     def set_current_signal_structure(self, portId, sigStructType):   # ONT-6xx  Only   ### krepo added ###
         """ UNDER TESTING: ONT-6XX only
@@ -1842,6 +1805,7 @@ class InstrumentONT(Equipment):
     #
     #   APPLICATION CONTROL: MEASUREMENT CONTROL
     #
+
     def start_measurement(self, portId):   # ONT-5xx  Only    ### krepo added ###       
         """ ONT-5XX only
             Starts a measurement.. """
@@ -1869,8 +1833,6 @@ class InstrumentONT(Equipment):
         self.__method_success(methodLocalName, None, localMessage)
         return True, callResult
 
-
-
     def halt_measurement(self, portId):   # ONT-5xx  Only    ### krepo added ###       
         """ Halts a running measurement. """
         methodLocalName = self.__lc_current_method_name(embedKrepoInit=True)
@@ -1895,9 +1857,7 @@ class InstrumentONT(Equipment):
         self.__lc_msg(localMessage)
         self.__method_success(methodLocalName, None, localMessage)
         return True, callResult
-
-
-        
+       
     def cli_user_debug_command(self,commandString, portId):   # To give the user the possibility to check commands       
         """ To give the user the possibility to check commands """
         methodLocalName = self.__lc_current_method_name(embedKrepoInit=True)
@@ -1909,7 +1869,6 @@ class InstrumentONT(Equipment):
         self.__lc_msg(localMessage)
         self.__method_success(methodLocalName, None, localMessage)
         return True, callResult
-
 
     def get_set_measurement_time(self, portId, gatingTime=""):   # ONT-5xx  Only   ### krepo added ###    
         """ Sets and  gets the measurement gating time.
@@ -1954,6 +1913,7 @@ class InstrumentONT(Equipment):
     #
     #   SDH EXPERT COMMANDS
     #
+
     def retrieve_optical_alarms(self, portId):   # ONT-5xx  ONT-6xx    ### krepo added ###       
         """ ONT-5XX  and ONT-6xx
             Retrieve optical alarms
@@ -2012,8 +1972,6 @@ class InstrumentONT(Equipment):
         self.__lc_msg(localMessage)
         self.__method_success(methodLocalName, None, localMessage)
         return True, retList
-
-
 
     def retrieve_sdh_alarms(self, portId):   # ONT-5xx  and ONT-6xx    ### krepo added ###       
         """ ONT-5XX  and ONT-6xx 
@@ -2175,8 +2133,6 @@ class InstrumentONT(Equipment):
             self.__method_failure(methodLocalName, None, "", localMessage)
             return False, retList
 
-
-
     def retrieve_ho_alarms(self, portId):   # ONT-5xx  Only    ### krepo added ###       
         """ ONT-5XX only
             Retrieve the following Higher Order SDH Alarms
@@ -2248,8 +2204,6 @@ class InstrumentONT(Equipment):
         self.__method_success(methodLocalName, None, localMessage)
         return True, retList
 
-
-
     def retrieve_lo_alarms(self, portId):   # ONT-5xx  Only    ### krepo added ###       
         """ ONT-5XX only
             Retrieve the following Lower Order SDH Alarms
@@ -2312,8 +2266,6 @@ class InstrumentONT(Equipment):
         self.__lc_msg(localMessage)
         self.__method_success(methodLocalName, None, localMessage)
         return True, retList
-
-
 
     def retrieve_ho_lo_alarms(self, portId):   # ONT-6xx  Only    ### krepo added ###       
         """ ONT-6XX only: both HO and LO alarms retrieved here
@@ -2410,8 +2362,6 @@ class InstrumentONT(Equipment):
         self.__method_success(methodLocalName, None, localMessage)
         return True, retList
 
-
-
     def get_set_laser_status(self, portId, laserStatus=""):   # ONT-5xx and ONT-6xx    ### krepo added ###       
         """ ONT-5XX and ONT-6xx
             Set or Retrieve the laser status
@@ -2457,8 +2407,6 @@ class InstrumentONT(Equipment):
         self.__lc_msg(localMessage)
         self.__method_success(methodLocalName, None, localMessage)
         return True, sdhAnswer
-
-
 
     def get_set_wavelenght(self, portId, waveLenght=""):   # ONT-5xx and ONT-6xx    ### krepo added ###       
         """ ONT-5XX only
@@ -2521,8 +2469,6 @@ class InstrumentONT(Equipment):
         self.__method_success(methodLocalName, None, localMessage)
         return True, sdhAnswer
 
-
-
     def __get_set_rx_bit_rate(self, portId, bitRate=""):   # ONT-5xx  ONT-6xx    ### krepo not added ###
         """ ONT-5XX only
             Get or Set the current bitRate from:
@@ -2580,8 +2526,6 @@ class InstrumentONT(Equipment):
         localMessage="Set RX bitRate required=[{}] after set=[{}] ".format(rxBitRateRequired,sdhAnswer)
         self.__lc_msg(localMessage)
         return True, sdhAnswer
-
-
 
     def get_set_rx_bit_rate(self, portId, bitRate=""):   # ONT-5xx  ONT-6xx    ### krepo added ###       
         """ ONT-5XX only
@@ -2644,8 +2588,6 @@ class InstrumentONT(Equipment):
         self.__method_success(methodLocalName, None, localMessage)
         return True, sdhAnswer
 
-
-
     def get_set_clock_reference_source(self, portId, clockMode=""):   # ONT-5xx and ONT-6xx    ### krepo added ###       
         """ ONT-5XX and ONT-6XX
             Get or Set the source of the reference clock:
@@ -2692,8 +2634,6 @@ class InstrumentONT(Equipment):
         self.__lc_msg(localMessage)
         self.__method_success(methodLocalName, None, localMessage)
         return True, sdhAnswer
-
-
 
     def get_set_rx_measure_channel(self, portId, rxChannel=""):   # ONT-5xx  Only    ### krepo added ###       
         """ ONT-5XX only
@@ -2747,8 +2687,6 @@ class InstrumentONT(Equipment):
         self.__lc_msg(localMessage)
         self.__method_success(methodLocalName, None, localMessage)
         return True, sdhAnswer
-
-
 
     def get_set_rx_channel_mapping_size(self, portId, channelMapping=""):   # ONT-5xx and ONT-6xx     ### krepo added ###       
         """ ONT-5XX only
@@ -2932,9 +2870,6 @@ class InstrumentONT(Equipment):
             self.__method_success(methodLocalName, None, localMessage)
             return True, sdhAnswer
 
-
-
-
     def get_set_alarmed_frames_number(self, portId, alarmedFramesNumber=""):   # ONT-5xx  and ONT-6xx    ### krepo added ###       
         """ ONT-5XX / ONT-6xx
             Get or Set the number of frames, in which alarm insertion is active.:
@@ -2983,8 +2918,6 @@ class InstrumentONT(Equipment):
         self.__method_success(methodLocalName, None, localMessage)
         return True, sdhAnswer
 
-
-
     def get_set_not_alarmed_frames_number(self, portId, notAlarmedFramesNumber=""):   # ONT-5xx  and ONT-6xx    ### krepo added ###      
         """ ONT-5XX only / ONT-6xx
             Get or Set the number of frames, in which alarm insertion is inactive.:
@@ -3031,8 +2964,6 @@ class InstrumentONT(Equipment):
         self.__lc_msg(localMessage)
         self.__method_success(methodLocalName, None, localMessage)
         return True, sdhAnswer
-
-
 
     def get_set_alarm_insertion_activation(self, portId, alarmOrder, alarmActivation=""):   # ONT-5xx  ONT-6xx    ### krepo added ###       
         """ ONT-5XX  / ONT-6xx
@@ -3087,8 +3018,6 @@ class InstrumentONT(Equipment):
         self.__lc_msg(localMessage)
         self.__method_success(methodLocalName, None, localMessage)
         return True, sdhAnswer
-
-
 
     def get_set_alarm_insertion_mode(self, portId, alarmOrder, alarmInsertionMode=""):   # ONT-5xx  ONT-6xx    ### krepo added ###       
         """ ONT-5XX ONT-6xx
@@ -3151,8 +3080,6 @@ class InstrumentONT(Equipment):
         self.__lc_msg(localMessage)
         self.__method_success(methodLocalName, None, localMessage)
         return True, sdhAnswer
-
-
 
     def get_set_alarm_insertion_type(self, portId, alarmInsertionType=""):   # ONT-5xx  ONT-6xx   ### krepo added ###      
         """ ONT-5XX   ONT-6xx
@@ -3271,7 +3198,6 @@ class InstrumentONT(Equipment):
         self.__method_success(methodLocalName, None, localMessage)
         return True, sdhAnswer
 
-
     def get_set_num_errored_burst_frames(self, portId, pathOrder, burstErroredFramesNumber=""):   # ONT-5xx  ONT-6xx   ### krepo added ###      
         """ ONT-5xx  ONT-6xx
             Get or Set number of frames, in which error insertion is active:
@@ -3322,7 +3248,6 @@ class InstrumentONT(Equipment):
         self.__lc_msg(localMessage)
         self.__method_success(methodLocalName, None, localMessage)
         return True, sdhAnswer
-
 
     def get_set_num_not_errored_burst_frames(self, portId, pathOrder, burstNotErroredFramesNumber=""):   # ONT-5xx  ONT-6xx   ### krepo added ###       
         """ ONT-5xx  ONT-6xx
@@ -3375,8 +3300,6 @@ class InstrumentONT(Equipment):
         self.__method_success(methodLocalName, None, localMessage)
         return True, sdhAnswer
 
-
-
     def get_set_error_activation(self, portId, pathOrder, errorActivation=""):   # ONT-5xx  ONT-6xx   ### krepo added ###       
         """ ONT-5xx  ONT-6xx
             Get or Set the error insertion status:
@@ -3428,8 +3351,6 @@ class InstrumentONT(Equipment):
         self.__lc_msg(localMessage)
         self.__method_success(methodLocalName, None, localMessage)
         return True, sdhAnswer
-
-
 
     def get_set_error_insertion_mode(self, portId, pathOrder, errorInsertionMode=""):   # ONT-5xx  ONT-6xx    ### krepo added ###       
         """ ONT-5XX ONT-6xx
@@ -3509,8 +3430,6 @@ class InstrumentONT(Equipment):
         self.__method_success(methodLocalName, None, localMessage)
         return True, sdhAnswer
 
-
-
     def get_set_error_rate(self, portId, pathOrder, errorRate=""):   # ONT-5xx  ONT-6xx    ### krepo added ###       
         """ ONT-5XX ONT-6xx
             Get or Set number of frames, in which error insertion is active:
@@ -3566,8 +3485,6 @@ class InstrumentONT(Equipment):
         self.__lc_msg(localMessage)
         self.__method_success(methodLocalName, None, localMessage)
         return True, sdhAnswer
-
-
 
     def get_set_error_insertion_type(self, portId, errorInsertionType=""):   # ONT-5xx ONT-6xx    ### krepo added ###      
         """ ONT-5XX  ONT-6xx
@@ -3651,8 +3568,6 @@ class InstrumentONT(Equipment):
         self.__method_success(methodLocalName, None, localMessage)
         return True, sdhAnswer
 
-
-
     def get_set_tx_bit_rate(self, portId, bitRate=""):   # ONT-5XX and ONT-6XX    ### krepo added ###    
         """ ONT-5XX and ONT-6XX
             Get or Set the current TX bitRate from:
@@ -3714,8 +3629,6 @@ class InstrumentONT(Equipment):
         self.__method_success(methodLocalName, None, localMessage)
         return True, sdhAnswer
 
-
-
     def get_set_tx_measure_channel(self, portId, txChannel=""):   # ONT-5xx  Only    ### krepo added ###       
         """ ONT-5XX only
             Get or Set measurement channel on TX side:
@@ -3768,8 +3681,6 @@ class InstrumentONT(Equipment):
         self.__lc_msg(localMessage)
         self.__method_success(methodLocalName, None, localMessage)
         return True, sdhAnswer
-
-
 
     def get_set_tx_channel_mapping_size(self, portId, channelMapping=""):     # ONT-5XX and ONT-6XX    ### krepo added ###    
         """ ONT-5XX only
@@ -3843,8 +3754,6 @@ class InstrumentONT(Equipment):
         self.__method_success(methodLocalName, None, localMessage)
         return True, sdhAnswer
 
-
-
     def get_set_tx_lo_measure_channel(self, portId, txLoChannel=""):   # ONT-5xx  ONT-6xx    ### krepo added ###      
         """ ONT-5XX  ONT-6xx
 
@@ -3904,8 +3813,6 @@ class InstrumentONT(Equipment):
         self.__method_success(methodLocalName, None, localMessage)
         return True, sdhAnswer
 
-
-
     def get_set_rx_lo_measure_channel(self, portId, rxLoChannel=""):   # ONT-5xx  ONT-6xx    ### krepo added ###    
         """ ONT-5XX ONT-6xx
 
@@ -3964,8 +3871,6 @@ class InstrumentONT(Equipment):
         self.__method_success(methodLocalName, None, localMessage)
         return True, sdhAnswer
 
-
-
     def get_set_background_channels_fill_mode(self, portId, backgroundMode=""):   # ONT-6xx only    ### krepo added ###      
         """ ONT-6xx only
             Get or Set the alarm insertion status:
@@ -4018,8 +3923,6 @@ class InstrumentONT(Equipment):
         self.__lc_msg(localMessage)
         self.__method_success(methodLocalName, None, localMessage)
         return True, sdhAnswer
-
-
 
     def get_set_tx_au_path_J1_trace_mode(self, portId, sequenceInJ1Byte=""):   # ONT-6xx only    ### krepo added ###       
         """ ONT-6xx only
@@ -4074,8 +3977,6 @@ class InstrumentONT(Equipment):
         self.__lc_msg(localMessage)
         self.__method_success(methodLocalName, None, localMessage)
         return True, sdhAnswer
-
-
 
     def get_set_au_path_trace_rx_channel(self, portId, auPathTraceMode=""):   # ONT-6xx only    ### krepo added ###       
         """ ONT-6xx only
@@ -4136,8 +4037,6 @@ class InstrumentONT(Equipment):
         self.__method_success(methodLocalName, None, localMessage)
         return True, sdhAnswer
 
-
-
     def get_set_au_path_trace_tx_channel(self, portId, auPathTraceMode=""):   # ONT-6xx only    ### krepo added ###      
         """ ONT-6xx only
             Get or Set the Au Path Trace Mode of the selected TX channel in J1 byte:
@@ -4197,8 +4096,6 @@ class InstrumentONT(Equipment):
         self.__method_success(methodLocalName, None, localMessage)
         return True, sdhAnswer
 
-
-
     def get_set_au_path_trace_rx_TR16_string(self, portId, expectedString=""):   # ONT-6xx only    ### krepo added ###      
         """ ONT-6xx only
             Get or Set the 15-char string in J1 byte for RX channel:
@@ -4246,8 +4143,6 @@ class InstrumentONT(Equipment):
         self.__method_success(methodLocalName, None, localMessage)
         return True, plainTextAnswer
 
-
-
     def get_set_au_path_trace_tx_TR16_string(self, portId, tr16String=""):   # ONT-6xx only  ### krepo added ###  
         """ ONT-6xx only
             Get or Set the 15-char string in J1 byte for TX channel:
@@ -4294,7 +4189,6 @@ class InstrumentONT(Equipment):
         self.__lc_msg(localMessage)
         self.__method_success(methodLocalName, None, plainTextAnswer)
         return True, plainTextAnswer
-
 
     def get_set_tu_path_trace_tx_TR16_string(self, portId, tr16String=""):   # ONT-6xx only  ### krepo added ###  
         """ ONT-6xx only
@@ -4390,10 +4284,6 @@ class InstrumentONT(Equipment):
         self.__method_success(methodLocalName, None, plainTextAnswer)
         return True, plainTextAnswer
 
-
-
-
-
     def get_set_tx_C2_signal_label(self, portId, zqC2label=""):   # ONT-6xx only    ### krepo added ###       
         """ ONT-6xx only
             Get or Set the C2 signal label byte:
@@ -4483,9 +4373,6 @@ class InstrumentONT(Equipment):
         self.__lc_msg(localMessage)
         self.__method_success(methodLocalName, None, localMessage)
         return True, sdhAnswer
-
-
-
 
     def get_set_tx_V5_signal_label(self, portId, zqV5label=""):   # ONT-6xx only    ### krepo added ###       
         """ ONT-6xx only
@@ -4662,7 +4549,6 @@ class InstrumentONT(Equipment):
         
         return True, callResult
 
-
     def get_set_enableServiceDisruption(self, portId, enableSDTest=""):   # ONT-5xx  Only   ### krepo added ###    
         """ 
             Return tuple: ( "True|False" , "< result/error list>)
@@ -4748,8 +4634,7 @@ class InstrumentONT(Equipment):
         serviceDisruptionParam.append(callResult)
 
         return True, serviceDisruptionParam
-    
-    
+       
     def setServiceDisruptionConfig(self, portId, separationTime="", trhesTime="", logMode="", sensor=""):   # ONT-5xx  Only   ### krepo added ###,    
         """
         Get the configuration setting for Service Disruption
@@ -4802,7 +4687,6 @@ class InstrumentONT(Equipment):
         self.__lc_msg(localMessage)
         
         return True, callResult
-
 
     def getServiceDisruptionResult(self, portId):      ### krepo added ###    
         """
