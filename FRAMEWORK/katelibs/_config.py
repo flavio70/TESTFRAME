@@ -16,6 +16,7 @@ class frmkLog():
     
     def __init__(self):
         c=_logConst()
+        print('\n\nkatelibs package base dir: %s\n\n'%c.PKG_DIR)
         with open(c.LOG_SETTINGS,"r",encoding="utf-8") as fd:
             D = json.load(fd)
             D.setdefault('version',1)
