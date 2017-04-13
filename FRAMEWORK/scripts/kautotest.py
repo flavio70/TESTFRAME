@@ -121,13 +121,13 @@ def guaranted_flow(args):
         else:
             set_RunTime_status(args.KateRunId, 'COMPLETED')
 
-        unlock_eqpt_nodes(eqpt_list)
+        unlock_eqpt_nodes(node_list)
         print('End of execution')
 
     except Exception as eee:
         print('Exception Detected: ' + str(eee))
         set_RunTime_status(args.KateRunId, 'ABORTED')
-        unlock_eqpt_nodes(eqpt_list)
+        unlock_eqpt_nodes(node_list)
 
 
 def besteffort_flow(args):
