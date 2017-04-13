@@ -1136,6 +1136,32 @@ class TL1message():
             return None
 
         return len(self.__m_coded['R_BODY_OK'])
+    
+    def get_cmd_display_output_rows(self):
+        """ Return and display the list of the valid rows (one dictionary is one rows) 
+            in the TL1 Response and calculate the number of valid rows 
+            None if wrong parameters are supplied
+        """
+        c = 1
+        b = []
+        
+        if self.__m_event:
+            return None
+
+        if self.get_cmd_status() != (True, "COMPLD"):
+            return None
+        
+        for the_key,the_val in self.__m_coded['R_BODY_OK'].items():
+                  print("Values the_key {} the_val {}\n".format(the_key,the_val))
+                  
+        a = self.__m_coded['R_BODY_OK'][the_key].__len__() #calcola la lunghezza della lista di dizionari
+        
+        for errore in self.__m_coded['R_BODY_OK'][the_key]:
+            b.append(errore)
+            print("Dizionario {} = {}".format(int(c),errore))
+            c = c + 1   
+        print("\n")
+        return b
 
 
     def get_cmd_attr_value(self, aid, attr):
