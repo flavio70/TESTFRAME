@@ -805,6 +805,13 @@ class TL1message():
                         for elem in words[1].split(','):
                             attr_val_list[str(local_index)] = elem
                             local_index += 1
+                            
+                    if words[3].find(',') != -1:
+                        my_pst_list = words[3].split(',')[0].split('&')
+                        my_sst_list = words[3].split(',')[1].split('&')
+                    else:
+                        my_pst_list = words[3].split('&')
+                        my_sst_list = ""        
 
                     if words[2] != "":
                         for elem in words[2].split(','):
@@ -812,11 +819,11 @@ class TL1message():
                                            
                         if words[0] in self.__m_coded['R_BODY_OK'].keys():
                             #aid already present in the R_BODY_OK dict structure
-                            self.__m_coded['R_BODY_OK'][words[0]].append({'VALUE' : attr_val_list})
+                            self.__m_coded['R_BODY_OK'][words[0]].append({'VALUE' : attr_val_list,'PST' : my_pst_list, 'SST' : my_sst_list})
                         else:
                             #aid is not present in the R_BODY_OK dict structure
                             row[ words[0] ]=[]
-                            row[ words[0] ].append({'VALUE' : attr_val_list})
+                            row[ words[0] ].append({'VALUE' : attr_val_list,'PST' : my_pst_list, 'SST' : my_sst_list})
                             self.__m_coded['R_BODY_OK'].update(row)
 
                     self.__m_coded['R_BODY_OK'].update(row)
