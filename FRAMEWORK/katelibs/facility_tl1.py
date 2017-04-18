@@ -805,6 +805,100 @@ class TL1message():
                         for elem in words[1].split(','):
                             attr_val_list[str(local_index)] = elem
                             local_index += 1
+
+                    if words[2] != "":
+                        for elem in words[2].split(','):
+                            attr_val_list[elem.split('=')[0]] = elem.split('=')[1]
+                                           
+                        if words[0] in self.__m_coded['R_BODY_OK'].keys():
+                            #aid already present in the R_BODY_OK dict structure
+                            self.__m_coded['R_BODY_OK'][words[0]].append({'VALUE' : attr_val_list})
+                        else:
+                            #aid is not present in the R_BODY_OK dict structure
+                            row[ words[0] ]=[]
+                            row[ words[0] ].append({'VALUE' : attr_val_list})
+                            self.__m_coded['R_BODY_OK'].update(row)
+
+                    self.__m_coded['R_BODY_OK'].update(row)
+                elif self.__m_coded['R_STATUS'] == "DENY":
+                    if len(stripped_line) == 4:
+                        self.__m_coded['R_ERROR'] = stripped_line
+                    else:
+                        self.__m_coded['R_BODY_KO'].append(stripped_line)
+                else:
+                    print("[{:s}] NON ANCORA GESTITO".format(self.__m_coded['R_STATUS']))
+                continue
+
+            if line == ';':
+                # TERMINATOR found - closing encoding
+                break
+
+
+    def __encode_resp_rtrv_crs(self):
+        """ INTERNAL USAGE
+        """
+        f_header = True
+        f_ident  = True
+        f_block  = True
+
+        f_skip_n = 0
+
+        for line in self.__m_plain.split('\n'):
+            if f_skip_n > 0:
+                # Skip one or more lines
+                f_skip_n = f_skip_n - 1
+                continue
+
+            if f_header:
+                if line.strip() == "":
+                    continue
+
+                self.__m_coded['C_SID']  = " ".join(line.split()[:-2]).replace('"', '')
+                self.__m_coded['C_DATE'] = line.split()[-2]
+                self.__m_coded['C_TIME'] = line.split()[-1]
+                f_header = False
+                continue
+
+            if f_ident:
+                words = line.split()
+
+                if is_autonomous_msg(words[0]):
+                    print("MESSAGGIO MALFORMATO")
+                    return
+
+                self.__m_coded['C_CODE']    = words[0]
+                self.__m_coded['C_TAG']     = words[1]
+                self.__m_coded['R_STATUS']  = words[2]
+                self.__m_coded['R_BODY_OK'] = {}
+                self.__m_coded['R_BODY_KO'] = []
+                self.__m_coded['R_ERROR']   = ""
+                f_ident = False
+                continue
+
+            if f_block:
+                # Command Response
+                stripped_line = line.strip()
+                if stripped_line == '>':
+                    f_skip_n = 2    # Long response - skip next 2 lines
+                    continue
+                if ( stripped_line.find('/*') != -1                                     and
+                     stripped_line.find("[{:s}]".format(self.__m_coded['C_TAG'])) != -1 and
+                     stripped_line.find('*/') != -1                                     ):
+                    # REMARK found - closing encoding
+                    tmp = stripped_line.replace("/* ","")
+                    tmp = tmp[:tmp.find(":")]
+                    self.__m_coded['R_BODY_CMD'] = tmp
+                    break
+                if self.__m_coded['R_STATUS'] == "COMPLD":
+                    words = stripped_line.replace('"', '').split(':')
+                    row = {}
+
+                    attr_val_list = {}
+                    if words[1] != "":
+                        local_index = 1
+                        for elem in words[1].split(','):
+                            attr_val_list[str(local_index)] = elem
+                            local_index += 1
                             
                     if words[3].find(',') != -1:
                         my_pst_list = words[3].split(',')[0].split('&')
@@ -969,8 +1063,8 @@ class TL1message():
                     response_type = "RTRV_POS_AND_NAME"
                     self.__m_type = "RTRV_POS_AND_NAME"
                 elif self.__m_plain.find("RTRV-CRS") != -1:
-                    response_type = "RTRV_POS_AND_NAME"
-                    self.__m_type = "RTRV_POS_AND_NAME"
+                    response_type = "RTRV_CRS"
+                    self.__m_type = "RTRV_CRS"
                 elif self.__m_plain.find("RTRV-ALM") != -1:
                     response_type = "RTRV_COND"
                     self.__m_type = "RTRV_COND"
@@ -1003,6 +1097,10 @@ class TL1message():
 
         if response_type == "RTRV_POS_AND_NAME":
             self.__encode_resp_rtrv_pos_and_name()
+            return
+        
+        if response_type == "RTRV_CRS":
+            self.__encode_resp_rtrv_crs()
             return
 
         if response_type == "ENT_CRS":
