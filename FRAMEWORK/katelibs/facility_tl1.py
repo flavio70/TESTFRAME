@@ -1257,6 +1257,9 @@ class TL1message():
         if self.get_cmd_status() != (True, "COMPLD"):
             return None
         
+        if self.__m_coded['R_BODY_OK'] == {}:
+            return None
+        
         for the_key,the_val in self.__m_coded['R_BODY_OK'].items():
                   print("Values the_key {} the_val {}\n".format(the_key,the_val))
                   
