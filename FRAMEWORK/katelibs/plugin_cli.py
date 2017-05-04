@@ -16,6 +16,7 @@ import threading
 import time
 import datetime
 import socket
+import os
 
 
 ########################################## CLASS Plugin1850CLI ####################
