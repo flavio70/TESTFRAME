@@ -502,6 +502,7 @@ class Plugin1850TL1():
         # Opening log file
         if log is not None:
             self.__logfile = open(log, "w")
+            os.chmod(log, 0o666)
 
         # TL1 Event Scanner initialization
         self.__collector = TL1EventCollector(self.__the_ip, self.__the_port, collector, self.__ktrc)

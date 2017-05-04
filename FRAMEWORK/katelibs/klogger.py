@@ -74,7 +74,9 @@ class Klogger1850():
         """
         file_name = "{}/{}_{}_ser#{:02d}.log".format(self.__basedir, self.__testname, self.__label, slot)
 
+        
         file_handler = open(file_name, "w")
+        os.chmod(file_name, 0o666)
 
         if file_handler is None:
             print("Error in opening {}".format(file_name))
