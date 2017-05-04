@@ -61,6 +61,10 @@ class Plugin1850CLI():
 
         # Opening log file
         if log is not None:
+
+
+            if os.path.isfile(log):os.remove(log)
+
             self.__logfile = open(log, "w")
             os.chmod(log, 0o666)
 
