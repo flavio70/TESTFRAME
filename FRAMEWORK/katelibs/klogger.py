@@ -74,7 +74,9 @@ class Klogger1850():
         """
         file_name = "{}/{}_{}_ser#{:02d}.log".format(self.__basedir, self.__testname, self.__label, slot)
 
-        
+ 
+        if os.path.isfile(file_name):os.remove(file_name)
+      
         file_handler = open(file_name, "w")
         os.chmod(file_name, 0o666)
 
