@@ -73,8 +73,15 @@ class InstrumentONT(Equipment):
         #self.VcToAu={"VC11":"AU4_C11", "VC12":"AU4_C12", "VC2":"NOTSUPPORTED", "VC3":"AU3_C3", "VC4":"AU4_C4", "VC4_4C":"AU4_4C", "VC4_16C":"AU4_16C", "VC4_64C":"AU4_64C"}
         self.VcToAu={"VC11":"AU4_C11", "VC12":"AU4_C12", "VC2":"NOTSUPPORTED", "VC3":"AU4_C3", "VC4":"AU4_C4", "VC4_4C":"AU4_4C", "VC4_16C":"AU4_16C", "VC4_64C":"AU4_64C"}
         self.E_TAG = "-10"
+
+
+        self.__logfileName = "{}/{}_{}_ont.log".format(kenv.path_logs(), kenv.get_test_name(), label)
+        if os.path.isfile(self.__logfileName):os.remove(self.__logfileName)
         
-        self.__logfile = open("{}/{}_{}_ont.log".format(kenv.path_logs(), kenv.get_test_name(), label), "w")
+        self.__logfile = open(self.__logfileName, "w")
+        os.chmod(self.__logfileName, 0o666)
+
+
         super().__init__(label, self.__prs.get_id(label))
         self.__get_instrument_info_from_db(self.__prs.get_id(label)) # inizializza i dati di IP, tipo di ONT..dal DB
         
