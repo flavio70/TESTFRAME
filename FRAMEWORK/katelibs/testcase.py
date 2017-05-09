@@ -1,11 +1,12 @@
 #!/usr/bin/env python
-"""
-@MODULE: testcase.py
-@AUTHOR: F.Ippolito
-@DATE  : 11/09/2015
-@Description: This module is used for general test case implementation.
-    Provides test class definition and common functions
-"""
+'''
+.. module::testcase
+   :platform: Unix
+   :synopsis:This module is used for general test case implementation.Provides test class definition and common functions
+
+.. moduleauthor:: Flavio Ippolito <flavio.ippolito@sm-optics.com>
+ 
+'''
 
 import argparse
 import traceback
@@ -16,8 +17,10 @@ from katelibs.kexception import KUserException, KFrameException
 
 
 class TestCase(object):
-    '''
-    TestCase General class definition
+    '''TestCase General class definition
+
+    :param str filename: test script Name
+    
     '''
 
     def __init__(self, filename):
@@ -172,35 +175,47 @@ class TestCase(object):
 
 
     def add_success(self, ref_obj, title, elapsed_time, out_text):
-        """ Inject a POSITIVE record on xml result file
-            ref_obj      : reference to an Equipment variable (could be None)
-            title        : describe the performed action. For example, a CLI/TL1/... command
-            out_text     : verbose description of test outcome.
-            elapsed_time : explicit declaration of test's time execution. See start_time()
+        """ Inject a POSITIVE record on xml K@TE result file.
+
+        :param ref_obj: reference to an Equipment variable (could be None)
+        :param title: describe the performed action. For example, a CLI/TL1/... command
+        :param out_text: verbose description of test outcome.
+        :param elapsed_time: explicit declaration of test's time execution. See start_time()
+
+        >>> Test1.add_success(NE1,'MyTitle','0.5','some output text')
+
         """
         self.kenvironment.krepo.add_success(ref_obj, title, elapsed_time, out_text)
 
 
     def add_failure(self, ref_obj, title, elapsed_time, out_text, err_text, log_text=None):
-        """ Inject a FAILURE record on xml result file
-            ref_obj      : reference to an Equipment variable (could be None)
-            title        : describe the performed action. For example, a CLI/TL1/... command
-            out_text     : verbose description of test outcome.
-            err_text     : verbose description of errored scenario.
-            log_text     : additional reference to log repository (optional)
-            elapsed_time : explicit declaration of test's time execution. See start_time()
+        """ Inject a FAILURE record on xml K@TE result file.
+
+        :param ref_obj: reference to an Equipment variable (could be None)
+        :param title: describe the performed action. For example, a CLI/TL1/... command
+        :param out_text: verbose description of test outcome.
+        :param err_text: verbose description of errored scenario.
+        :param log_text: additional reference to log repository (optional)
+        :param elapsed_time: explicit declaration of test's time execution. See start_time()
+
+        >>> Test1.add_failure(NE1,'MyTitle','0.5','some output text', 'some error details')
+
         """
         self.kenvironment.krepo.add_failure(ref_obj, title, elapsed_time, out_text, err_text, log_text)
 
 
     def add_skipped(self, ref_obj, title, elapsed_time, out_text, err_text, skip_text=None):
-        """ Inject a SKIPPED record on xml result file
-            ref_obj      : reference to an Equipment variable (could be None)
-            title        : describe the performed action. For example, a CLI/TL1/... command
-            out_text     : verbose description of test outcome.
-            err_text     : verbose description of skip reasons
-            log_text     : additional reference to log repository (optional)
-            elapsed_time : explicit declaration of test's time execution. See start_time()
+        """ Inject a SKIPPED record on xml K@TE result file.
+
+        :param ref_obj: reference to an Equipment variable (could be None)
+        :param title: describe the performed action. For example, a CLI/TL1/... command
+        :param out_text: verbose description of test outcome.
+        :param err_text: verbose description of skip reasons
+        :param log_text: additional reference to log repository (optional)
+        :param elapsed_time: explicit declaration of test's time execution. See start_time()
+
+        >>> Test1.add_skipped(NE1,'MyTitle','0.5','some output text', 'some skipped details')
+
         """
         self.kenvironment.krepo.add_skipped(ref_obj, title, elapsed_time, out_text, err_text, skip_text)
 
