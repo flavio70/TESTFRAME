@@ -3352,6 +3352,143 @@ class InstrumentONT(Equipment):
         self.__method_success(methodLocalName, None, localMessage)
         return True, sdhAnswer
 
+    def retrieve_sdh_errors(self, portId):   # ONT-5xx  and ONT-6xx    ### krepo added ###       
+        """ ONT-5XX  and ONT-6xx 
+            Retrieve SDH Errors in both instruments types, without no HO/LO distinction.
+            Use this method to ease the errors retrieving for all JDSU/ Ont5xx/6xx instruments
+            ONT-5XX / Higher Order SDH Errors:  
+                FAS       1    FAS error.
+                RS-BIP    2    B1 error.
+                MS-BIP    4    B2 error.
+                MS-REI    8    MS-REI error.
+                HP-BIP    16   B3 error.
+                HP-REI    32   HP-REI error.
+                AU-PCO    64   Pointer Increment.
+                AU-NCO    128  Pointer Decrement.
+                AU-NDF    256  Pointer with New Data Flag.
+                AU-PVAL   512  New Pointer Value.
+
+            ONT-5XX / Lower Order SDH Errors:  
+                LP-BIP    1    BIP-2 error
+                LP-REI    2    LP-REI error
+                TU-PCO    4    VC-11/12 Pointer Increment
+                TU-NCO    8    VC-11/12 Pointer Decrement
+                TU-NDF    16   VC-11/12 Pointer with New Data Flag
+                TU-PVAL   32   New VC-11/12 Pointer Value
+
+            ONT-6XX HO and LO alarms SDH Errors
+                FAS           1        FAS
+                RS-BIP        2        RS BIP (B1)            
+                MS-BIP        4        MS BIP (B2)            
+                MS-REI        8        MS-REI            
+                HP-BIP        16       HP BIP (B3)            
+                HP-REI        32       HP-REI            
+                AU-NDF        64       AU-PJE with AU-NDF            
+                AU-PJE-INC    128      AU-PJE Incr.            
+                AU-PJE-DEC    256      AU-PJE Decr.            
+                BIP-2         1024     BIP-2            
+                LP-REI        2048     LP-REI            
+                TU-NDF        4096     TU-NDF            
+                TU-PJE-INC    8192     TU-PJE-INC            
+                TU-PJE-DEC    16384    TU-PJE-DEC            
+            Return tuple:
+            ( "True|False" , "<return string / error list>)
+            True : command execution ok, the return string contains the error list (empty if no alarm)
+            False: command execution failed, error string for debug purposes
+        """
+        methodLocalName = self.__lc_current_method_name(embedKrepoInit=True)
+        portId = self.__recover_port_to_use(portId)
+        if portId == "":
+            localMessage = "[{}] ERROR retrieve_ho_error: portId  [{}] not specified".format(methodLocalName,portId)
+            self.__lc_msg(localMessage)
+            self.__method_failure(methodLocalName, None, "", localMessage)
+            return False, localMessage
+        retList = []
+        if self.__ontType  == "6xx":  # ONT 6xx management
+            localCommand=":SDH:SEL:HST:ERR?"
+            rawCallResult = self.__send_port_cmd(portId, localCommand)
+            sdhAnswer = self.__remove_dust(rawCallResult[1])
+            resultItemsArray=sdhAnswer.split(",")
+            if resultItemsArray[0] == "-1":  # SDH command error
+                localMessage = "ERROR: retrieve_sdh_errors ({}) answers :[{}] ".format(localCommand,resultItemsArray[0])
+                self.__lc_msg(localMessage)
+                self.__method_failure(methodLocalName, None, "", localMessage)
+                return False, localMessage
+            alarmCodes = resultItemsArray[1]
+            localMessage="[6xx] Optical errors retcode: [{}]".format(str(alarmCodes))
+            self.__lc_msg(str(localMessage))
+            alarmCodes=int(float(alarmCodes))
+            if alarmCodes & 1 :           retList += ["FAS"]
+            if alarmCodes & 2 :           retList += ["RS-BIP"]
+            if alarmCodes & 4 :           retList += ["MS-BIP"]
+            if alarmCodes & 8 :           retList += ["MS-REI"]
+            if alarmCodes & 16 :          retList += ["HP-BIP"]
+            if alarmCodes & 32 :          retList += ["HP-REI"]
+            if alarmCodes & 64 :          retList += ["AU-NDF"]
+            if alarmCodes & 128 :         retList += ["AU-PJE-INC"]
+            if alarmCodes & 256 :         retList += ["AU-PJE-DEC"]
+            if alarmCodes & 1024 :        retList += ["BIP-2"]
+            if alarmCodes & 2048 :        retList += ["LP-REI"]
+            if alarmCodes & 4096 :        retList += ["TU-NDF"]
+            if alarmCodes & 8192 :        retList += ["TU-PJE-INC"]
+            if alarmCodes & 16384 :       retList += ["TU-PJE-DEC"]
+            localMessage="High Order and Lower Order Found Errors: [{}]".format(retList)
+            self.__lc_msg(localMessage)
+            self.__method_success(methodLocalName, None, localMessage)
+            return True, retList
+        elif self.__ontType  == "5xx":  # ONT 5xx management :
+            localCommand=":HST:RX:SDH:ERR?"
+            rawCallResult = self.__send_port_cmd(portId, localCommand)
+            sdhAnswer = self.__remove_dust(rawCallResult[1])
+            resultItemsArray=sdhAnswer.split(",")
+            if resultItemsArray[0] == "-1":  # SDH command error
+                localMessage = "ERROR: retrieve_sdh_ho_errors ({}) answers :[{}] ".format(localCommand,resultItemsArray[0])
+                self.__lc_msg(localMessage)
+                self.__method_failure(methodLocalName, None, "", localMessage)
+                return False, localMessage
+            alarmCodes = resultItemsArray[1]
+            alarmCodes=int(float(alarmCodes))
+            if alarmCodes & 1:            retList += ["FAS"]
+            if alarmCodes & 2:            retList += ["RS-BIP"]
+            if alarmCodes & 4:            retList += ["MS-BIP"]
+            if alarmCodes & 8:            retList += ["MS-REI"]
+            if alarmCodes & 16:           retList += ["HP-BIP"]
+            if alarmCodes & 32:           retList += ["HP-REI"]
+            if alarmCodes & 64:           retList += ["AU-PCO"]
+            if alarmCodes & 128:          retList += ["AU-NCO"]
+            if alarmCodes & 256:          retList += ["AU-NDF"]
+            if alarmCodes & 512:          retList += ["AU-PVAL"]
+             
+            localCommand=":HST:RX:SDH:TRIB:ERR?"
+            rawCallResult = self.__send_port_cmd(portId, localCommand)
+            sdhAnswer = self.__remove_dust(rawCallResult[1])
+            resultItemsArray=sdhAnswer.split(",")
+            if resultItemsArray[0] == "-1":  # SDH command errorJust print a message in case of lower order errors
+                localMessage = "INFO: retrieve_sdh_lo_errors ({}) answers :[{}] skipping LO sdh error processing".format(localCommand,resultItemsArray[0])
+                self.__lc_msg(localMessage)
+                #self.__method_failure(methodLocalName, None, "", localMessage)
+                #return False, localMessage
+            else:  # with no errors in lower order error retrieve process alarmCodes
+                alarmCodes = resultItemsArray[1]
+                alarmCodes=int(float(alarmCodes))
+                if alarmCodes & 1:            retList += ["LP-BIP"]
+                if alarmCodes & 2:            retList += ["LP-REI"]
+                if alarmCodes & 4:            retList += ["TU-PCO"]
+                if alarmCodes & 8:            retList += ["TU-NCO"]
+                if alarmCodes & 16:           retList += ["TU-NDF"]
+                if alarmCodes & 32:           retList += ["TU-PVAL"]
+            localMessage="Found Errors: [{}]".format(retList)
+            self.__lc_msg(localMessage)
+            self.__method_success(methodLocalName, None, localMessage)
+            return True, retList
+        else :  # "Instrument not supported" case management :
+            localMessage="Instrument [{}] not supported".format(retList)
+            self.__lc_msg(localMessage)
+            self.__method_failure(methodLocalName, None, "", localMessage)
+            return False, retList
+
+   
+    
     def get_set_num_errored_burst_frames(self, portId, pathOrder, burstErroredFramesNumber=""):   # ONT-5xx  ONT-6xx   ### krepo added ###      
         """ ONT-5xx  ONT-6xx
             Get or Set number of frames, in which error insertion is active:
