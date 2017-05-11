@@ -543,12 +543,20 @@ class InstrumentONT(Equipment):
 
             self.__lc_msg("Step 2 ++++++++++++++++++++++++++")
 
-            callResult = self.select_port(portId)
-            if self.__check_method_execution("select_port") == False: 
-                callResult = self.deselect_port(portId)    # uncomment to deselect the specified port
-                localMessage="Error in method [{}] call \n".format(localMethodName)
-                self.__lc_msg(localMessage)
-                return False, "Error in method "+ localMethodName +" call "
+
+            # provo a bypassare se gia' caricata
+            callResult = self.get_selected_ports(portId)
+            if (callResult[0] == True):
+                #port alredy used
+                messageForDebugPurposes = "Port already in use"
+                self.__lc_msg(messageForDebugPurposes)
+            else:
+                callResult = self.select_port(portId)
+                if self.__check_method_execution("select_port") == False: 
+                    callResult = self.deselect_port(portId)    # uncomment to deselect the specified port
+                    localMessage="Error in method [{}] call \n".format(localMethodName)
+                    self.__lc_msg(localMessage)
+                    return False, "Error in method "+ localMethodName +" call "
 
             self.__lc_msg("Step 3 ++++++++++++++++++++++++++")
             
@@ -631,7 +639,10 @@ class InstrumentONT(Equipment):
         localMessage="[{}]: init_instrument: instrument correctly initialized".format(self.__ontType)
         self.__lc_msg(localMessage)
         return True, localMessage
-    
+ 
+
+
+   
     def __recover_port_to_use(self, portId):
         """ Smart port translator (5xx/6xx):
             if portId=/rack/slot/portNo  --> return      /rack/slot/portNo  
@@ -646,6 +657,8 @@ class InstrumentONT(Equipment):
         localMessage = "Port fixed: [{}]-->[{}]".format(portId, originalPortId )
         self.__lc_msg(localMessage)
         return originalPortId  
+
+
 
     def deinit_instrument(self, portId):
         """
@@ -917,6 +930,52 @@ class InstrumentONT(Equipment):
 
 
 
+    def __J1StringToAsciiCsv(self, stringToConvert):
+        ''' 
+            Convert a string to a CSV ascii list for ONT5xx
+            with 64 byte length filled with space
+            'es: {:<15}'.format(a[:15])
+        '''
+        print (len(stringToConvert))
+        tempStr = stringToConvert
+        if (len(stringToConvert) < 64):
+            # fill the string with space using format function
+            tempStr = "{:<64}".format(tempStr)
+            print (len(tempStr), tempStr)
+            # fill the string with space using format function
+#             tempStr = tempStr.ljust(64)
+#             print (len(tempStr), tempStr)
+            # fill the string with space using format function
+#             spacesString="                                                                "
+#             tempStr=stringToConvert+spacesString
+        # slice the string to 64 char
+        tempStr1=tempStr[0:64]
+        #print ("tempStr1: ", len(tempStr1))
+        # convert to a list of ascii char
+        asciiCsvTempResult=[ord(c) for c in tempStr1]
+        # build a csv for ONT
+        asciiCsvResult=""
+        flag=0
+        for element in  asciiCsvTempResult:
+            if flag == 0:
+                asciiCsvResult+=str(element)
+                flag=1
+            else:
+                asciiCsvResult+=","+str(element)
+        #print(stringToConvert)
+        #print(asciiCsvResult)
+        return asciiCsvResult
+    
+    
+        
+
+
+
+
+
+
+
+
     #
     #   ACCOUNT MANAGEMENT
     #
@@ -990,6 +1049,39 @@ class InstrumentONT(Equipment):
         self.__sessionName = sessionName
         self.__method_failure(methodLocalName, None, "", localMessage)
         return False, localMessage
+
+
+
+    def getSession(self):       ### krepo added ###
+        """ get session """
+        methodLocalName = self.__lc_current_method_name(embedKrepoInit=True)
+        # create a new session if not exsists and check if done
+        #localCommand=":SESM:SES:ASYN {}".format(sessionName)
+#         localCommand=":SESM:SES {}".format(sessionName)
+#         callResult = self.__send_cmd(localCommand)
+        # check if session created
+        
+        localCommand=":SESM:SES?"
+        callResult = self.__send_cmd(localCommand)
+        print (callResult)
+        if callResult[0] == True:
+            print(callResult[1])
+            sessionString = callResult[1].replace("> ","").replace('\n','')
+            print ("sessionString:", sessionString)
+#             sessionString1 = sessionString.replace('\n','')
+#             print ("sessionString1:", sessionString1)    
+            localMessage="sessionString [{}]  present)".format(sessionString)
+            self.__lc_msg(localMessage)
+            sessionString1 = self.__remove_dust(callResult[1])
+            localMessage="sessionString1 [{}]  present)".format(sessionString1)
+            self.__lc_msg(localMessage)
+            return True, sessionString
+        else:
+            localMessage = "Session not present" 
+            self.__lc_msg(localMessage)
+            return False, ""
+
+
 
     def set_user(self,ontUsr='Automation',ontPwd='Automation'):
         """Set current user and password"""
@@ -1141,6 +1233,13 @@ class InstrumentONT(Equipment):
         self.__lc_msg(localMessage)
         return True
 
+
+    def getOntType(self):  ### krepo not added ###
+        # to check if Ont Type has been correctly detected
+        return (self.__ontType)
+
+
+
     def select_port(self, portId):  ### krepo added ###
         """ Select the portId ( /rack/slotNo/portNo ) port
             if available for the use
@@ -1184,6 +1283,54 @@ class InstrumentONT(Equipment):
         else:
             self.__method_failure(methodLocalName, None, "", localMessage)
         return portAllocated, localMessage
+
+
+
+    def selectPort(self, portId):  ### krepo added ###
+        """ Select the portId ( /rack/slotNo/portNo ) port
+            if available for the use
+            Return tuple:
+            True , < information string >
+            False, < cause of fail (eg: port already selected... >  """
+        # basic check input parameter
+        methodLocalName = self.__lc_current_method_name(embedKrepoInit=True)
+        portId = self.__recover_port_to_use(portId)
+        if portId == "":
+            localMessage = "port:[{}] not specified: empty parameter".format(portId)
+            self.__lc_msg(localMessage)
+            self.__method_failure(methodLocalName, None, "", localMessage)
+            return False, localMessage
+        # port availability check
+        callResult = self.get_available_ports()
+        verifyResult = self.__verify_presence_in_csv_format_answer(callResult, portId)
+        if not verifyResult[0]: # False
+            localMessage = "Port [{}] not selected: not found in available ports list".format(portId)
+            self.__lc_msg(localMessage)
+            self.__method_failure(methodLocalName, None, "", localMessage)
+            return False, localMessage
+        # ONT command
+        localCommand = ":PRTM:SEL {}".format(portId)
+        CallResult   = self.__send_cmd(localCommand)
+        # verify command execution result
+        portAllocated = False
+        localMessage = "Port [{}] selection FAILED: still present in available ports list".format(portId)
+        for n in range(1,self.__ontCmdMaxRetry):
+            callResult = self.get_available_ports()
+            verifyResult = self.__verify_presence_in_csv_format_answer(callResult, portId)
+            if not verifyResult[0]: # False means: port correctly allocated
+                commandExecTime = (n * self.__ontSleepTimeForRetry)
+                localMessage="Port [{}] selection OK: no more present in available ports list (retry : [{}])".format(portId, n)
+                self.__lc_msg(localMessage)
+                portAllocated = True
+                break
+            time.sleep(self.__ontSleepTimeForRetry)
+        if portAllocated == True:
+            self.__method_success(methodLocalName, None, localMessage)
+        else:
+            self.__method_failure(methodLocalName, None, "", localMessage)
+        return portAllocated, localMessage
+
+
 
     def deselect_port(self, portId): ### krepo added ###
         """ Deselect the portId ( /rack/slotNo/portNo ) port
@@ -2044,7 +2191,7 @@ class InstrumentONT(Equipment):
             return False, localMessage
         retList = []
         if self.__ontType  == "6xx":  # ONT 6xx management
-            localCommand="SDH:SEL:CST:ALAR?"
+            localCommand="SDH:SEL:HST:ALAR?"
             rawCallResult = self.__send_port_cmd(portId, localCommand)
             sdhAnswer = self.__remove_dust(rawCallResult[1])
             resultItemsArray=sdhAnswer.split(",")
@@ -2326,7 +2473,7 @@ class InstrumentONT(Equipment):
             self.__lc_msg(localMessage)
             self.__method_failure(methodLocalName, None, "", localMessage)
             return False, localMessage
-        localCommand="SDH:SEL:CST:ALAR?"
+        localCommand="SDH:SEL:HST:ALAR?"
         rawCallResult = self.__send_port_cmd(portId, localCommand)
         sdhAnswer = self.__remove_dust(rawCallResult[1])
         resultItemsArray=sdhAnswer.split(",")
@@ -3205,6 +3352,143 @@ class InstrumentONT(Equipment):
         self.__method_success(methodLocalName, None, localMessage)
         return True, sdhAnswer
 
+    def retrieve_sdh_errors(self, portId):   # ONT-5xx  and ONT-6xx    ### krepo added ###       
+        """ ONT-5XX  and ONT-6xx 
+            Retrieve SDH Errors in both instruments types, without no HO/LO distinction.
+            Use this method to ease the errors retrieving for all JDSU/ Ont5xx/6xx instruments
+            ONT-5XX / Higher Order SDH Errors:  
+                FAS       1    FAS error.
+                RS-BIP    2    B1 error.
+                MS-BIP    4    B2 error.
+                MS-REI    8    MS-REI error.
+                HP-BIP    16   B3 error.
+                HP-REI    32   HP-REI error.
+                AU-PCO    64   Pointer Increment.
+                AU-NCO    128  Pointer Decrement.
+                AU-NDF    256  Pointer with New Data Flag.
+                AU-PVAL   512  New Pointer Value.
+
+            ONT-5XX / Lower Order SDH Errors:  
+                LP-BIP    1    BIP-2 error
+                LP-REI    2    LP-REI error
+                TU-PCO    4    VC-11/12 Pointer Increment
+                TU-NCO    8    VC-11/12 Pointer Decrement
+                TU-NDF    16   VC-11/12 Pointer with New Data Flag
+                TU-PVAL   32   New VC-11/12 Pointer Value
+
+            ONT-6XX HO and LO alarms SDH Errors
+                FAS           1        FAS
+                RS-BIP        2        RS BIP (B1)            
+                MS-BIP        4        MS BIP (B2)            
+                MS-REI        8        MS-REI            
+                HP-BIP        16       HP BIP (B3)            
+                HP-REI        32       HP-REI            
+                AU-NDF        64       AU-PJE with AU-NDF            
+                AU-PJE-INC    128      AU-PJE Incr.            
+                AU-PJE-DEC    256      AU-PJE Decr.            
+                BIP-2         1024     BIP-2            
+                LP-REI        2048     LP-REI            
+                TU-NDF        4096     TU-NDF            
+                TU-PJE-INC    8192     TU-PJE-INC            
+                TU-PJE-DEC    16384    TU-PJE-DEC            
+            Return tuple:
+            ( "True|False" , "<return string / error list>)
+            True : command execution ok, the return string contains the error list (empty if no alarm)
+            False: command execution failed, error string for debug purposes
+        """
+        methodLocalName = self.__lc_current_method_name(embedKrepoInit=True)
+        portId = self.__recover_port_to_use(portId)
+        if portId == "":
+            localMessage = "[{}] ERROR retrieve_ho_error: portId  [{}] not specified".format(methodLocalName,portId)
+            self.__lc_msg(localMessage)
+            self.__method_failure(methodLocalName, None, "", localMessage)
+            return False, localMessage
+        retList = []
+        if self.__ontType  == "6xx":  # ONT 6xx management
+            localCommand=":SDH:SEL:HST:ERR?"
+            rawCallResult = self.__send_port_cmd(portId, localCommand)
+            sdhAnswer = self.__remove_dust(rawCallResult[1])
+            resultItemsArray=sdhAnswer.split(",")
+            if resultItemsArray[0] == "-1":  # SDH command error
+                localMessage = "ERROR: retrieve_sdh_errors ({}) answers :[{}] ".format(localCommand,resultItemsArray[0])
+                self.__lc_msg(localMessage)
+                self.__method_failure(methodLocalName, None, "", localMessage)
+                return False, localMessage
+            alarmCodes = resultItemsArray[1]
+            localMessage="[6xx] Optical errors retcode: [{}]".format(str(alarmCodes))
+            self.__lc_msg(str(localMessage))
+            alarmCodes=int(float(alarmCodes))
+            if alarmCodes & 1 :           retList += ["FAS"]
+            if alarmCodes & 2 :           retList += ["RS-BIP"]
+            if alarmCodes & 4 :           retList += ["MS-BIP"]
+            if alarmCodes & 8 :           retList += ["MS-REI"]
+            if alarmCodes & 16 :          retList += ["HP-BIP"]
+            if alarmCodes & 32 :          retList += ["HP-REI"]
+            if alarmCodes & 64 :          retList += ["AU-NDF"]
+            if alarmCodes & 128 :         retList += ["AU-PJE-INC"]
+            if alarmCodes & 256 :         retList += ["AU-PJE-DEC"]
+            if alarmCodes & 1024 :        retList += ["BIP-2"]
+            if alarmCodes & 2048 :        retList += ["LP-REI"]
+            if alarmCodes & 4096 :        retList += ["TU-NDF"]
+            if alarmCodes & 8192 :        retList += ["TU-PJE-INC"]
+            if alarmCodes & 16384 :       retList += ["TU-PJE-DEC"]
+            localMessage="High Order and Lower Order Found Errors: [{}]".format(retList)
+            self.__lc_msg(localMessage)
+            self.__method_success(methodLocalName, None, localMessage)
+            return True, retList
+        elif self.__ontType  == "5xx":  # ONT 5xx management :
+            localCommand=":HST:RX:SDH:ERR?"
+            rawCallResult = self.__send_port_cmd(portId, localCommand)
+            sdhAnswer = self.__remove_dust(rawCallResult[1])
+            resultItemsArray=sdhAnswer.split(",")
+            if resultItemsArray[0] == "-1":  # SDH command error
+                localMessage = "ERROR: retrieve_sdh_ho_errors ({}) answers :[{}] ".format(localCommand,resultItemsArray[0])
+                self.__lc_msg(localMessage)
+                self.__method_failure(methodLocalName, None, "", localMessage)
+                return False, localMessage
+            alarmCodes = resultItemsArray[1]
+            alarmCodes=int(float(alarmCodes))
+            if alarmCodes & 1:            retList += ["FAS"]
+            if alarmCodes & 2:            retList += ["RS-BIP"]
+            if alarmCodes & 4:            retList += ["MS-BIP"]
+            if alarmCodes & 8:            retList += ["MS-REI"]
+            if alarmCodes & 16:           retList += ["HP-BIP"]
+            if alarmCodes & 32:           retList += ["HP-REI"]
+            if alarmCodes & 64:           retList += ["AU-PCO"]
+            if alarmCodes & 128:          retList += ["AU-NCO"]
+            if alarmCodes & 256:          retList += ["AU-NDF"]
+            if alarmCodes & 512:          retList += ["AU-PVAL"]
+             
+            localCommand=":HST:RX:SDH:TRIB:ERR?"
+            rawCallResult = self.__send_port_cmd(portId, localCommand)
+            sdhAnswer = self.__remove_dust(rawCallResult[1])
+            resultItemsArray=sdhAnswer.split(",")
+            if resultItemsArray[0] == "-1":  # SDH command errorJust print a message in case of lower order errors
+                localMessage = "INFO: retrieve_sdh_lo_errors ({}) answers :[{}] skipping LO sdh error processing".format(localCommand,resultItemsArray[0])
+                self.__lc_msg(localMessage)
+                #self.__method_failure(methodLocalName, None, "", localMessage)
+                #return False, localMessage
+            else:  # with no errors in lower order error retrieve process alarmCodes
+                alarmCodes = resultItemsArray[1]
+                alarmCodes=int(float(alarmCodes))
+                if alarmCodes & 1:            retList += ["LP-BIP"]
+                if alarmCodes & 2:            retList += ["LP-REI"]
+                if alarmCodes & 4:            retList += ["TU-PCO"]
+                if alarmCodes & 8:            retList += ["TU-NCO"]
+                if alarmCodes & 16:           retList += ["TU-NDF"]
+                if alarmCodes & 32:           retList += ["TU-PVAL"]
+            localMessage="Found Errors: [{}]".format(retList)
+            self.__lc_msg(localMessage)
+            self.__method_success(methodLocalName, None, localMessage)
+            return True, retList
+        else :  # "Instrument not supported" case management :
+            localMessage="Instrument [{}] not supported".format(retList)
+            self.__lc_msg(localMessage)
+            self.__method_failure(methodLocalName, None, "", localMessage)
+            return False, retList
+
+   
+    
     def get_set_num_errored_burst_frames(self, portId, pathOrder, burstErroredFramesNumber=""):   # ONT-5xx  ONT-6xx   ### krepo added ###      
         """ ONT-5xx  ONT-6xx
             Get or Set number of frames, in which error insertion is active:
@@ -4002,10 +4286,7 @@ class InstrumentONT(Equipment):
         if self.__ontType  == "6xx":
             ONTCmdString=":SENS:DATA:TEL:SDH:PATH:SEL:J1TR:MODE"
         else:
-            localMessage="Command supported by ONT-6xx only (current test equipment type:[{}]) ".format(self.__ontType)
-            self.__lc_msg(localMessage)
-            self.__method_failure(methodLocalName, None, "", localMessage)
-            return False, localMessage
+            ONTCmdString = ":SENS:DATA:TEL:SDH:PATH1:OVER:J1TR:MODE"
 
         if portId == "":
             localMessage = "ERROR get_set_au_path_trace_rx_channel: portId  [{}] not specified".format(portId)
@@ -4061,10 +4342,7 @@ class InstrumentONT(Equipment):
         if self.__ontType  == "6xx":
             ONTCmdString=":SOUR:DATA:TEL:SDH:PATH:SEL:J1TR:MODE"
         else:
-            localMessage="Command supported by ONT-6xx only (current test equipment type:[{}]) ".format(self.__ontType)
-            self.__lc_msg(localMessage)
-            self.__method_failure(methodLocalName, None, "", localMessage)
-            return False, localMessage
+            ONTCmdString=":SOUR:DATA:TEL:SDH:PATH1:OVER:J1TR:MODE"
 
         if portId == "":
             localMessage = "ERROR get_set_au_path_trace_tx_channel: portId  [{}] not specified".format(portId)
@@ -4121,10 +4399,18 @@ class InstrumentONT(Equipment):
         if self.__ontType  == "6xx":
             ONTCmdString=":SENS:DATA:TEL:SDH:PATH:SEL:J1TR:REF:TR16:BLOC"
         else:
-            localMessage="Command supported by ONT-6xx only (current test equipment type:[{}]) ".format(self.__ontType)
-            self.__lc_msg(localMessage)
-            self.__method_failure(methodLocalName, None, "", localMessage)
-            return False, localMessage
+            if (expectedString == ""):
+                # Get auPathTraceMode and exit
+                res = self.getAuPathTraceRxJ1ExpectedONT5xx(portId)
+            else:
+                res = self.setAuPathTraceRxJ1ExpectedONT5xx(portId, expectedString)
+                
+            return (res)
+            
+#             localMessage="Command supported by ONT-6xx only (current test equipment type:[{}]) ".format(self.__ontType)
+#             self.__lc_msg(localMessage)
+#             self.__method_failure(methodLocalName, None, "", localMessage)
+#             return False, localMessage
         if expectedString == "":  # Get auPathTraceMode and exit
             localCommand="{}?".format(ONTCmdString)
             rawCallResult = self.__send_port_cmd(portId, localCommand)
@@ -4168,10 +4454,17 @@ class InstrumentONT(Equipment):
         if self.__ontType  == "6xx":
             ONTCmdString=":SOUR:DATA:TEL:SDH:PATH:SEL:J1TR:TR16:BLOC"
         else:
-            localMessage="Command supported by ONT-6xx only (current test equipment type:[{}]) ".format(self.__ontType)
-            self.__lc_msg(localMessage)
-            self.__method_failure(methodLocalName, None, "", localMessage)
-            return False, localMessage
+            if (tr16String == ""):
+                # Get auPathTraceMode and exit
+                res = self.getAuPathTraceTxJ1StringONT5xx(portId)
+            else:
+                res = self.setAuPathTraceTxJ1StringONT5xx(portId, tr16String)
+                
+            return (res)
+#             localMessage="Command supported by ONT-6xx only (current test equipment type:[{}]) ".format(self.__ontType)
+#             self.__lc_msg(localMessage)
+#             self.__method_failure(methodLocalName, None, "", localMessage)
+#             return False, localMessage
         if tr16String == "":  # Get auPathTraceMode and exit
             localCommand="{}?".format(ONTCmdString)
             rawCallResult = self.__send_port_cmd(portId, localCommand)
@@ -4196,6 +4489,61 @@ class InstrumentONT(Equipment):
         self.__lc_msg(localMessage)
         self.__method_success(methodLocalName, None, plainTextAnswer)
         return True, plainTextAnswer
+
+
+
+
+
+
+    def getAuPathTraceTxJ1StringONT5xx(self, portId):
+        '''
+        Get J1 trace transmitted on ONT5xxx
+        '''
+        methodLocalName = self.__lc_current_method_name()
+
+        
+        portId = self.__recover_port_to_use(portId)
+        if self.__ontType  == "5xx":
+            ONTCmdString=":SOUR:DATA:TEL:SDH:PATH1:OVER:J1TR:BLOC"
+            
+        localCommand="{}?".format(ONTCmdString)
+        rawCallResult = self.__send_port_cmd(portId, localCommand)
+        if (rawCallResult[0] == False):
+            return False, ""
+         
+        sdhAnswer = self.__remove_dust(rawCallResult[1])
+        #print (sdhAnswer)
+        plainTextAnswer = self.__TR16_to_string(sdhAnswer)
+        #print (len(plainTextAnswer))
+        # ONT5xx restituisce una stringa di 64 caratteri ( ne prendo 16
+        # Dovrei testare come e' settato il MODE per decidere quanti sono 
+        # i caratteri validi da recuperare
+        J1String16 = plainTextAnswer[:15]
+        #self.__method_success(methodLocalName, None, plainTextAnswer)
+        return True, J1String16
+
+    def setAuPathTraceTxJ1StringONT5xx(self, portId, tr16String=""):
+        '''
+        Get J1 trace transmitted on ONT5xxx
+        '''
+        methodLocalName = self.__lc_current_method_name()
+        portId = self.__recover_port_to_use(portId)
+        
+        J1String = []
+        ONTCmdString=":SOUR:DATA:TEL:SDH:PATH1:OVER:J1TR:BLOC"
+
+        asciiCsvString=self.__J1StringToAsciiCsv(tr16String) # this is the format used in set and get
+        localCommand="{} {}".format(ONTCmdString, asciiCsvString)
+        rawCallResult = self.__send_port_cmd(portId, localCommand)
+        if (rawCallResult[0] == False):
+            return False, "Fail to send cmd"
+        # add check setting is ok
+        else:
+            sdhAnswer = self.__remove_dust(rawCallResult[1])
+            print (sdhAnswer)
+            return (True, sdhAnswer)
+
+
 
     def get_set_tu_path_trace_tx_TR16_string(self, portId, tr16String=""):   # ONT-6xx only  ### krepo added ###  
         """ ONT-6xx only
@@ -4454,6 +4802,7 @@ class InstrumentONT(Equipment):
             True, < instrument identification string, e.g. JDSU,ONT-XXX,...
             False, <empty list> if there is no suitable port """
         # wait until no operation is in progress...
+        methodLocalName = self.__lc_current_method_name()
         callResult = self.wait_ops_completed()
         if not callResult[0]:  # False: operation pending: unable to proceed
             localMessage="Instrument busy: unable to proceed [{}]".format(callResult[1])
@@ -4556,7 +4905,7 @@ class InstrumentONT(Equipment):
         
         return True, callResult
 
-    def get_set_enableServiceDisruption(self, portId, enableSDTest=""):   # ONT-5xx  Only   ### krepo added ###    
+    def getSetEnableServiceDisruption(self, portId, enableSDTest=""):   # ONT-5xx  Only   ### krepo added ###    
         """ 
             Return tuple: ( "True|False" , "< result/error list>)
         """
@@ -4569,7 +4918,7 @@ class InstrumentONT(Equipment):
         portId = self.__recover_port_to_use(portId)
 
         if self.__ontType  == "5xx":
-            print ( " Function not yet implemented")
+            localCommand = ":SENS:DATA:TEL:SDH:SDIS:MODE?"
         else:
             localCommand = ":SENS:DATA:TEL:SDH:SDIS:MODE?"
         
@@ -4583,35 +4932,54 @@ class InstrumentONT(Equipment):
         
         localCommand=":SENS:DATA:TEL:SDH:SDIS:MODE {}".format(enableSDTest)        
         rawCallResult = self.__send_port_cmd(portId, localCommand)
-        callResult = self.__remove_dust(rawCallResult[1]).replace(">","")
-        localMessage="Enable Service Disruption Test:[{}]".format(enableSDTest)
-        self.__lc_msg(localMessage)
-        self.__method_success(methodLocalName, None, localMessage)
-        return True, callResult
+        callResult = self.__remove_dust(rawCallResult[1])
+        if (rawCallResult[0] == True):
+            localMessage="Set Enable Service Disruption :[{}]".format(enableSDTest)
+            self.__lc_msg(localMessage)
+#         self.__method_success(methodLocalName, None, localMessage)
+            return False, callResult
+        else:
+            return False, callResult
 
-    def getServiceDisruptionConfig(self, portId):   # ONT-5xx  Only   ### krepo added ###    
+
+
+    def getServiceDisruptionConfig(self, portId):
         """
         Get the configuration setting for Service Disruption
             Return tuple: ( "True|False" , "< result/error list>)
         """
         serviceDisruptionParam = []
         methodLocalName = self.__lc_current_method_name(embedKrepoInit=True)
+        portId = self.__recover_port_to_use(portId)
+
         if portId == "":
             localMessage = "{} error: portId  [{}] not valid (empty value)".format(methodLocalName,portId)
             self.__lc_msg(localMessage)
             self.__method_failure(methodLocalName, None, "", localMessage)
             return False, localMessage        
-        portId = self.__recover_port_to_use(portId)
+
 
         if self.__ontType  == "5xx":
-            localMessage = " Function not yet implemented"
-            self.__lc_msg(localMessage)
-            return False, localMessage        
+            res = self.getServiceDisruptionConfigONT5xx(portId)            
+        else:
+            res = self.getServiceDisruptionConfigONT600(portId)
+
+        return res
+
+    def getServiceDisruptionConfigONT600(self, portId):
+        """
+        Get the configuration setting for Service Disruption
+            Return tuple: ( "True|False" , "< result/error list>)
+        """
+        serviceDisruptionParam = []
+        methodLocalName = self.__lc_current_method_name()
+
+        portId = self.__recover_port_to_use(portId)
         
         #// Separation time
         localCommand = ":SENS:DATA:TEL:SDH:SDIS:SEP:TIME?"  
         rawCallResult = self.__send_port_cmd(portId, localCommand)
-        callResult = self.__remove_dust(rawCallResult[1]).replace(">","")
+        callResult = self.__remove_dust(rawCallResult[1])
         localMessage="Separation time:[{}]".format(callResult)
         self.__lc_msg(localMessage)
         serviceDisruptionParam.append(callResult)
@@ -4619,7 +4987,7 @@ class InstrumentONT(Equipment):
         #// Threshold Time  
         localCommand = ":SENS:DATA:TEL:SDH:SDIS:THR:TIME?"
         rawCallResult = self.__send_port_cmd(portId, localCommand)
-        callResult = self.__remove_dust(rawCallResult[1]).replace(">","")
+        callResult = self.__remove_dust(rawCallResult[1])
         localMessage="Threshold Time:[{}]".format(callResult)
         self.__lc_msg(localMessage)
         serviceDisruptionParam.append(callResult)
@@ -4627,73 +4995,201 @@ class InstrumentONT(Equipment):
         #// Sensor:  SDH Alarms SDH Errors Payload
         localCommand = ":SENS:DATA:TEL:SDH:SDIS:EVEN?"
         rawCallResult = self.__send_port_cmd(portId, localCommand)
-        callResult = self.__remove_dust(rawCallResult[1]).replace(">","")
-        localMessage="Sensor:  SDH Alarms SDH Errors Payload:[{}]".format(callResult)
+        callResult = self.__remove_dust(rawCallResult[1])
+        localMessage="Sensor:[{}]".format(callResult)
         self.__lc_msg(localMessage)
         serviceDisruptionParam.append(callResult)
 
         #// Logging Mode
         localCommand = ":SENS:DATA:TEL:SDH:SDIS:LOG:MODE?"
         rawCallResult = self.__send_port_cmd(portId, localCommand)
-        callResult = self.__remove_dust(rawCallResult[1]).replace(">","")
-        localMessage="Sensor:  SDH Alarms SDH Errors Payload:[{}]".format(callResult)
+        callResult = self.__remove_dust(rawCallResult[1])
+        localMessage="Logging Mode:[{}]".format(callResult)
         self.__lc_msg(localMessage)
         serviceDisruptionParam.append(callResult)
 
         return True, serviceDisruptionParam
-       
-    def setServiceDisruptionConfig(self, portId, separationTime="", trhesTime="", logMode="", sensor=""):   # ONT-5xx  Only   ### krepo added ###,    
+   
+
+
+
+    def getServiceDisruptionConfigONT5xx(self, portId):
         """
         Get the configuration setting for Service Disruption
             Return tuple: ( "True|False" , "< result/error list>)
         """
+        serviceDisruptionParam = []
+        serviceDisruptionDict = {"SeparationTime":"", "ThresholdTime":"","Sensor":"","LogMode":""}
+        
+        methodLocalName = self.__lc_current_method_name()
+
+        #// Separation time :SENS:DATA:TEL:SDH:SDIS:SEPA:TIME
+        localCommand = ":SENS:DATA:TEL:SDH:SDIS:SEPA:TIME?"  
+        rawCallResult = self.__send_port_cmd(portId, localCommand)
+        callResult = self.__remove_dust(rawCallResult[1])
+        localMessage="Separation time:[{}]".format(callResult)
+        self.__lc_msg(localMessage)
+        serviceDisruptionParam.append(callResult)
+        serviceDisruptionDict["SeparationTime"] = callResult
+
+        #// Threshold Time  :SENS:DATA:TEL:SDH:SDIS:THR:TIME
+        localCommand = ":SENS:DATA:TEL:SDH:SDIS:THR:TIME?"
+        rawCallResult = self.__send_port_cmd(portId, localCommand)
+        callResult = self.__remove_dust(rawCallResult[1])
+        localMessage="Threshold Time:[{}]".format(callResult)
+        self.__lc_msg(localMessage)
+        serviceDisruptionParam.append(callResult)
+        serviceDisruptionDict["ThresholdTime"] = callResult
+
+        #// Sensor:  :SENS:DATA:TEL:SDH:SDIS:EVEN1
+        localCommand = ":SENS:DATA:TEL:SDH:SDIS:EVEN1?"
+        rawCallResult = self.__send_port_cmd(portId, localCommand)
+        callResult = self.__remove_dust(rawCallResult[1])
+        localMessage="Sensor:[{}]".format(callResult)
+        self.__lc_msg(localMessage)
+        serviceDisruptionParam.append(callResult)
+        serviceDisruptionDict["Sensor"] = callResult
+
+        #// Logging Mode not present on ONT5xx
+#         localCommand = ":SENS:DATA:TEL:SDH:SDIS:LOG:MODE?"
+#         rawCallResult = self.__send_port_cmd(portId, localCommand)
+#         callResult = self.__remove_dust(rawCallResult[1])
+#         localMessage="Logging Mode :[{}]".format(callResult)
+#         self.__lc_msg(localMessage)
+#         serviceDisruptionParam.append(callResult)
+#        serviceDisruptionDict["LogMode"] = callResult
+
+        return True, serviceDisruptionParam, serviceDisruptionDict
+    
+    
+    def setServiceDisruptionConfig(self, portId, separationTime="", trhesTime="", logMode="", sensor=""):   # ONT-5xx  Only   ### krepo added ###,    
+        """
+        Get the configuration setting for Service Disruption
+            Return tuple: ( "True|False" , "< result/error list>)
+            The time is in msec, on 600 is in microsec
+            Sensor supported only PAYLOAD
+        """
         print (separationTime, trhesTime, logMode, sensor )
         methodLocalName = self.__lc_current_method_name(embedKrepoInit=True)
+        portId = self.__recover_port_to_use(portId)
+
         if portId == "":
             localMessage = "{} error: portId  [{}] not valid (empty value)".format(methodLocalName,portId)
             self.__lc_msg(localMessage)
             self.__method_failure(methodLocalName, None, "", localMessage)
             return False, localMessage        
-        portId = self.__recover_port_to_use(portId)
-
+       
         if self.__ontType  == "5xx":
-            localMessage = " Function not yet implemented"
-            self.__lc_msg(localMessage)
-            return False, localMessage        
+            res = self.setServiceDisruptionConfigONT5xx(portId, separationTime, trhesTime, logMode, sensor)
+        else:
+            res = self.setServiceDisruptionConfigONT600(portId, separationTime, trhesTime, logMode, sensor)   
+        return res
+    
+    
+    def setServiceDisruptionConfigONT600(self, portId, separationTime="", trhesTime="", logMode="", sensor=""):   # ONT-5xx  Only   ### krepo added ###,    
+        """
+        Get the configuration setting for Service Disruption
+            Return tuple: ( "True|False" , "< result/error list>)
+            time must be set to microsecond
+        """
+        methodLocalName = self.__lc_current_method_name()
+        print (separationTime, trhesTime, logMode, sensor )
         
         #// Separation time
+        separationTime = int (separationTime)
+        separationTime = (separationTime * 1000)
+        separationTime = repr (separationTime)
         localCommand = ":SENS:DATA:TEL:SDH:SDIS:SEP:TIME"
         localCommand = "{} {}".format(localCommand,separationTime)
         rawCallResult = self.__send_port_cmd(portId, localCommand)
-        callResult = self.__remove_dust(rawCallResult[1]).replace(">","")
-        localMessage="Separation time:[{}]".format(separationTime)
+        callResult = self.__remove_dust(rawCallResult[1])
+        localMessage="Separation time:[res: {} value {}]".format(callResult, separationTime)
         self.__lc_msg(localMessage)
 
-        #// Threshold Time  
+        #// Threshold Time 
+        trhesTime = int (trhesTime)        
+        trhesTime =  (trhesTime * 1000)
+        trhesTime = repr (trhesTime)
         localCommand = ":SENS:DATA:TEL:SDH:SDIS:THR:TIME"
         localCommand = "{} {}".format(localCommand,trhesTime)    
         rawCallResult = self.__send_port_cmd(portId, localCommand)
-        callResult = self.__remove_dust(rawCallResult[1]).replace(">","")
-        localMessage="Threshold Time:[{}]".format(trhesTime)
+        callResult = self.__remove_dust(rawCallResult[1])
+        localMessage="Threshold Time:[res: {} value {}]".format(callResult, trhesTime)
         self.__lc_msg(localMessage)
 
         #// Sensor:  SDH Alarms SDH Errors Payload
+        if (sensor == "PAYLOAD"):
+            sensor = "16777216"
+        else:
+            print ("Only PAYLOAD is valid")
+            sensor = "16777216"
         localCommand = ":SENS:DATA:TEL:SDH:SDIS:EVEN"
         localCommand = "{} {}".format(localCommand,sensor)    
         rawCallResult = self.__send_port_cmd(portId, localCommand)
-        callResult = self.__remove_dust(rawCallResult[1]).replace(">","")
-        localMessage="Sensor:  SDH Alarms SDH Errors Payload:[{}]".format(sensor)
+        callResult = self.__remove_dust(rawCallResult[1])
+        localMessage="Sensor :[res: {} value {}]".format(callResult, sensor)
         self.__lc_msg(localMessage)
 
         #// Logging Mode
         localCommand = ":SENS:DATA:TEL:SDH:SDIS:LOG:MODE"
         localCommand = "{} {}".format(localCommand,logMode)    
         rawCallResult = self.__send_port_cmd(portId, localCommand)
-        callResult = self.__remove_dust(rawCallResult[1]).replace(">","")
-        localMessage="Logging Mode:[{}]".format(logMode)
+        callResult = self.__remove_dust(rawCallResult[1])
+        localMessage="Logging Mode:[res: {} value {}]".format(callResult, logMode)
         self.__lc_msg(localMessage)
         
         return True, callResult
+
+
+
+    def setServiceDisruptionConfigONT5xx(self, portId, separationTime="", trhesTime="", logMode="", sensor=""):   # ONT-5xx  Only   ### krepo added ###,    
+        """
+        Get the configuration setting for Service Disruption
+            Return tuple: ( "True|False" , "< result/error list>)
+        """
+        print (separationTime, trhesTime, logMode, sensor )
+        methodLocalName = self.__lc_current_method_name()
+        #// Separation time :SENS:DATA:TEL:SDH:SDIS:SEPA:TIME
+        localCommand = ":SENS:DATA:TEL:SDH:SDIS:SEPA:TIME"
+        localCommand = "{} {}".format(localCommand,separationTime)
+        rawCallResult = self.__send_port_cmd(portId, localCommand)
+        callResult = self.__remove_dust(rawCallResult[1])
+        localMessage="Separation time:[res: {} value {}]".format(callResult, separationTime)
+        self.__lc_msg(localMessage)
+
+        #// Threshold Time  :SENS:DATA:TEL:SDH:SDIS:THR:TIME
+        localCommand = ":SENS:DATA:TEL:SDH:SDIS:THR:TIME"
+        localCommand = "{} {}".format(localCommand,trhesTime)    
+        rawCallResult = self.__send_port_cmd(portId, localCommand)
+        callResult = self.__remove_dust(rawCallResult[1])
+        localMessage="Threshold Time:[res: {} value {}]".format(callResult, trhesTime)
+        self.__lc_msg(localMessage)
+
+        #// Sensor:  SDH Alarms SDH Errors Payload :SENS:DATA:TEL:SDH:SDIS:EVEN1
+        if (sensor == "PAYLOAD"):
+            sensor = "64"
+        else:
+            print ("Only PAYLOAD is valid")
+            sensor = "64"
+        
+        localCommand = ":SENS:DATA:TEL:SDH:SDIS:EVEN1"
+        localCommand = "{} {}".format(localCommand,sensor)    
+        rawCallResult = self.__send_port_cmd(portId, localCommand)
+        callResult = self.__remove_dust(rawCallResult[1])
+        localMessage="Sensor:[res: {} value {}]".format(callResult, sensor)
+        self.__lc_msg(localMessage)
+
+#             #// Logging Mode 
+#             localCommand = ":SENS:DATA:TEL:SDH:SDIS:LOG:MODE" 
+#             localCommand = "{} {}".format(localCommand,logMode)    
+#             rawCallResult = self.__send_port_cmd(portId, localCommand)
+#             callResult = self.__remove_dust(rawCallResult[1])
+#             localMessage="Logging Mode:[{}]".format(logMode)
+#             self.__lc_msg(localMessage)                
+
+        return True, callResult
+
+
 
     def getServiceDisruptionResult(self, portId):      ### krepo added ###    
         """
@@ -4710,14 +5206,51 @@ class InstrumentONT(Equipment):
         portId = self.__recover_port_to_use(portId)
 
         if self.__ontType  == "5xx":
+            res = self.getServiceDisruptionResultONT5xx(portId)
+        else:
+            res = self.getServiceDisruptionResultONT600(portId)
+
+        return res
+
+    def getServiceDisruptionResultONT600(self, portId):      ### krepo added ###    
+        """
+        Get the result for Service Disruption 
+            Return tuple: ( "True|False" , "< result/error list>)
+        """
+        serviceDisruptionParam = []
+        methodLocalName = self.__lc_current_method_name()
+        if portId == "":
+            localMessage = "{} error: portId  [{}] not valid (empty value)".format(methodLocalName,portId)
+            self.__lc_msg(localMessage)
+            self.__method_failure(methodLocalName, None, "", localMessage)
+            return False, localMessage        
+        portId = self.__recover_port_to_use(portId)
+
+        if self.__ontType  == "5xx":
             localMessage = " Function not yet implemented"
             self.__lc_msg(localMessage)
-            return False, localMessage        
+            return False, localMessage
 
+
+        #// number of disruption
+        localCommand = ":SDH:SD:SEL:DISR:COUN?"  
+        rawCallResult = self.__send_port_cmd(portId, localCommand)
+        callResult = self.__remove_dust(rawCallResult[1])
+        if (callResult != "-1,9.91E37"):
+            # split the string
+            responseArray = callResult.split ((','))
+#            resultItemsArray=sdhAnswer.split(",")
+            localMessage="Number of disruption:[{}]".format(responseArray[1])
+            serviceDisruptionParam.append(responseArray[1])
+        else:
+            localMessage="invalid Number of disruption"
+            serviceDisruptionParam.append(callResult)            
+        self.__lc_msg(localMessage)
+        
         #// threshold evaluation 
         localCommand = ":SDH:SD:SEL:THR:EXCE?"
         rawCallResult = self.__send_port_cmd(portId, localCommand)
-        callResult = self.__remove_dust(rawCallResult[1]).replace(">","")
+        callResult = self.__remove_dust(rawCallResult[1])
         if (callResult != "-1,9.91E37"):
             responseArray = callResult.split ((','))
             if (responseArray[1] == "0"):
@@ -4730,31 +5263,15 @@ class InstrumentONT(Equipment):
             localMessage=" threshold evaluation:[{}]".format(responseArray[1])
             serviceDisruptionParam.append(responseArray[1])            
         else:
-            localMessage="invalid threshold evaluation"
+            localMessage="invalid Threshold evaluation"
             serviceDisruptionParam.append(callResult)                   
         self.__lc_msg(localMessage)
-        
-        #// number of disruption
-        localCommand = ":SDH:SD:SEL:DISR:COUN?"  
-        rawCallResult = self.__send_port_cmd(portId, localCommand)
-        callResult = self.__remove_dust(rawCallResult[1]).replace(">","")
-        if (callResult != "-1,9.91E37"):
-            # split the string
-            responseArray = callResult.split ((','))
-#            resultItemsArray=sdhAnswer.split(",")
-            localMessage="number of disruption:[{}]".format(responseArray[1])
-            serviceDisruptionParam.append(responseArray[1])
-        else:
-            localMessage="invalid number of disruption"
-            serviceDisruptionParam.append(callResult)            
-        self.__lc_msg(localMessage)
-        
 
         # Begin of first Disruption
         #// :SDH:SD:SEL:FIRS:STAR:TIME:ABS?
         localCommand = ":SDH:SD:SEL:FIRS:STAR:TIME:ABS?"
         rawCallResult = self.__send_port_cmd(portId, localCommand)
-        callResult = self.__remove_dust(rawCallResult[1]).replace(">","")
+        callResult = self.__remove_dust(rawCallResult[1])
         if (callResult != "-1,9.91E37"):
             responseArray = callResult.split ((','))            
             localMessage="Begin of first Disruption:[{}]".format(responseArray[1])
@@ -4767,7 +5284,93 @@ class InstrumentONT(Equipment):
         #// End of last Disruption
         localCommand = ":SDH:SD:SEL:LAST:STOP:TIME:ABS?"
         rawCallResult = self.__send_port_cmd(portId, localCommand)
-        callResult = self.__remove_dust(rawCallResult[1]).replace(">","")
+        callResult = self.__remove_dust(rawCallResult[1])
+        if (callResult != "-1,9.91E37"):
+            responseArray = callResult.split ((','))            
+            localMessage="End of last Disruption:[{}]".format(responseArray[1])
+            serviceDisruptionParam.append(responseArray[1])
+        else:
+            localMessage="invalid End of last Disruption"        
+            serviceDisruptionParam.append(callResult)
+        self.__lc_msg(localMessage)
+
+        return True, serviceDisruptionParam
+
+    def getServiceDisruptionResultONT5xx(self, portId):      ### krepo added ###    
+        """
+        Get the result for Service Disruption 
+            Return tuple: ( "True|False" , "< result/error list>)
+        """
+        serviceDisruptionParam = []
+        methodLocalName = self.__lc_current_method_name()
+        if portId == "":
+            localMessage = "{} error: portId  [{}] not valid (empty value)".format(methodLocalName,portId)
+            self.__lc_msg(localMessage)
+            self.__method_failure(methodLocalName, None, "", localMessage)
+            return False, localMessage        
+        portId = self.__recover_port_to_use(portId)
+
+#         if self.__ontType  == "5xx":
+#             localMessage = " Function not yet implemented"
+#             self.__lc_msg(localMessage)
+#             return False, localMessage        
+
+
+        #// number of disruption
+        localCommand = ":SDH:SDIS:COUN?"  
+
+        rawCallResult = self.__send_port_cmd(portId, localCommand)
+        callResult = self.__remove_dust(rawCallResult[1])
+        if (callResult != "-1,9.91E37"):
+            # split the string
+            responseArray = callResult.split ((','))
+#            resultItemsArray=sdhAnswer.split(",")
+            localMessage="Number of disruption:[{}]".format(responseArray[1])
+            serviceDisruptionParam.append(responseArray[1])
+        else:
+            localMessage="invalid Number of disruption"
+            serviceDisruptionParam.append(callResult)            
+        self.__lc_msg(localMessage)
+        
+        #// threshold evaluation 
+        localCommand = ":SDH:SDIS:THR:EXCE?"
+        rawCallResult = self.__send_port_cmd(portId, localCommand)
+        callResult = self.__remove_dust(rawCallResult[1])
+        if (callResult != "-1,9.91E37"):
+            responseArray = callResult.split ((','))
+            if (responseArray[1] == "0"):
+                # Limit not exceeded. The duration of all disruptions is below or equal to the configured threshold.
+                print ( "Limit not exceeded")
+            else:
+                # Limit exceeded. The duration of at least one disruption is above the configured threshold.
+                print ( "Limit exceeded")
+                            
+            localMessage=" threshold evaluation:[{}]".format(responseArray[1])
+            serviceDisruptionParam.append(responseArray[1])            
+        else:
+            localMessage="invalid Threshold evaluation"
+            serviceDisruptionParam.append(callResult)                   
+        self.__lc_msg(localMessage)
+
+        # Begin of first Disruption
+        #// :SDH:SD:SEL:FIRS:STAR:TIME:ABS?
+        localCommand = "SDH:SDIS:STAR:TIME:SHOR?"
+        rawCallResult = self.__send_port_cmd(portId, localCommand)
+        callResult = self.__remove_dust(rawCallResult[1])
+        if (callResult != "-1,9.91E37"):
+            responseArray = callResult.split ((','))            
+            localMessage="Begin of first Disruption:[{}]".format(responseArray[1])
+            serviceDisruptionParam.append(responseArray[1])
+        else:
+            localMessage="invalid Begin of first Disruption"        
+            serviceDisruptionParam.append(callResult)
+        self.__lc_msg(localMessage)
+
+        #// End of last Disruption
+        #localCommand = ":SDH:SD:SEL:LAST:STOP:TIME:ABS?"
+        localCommand = ":SDH:SDIS:END:TIME:LAST?"
+        rawCallResult = self.__send_port_cmd(portId, localCommand)
+        callResult = self.__remove_dust(rawCallResult[1])
         if (callResult != "-1,9.91E37"):
             responseArray = callResult.split ((','))            
             localMessage="End of last Disruption:[{}]".format(responseArray[1])
@@ -4780,24 +5383,122 @@ class InstrumentONT(Equipment):
         return True, serviceDisruptionParam
 
 
+    def getAuPathTraceRxJ1ExpectedONT5xx(self, portId):
+        """ ONT-5xx only
+            Get or Set the 15-char string in J1 byte for RX channel:
+                expectedString: "string"|empty string to read current value
+            Return tuple: ( "True|False" , "< result/error list>)
+                True : command execution ok, current  alarm status in result string
+                False: error in command execution, details in error list string
+        """
+        methodLocalName = self.__lc_current_method_name()
+        portId = self.__recover_port_to_use(portId)
+        if portId == "":
+            localMessage = "ERROR get_set_au_path_trace_rx_TR16_string: portId  [{}] not specified".format(portId)
+            self.__lc_msg(localMessage)
+            self.__method_failure(methodLocalName, None, "", localMessage)
+            return False, localMessage
+        
+        ONTCmdString = ":SENS:DATA:TEL:SDH:PATH1:OVER:J1TR:REF:TRAC:BLOC"
+        localCommand="{}?".format(ONTCmdString)
+        rawCallResult = self.__send_port_cmd(portId, localCommand)
+        if (rawCallResult[0] == False):
+            return False, ""
+
+        sdhAnswer = self.__remove_dust(rawCallResult[1])        
+        plainTextAnswer = self.__TR16_to_string(sdhAnswer)
+        J1String16 = plainTextAnswer[:15]
+        #self.__method_success(methodLocalName, None, plainTextAnswer)
+        return True, J1String16
 
 
+    def setAuPathTraceRxJ1ExpectedONT5xx(self, portId, expectedString=""):      
+        """ ONT-5xx only
+            Get or Set the 15-char string in J1 byte for RX channel:
+                expectedString: "string"|empty string to read current value
+            Return tuple: ( "True|False" , "< result/error list>)
+                True : command execution ok, current  alarm status in result string
+                False: error in command execution, details in error list string
+        """
+        methodLocalName = self.__lc_current_method_name()
+        portId = self.__recover_port_to_use(portId)
+        if portId == "":
+            localMessage = "ERROR get_set_au_path_trace_rx_TR16_string: portId  [{}] not specified".format(portId)
+            self.__lc_msg(localMessage)
+            self.__method_failure(methodLocalName, None, "", localMessage)
+            return False, localMessage
+
+        ONTCmdString = ":SENS:DATA:TEL:SDH:PATH1:OVER:J1TR:REF:TRAC:BLOC"
 
 
+        asciiCsvString=self.__J1StringToAsciiCsv(expectedString) # this is the format used in set and get
+        localCommand="{} {}".format(ONTCmdString, asciiCsvString)
+        rawCallResult = self.__send_port_cmd(portId, localCommand)
+        if (rawCallResult[0] == False):
+            return False, "Fail to send cmd"
+        # add check setting is ok
+        else:
+            sdhAnswer = self.__remove_dust(rawCallResult[1])
+            print (sdhAnswer)
+            return (True, sdhAnswer)
 
 
+    def getHPTIMEvaluation(self, portId):
+        '''
+        '''
+        
+        methodLocalName = self.__lc_current_method_name()
+
+        portId = self.__recover_port_to_use(portId)
+        if portId == "":
+            localMessage = "ERROR get_set_au_path_trace_rx_TR16_string: portId  [{}] not specified".format(portId)
+            self.__lc_msg(localMessage)
+            self.__method_failure(methodLocalName, None, "", localMessage)
+            return False, localMessage
+        
+        if self.__ontType  == "5xx":
+            ONTCmdString = ":SENS:DATA:TEL:SDH:PATH1:ALAR:HPTIM:MODE"
+        else:
+            ONTCmdString = ":SENS:DATA:TEL:SDH:PATH:SEL:HPTIM:EVAL"
+            
+        localCommand="{}?".format(ONTCmdString)
+        rawCallResult = self.__send_port_cmd(portId, localCommand)
+        if (rawCallResult[0] == False):
+            return False, ""
+
+        sdhAnswer = self.__remove_dust(rawCallResult[1])        
+        #self.__method_success(methodLocalName, None, plainTextAnswer)
+        return True, sdhAnswer
 
 
+    def setHPTIMEvaluation(self, portId, hptim=""):   
+        """ 
+            Set the HP-TIM Evaluation
+            Return tuple: ( "True|False" , "< result/error list>)
+                True : command execution ok, current  alarm status in result string
+                False: error in command execution, details in error list string
+        """
+        methodLocalName = self.__lc_current_method_name()
+        portId = self.__recover_port_to_use(portId)
+        if portId == "":
+            localMessage = "ERROR get_set_au_path_trace_rx_TR16_string: portId  [{}] not specified".format(portId)
+            self.__lc_msg(localMessage)
+            self.__method_failure(methodLocalName, None, "", localMessage)
+            return False, localMessage
 
-
-
-
-
-
-
-
-
-
+        if self.__ontType  == "5xx":
+            ONTCmdString = ":SENS:DATA:TEL:SDH:PATH1:ALAR:HPTIM:MODE"
+        else:
+            ONTCmdString = ":SENS:DATA:TEL:SDH:PATH:SEL:HPTIM:EVAL"
+        localCommand="{} {}".format(ONTCmdString, hptim)
+        rawCallResult = self.__send_port_cmd(portId, localCommand)
+        if (rawCallResult[0] == False):
+            return (False, "Fail to send cmd")
+        # add check setting is ok
+        else:
+            sdhAnswer = self.__remove_dust(rawCallResult[1])
+            print (sdhAnswer)
+            return (True, sdhAnswer)
 
 
 
