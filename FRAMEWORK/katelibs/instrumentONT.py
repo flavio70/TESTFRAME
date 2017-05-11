@@ -2191,7 +2191,7 @@ class InstrumentONT(Equipment):
             return False, localMessage
         retList = []
         if self.__ontType  == "6xx":  # ONT 6xx management
-            localCommand="SDH:SEL:CST:ALAR?"
+            localCommand="SDH:SEL:HST:ALAR?"
             rawCallResult = self.__send_port_cmd(portId, localCommand)
             sdhAnswer = self.__remove_dust(rawCallResult[1])
             resultItemsArray=sdhAnswer.split(",")
@@ -2473,7 +2473,7 @@ class InstrumentONT(Equipment):
             self.__lc_msg(localMessage)
             self.__method_failure(methodLocalName, None, "", localMessage)
             return False, localMessage
-        localCommand="SDH:SEL:CST:ALAR?"
+        localCommand="SDH:SEL:HST:ALAR?"
         rawCallResult = self.__send_port_cmd(portId, localCommand)
         sdhAnswer = self.__remove_dust(rawCallResult[1])
         resultItemsArray=sdhAnswer.split(",")
