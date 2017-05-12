@@ -74,6 +74,13 @@ class InstrumentMAP(Equipment):
         super().__init__(label, self.__instrumentId)
 
 
+    def get_preset(self, name):
+        """ Get current value for specified presetting
+        """
+        return self.__prs.get_elem(self.get_label(), name)
+
+
+
     #def init_instrument(self, localUser, localPwd, localOntIpAddress, portId):
     def init_instrument(self):
         methodLocalName = self.__lc_current_method_name(embedKrepoInit=True)
