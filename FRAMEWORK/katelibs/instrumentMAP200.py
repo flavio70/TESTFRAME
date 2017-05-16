@@ -57,7 +57,7 @@ class InstrumentMAP(Equipment):
         self.__mapUser              = None             #  Ont session authentication user
         self.__mapPassword          = "map200"         #  Ont session user's password
         self.__mapIpAddress         = ""               #  Map200 IP address
-        self.__mapInstrType         = ""               #  Instrument type
+        self.__mapType              = ""               #  Instrument type
         self.__mapInstrLabel        = label            #  Instrument label
         self.__chassisSlotContent   = []               #  Map slot to 
        
@@ -99,6 +99,7 @@ class InstrumentMAP(Equipment):
             #response = self.__send_cmd(":SYSTem:LAYout?")
             response = self.__send_cmd(":SYSTem:LAYout:Port?")
             localMessage = "MAP200 [{}] ANSWER [{}] :Telnet connection established".format(self.__mapIpAddress,response)
+            self.__mapType = response[1].split(",")[0]
             self.__lc_msg(localMessage)
             if self.__init_chassis_slot_content(response) == False:
                 localMessage = "MAP200 [{}]:Slot map ERROR".format(self.__mapIpAddress)
@@ -235,7 +236,7 @@ class InstrumentMAP(Equipment):
             localMessage = "MAP200 [{}]:GET {}".format(self.__mapIpAddress, inputNumber)
             self.__lc_msg(localMessage)
         else:
-            localMessage = "MAP200 [{}]:SET {}".format(self.__mapIpAddress,localCommandSet)
+            localMessage = "MAP200 [{}]:SET {} to {}".format(self.__mapIpAddress,inputNumber,outputNumber)
             self.__lc_msg(localMessage)
         commandToSend=":ROUT:CLOS? {},{},{},{}".format(chassisNumber, slotNumber, deviceNumber, inputNumber)
         responseList = self.__send_cmd(commandToSend)

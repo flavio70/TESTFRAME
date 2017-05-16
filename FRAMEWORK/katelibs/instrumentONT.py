@@ -3163,11 +3163,11 @@ class InstrumentONT(Equipment):
         localCommand="{}?".format(ONTCmdString)
         rawCallResult = self.__send_port_cmd(portId, localCommand)
         sdhAnswer = self.__remove_dust(rawCallResult[1])
-        if sdhAnswer != alarmActivation:
-            localMessage="Alarms insertion status mismatch: required [{}] but set [{}]".format(alarmActivation,sdhAnswer)
-            self.__lc_msg(localMessage)
-            self.__method_failure(methodLocalName, None, "", localMessage)
-            return False, sdhAnswer
+        #if sdhAnswer != alarmActivation:
+        #    localMessage="Alarms insertion status mismatch: required [{}] but set [{}]".format(alarmActivation,sdhAnswer)
+        #    self.__lc_msg(localMessage)
+        #    self.__method_failure(methodLocalName, None, "", localMessage)
+        #    return False, sdhAnswer
         localMessage="Current alarms insertion status:[{}]".format(sdhAnswer)
         self.__lc_msg(localMessage)
         self.__method_success(methodLocalName, None, localMessage)
@@ -3633,11 +3633,11 @@ class InstrumentONT(Equipment):
         localCommand="{}?".format(ONTCmdString)
         rawCallResult = self.__send_port_cmd(portId, localCommand)
         sdhAnswer = self.__remove_dust(rawCallResult[1])
-        if sdhAnswer != errorActivation:
-            localMessage="Error insertion status mismatch: required [{}] but set [{}]".format(errorActivation,sdhAnswer)
-            self.__lc_msg(localMessage)
-            self.__method_failure(methodLocalName, None, "", localMessage)
-            return False, sdhAnswer
+        #if sdhAnswer != errorActivation:
+        #    localMessage="Error insertion status mismatch: required [{}] but set [{}]".format(errorActivation,sdhAnswer)
+        #    self.__lc_msg(localMessage)
+        #    self.__method_failure(methodLocalName, None, "", localMessage)
+        #    return False, sdhAnswer
         localMessage="Current error insertion status:[{}]".format(sdhAnswer)
         self.__lc_msg(localMessage)
         self.__method_success(methodLocalName, None, localMessage)
